@@ -85,18 +85,18 @@ Future<List<Group>> _toGroupsTask(ComputeGroupsState state) async {
 
 Future<VM2<String, String>> makeRealProfileTask(
   MakeRealProfileState data, {
-  bool? useDefaultRouting,
+  bool? isOhos,
 }) async {
   return compute<(MakeRealProfileState, bool), VM2<String, String>>(
     _makeRealProfileTask,
-    (data, useDefaultRouting ?? system.isOhos),
+    (data, isOhos ?? system.isOhos),
   );
 }
 
 Future<VM2<String, String>> _makeRealProfileTask(
   (MakeRealProfileState, bool) params,
 ) async {
-  final (data, useDefaultRouting) = params;
+  final (data, isOhos) = params;
   final rawConfig = Map<String, dynamic>.from(data.rawConfig);
   final realPatchConfig = data.realPatchConfig;
   final profilesPath = data.profilesPath;
@@ -131,7 +131,7 @@ Future<VM2<String, String>> _makeRealProfileTask(
   rawConfig['socks-port'] = realPatchConfig.socksPort;
   rawConfig['redir-port'] = realPatchConfig.redirPort;
   rawConfig['tproxy-port'] = realPatchConfig.tproxyPort;
-  rawConfig['find-process-mode'] = system.isOhos
+  rawConfig['find-process-mode'] = isOhos
       ? FindProcessMode.off.name
       : realPatchConfig.findProcessMode.name;
   rawConfig['allow-lan'] = realPatchConfig.allowLan;
@@ -225,7 +225,8 @@ Future<VM2<String, String>> _makeRealProfileTask(
   }
   List<String> rules = [];
   if (data.rules.isEmpty) {
-    if (useDefaultRouting) {
+    if (isOhos) {
+      excludeDirectFromAutomaticGroups(rawConfig);
       rules = defaultRoutingRules(rawConfig);
       applyDefaultDns(rawConfig);
     } else if (rawConfig['rules'] != null) {

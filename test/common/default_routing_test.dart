@@ -8,7 +8,7 @@ Map<String, dynamic> subscription({String catchAll = 'MATCH,Main'}) => {
   'proxies': [
     {'name': 'Node', 'type': 'ss'},
   ],
-  'proxy-groups': [
+  'proxy-groups': <Map<String, dynamic>>[
     {
       'name': 'Ads',
       'type': 'select',
@@ -22,7 +22,7 @@ Map<String, dynamic> subscription({String catchAll = 'MATCH,Main'}) => {
   ],
   'rules': [
     'DOMAIN-SUFFIX,qq.com,Main',
-    'DOMAIN,foreign.example,DIRECT',
+    'DOMAIN,www.google.com,DIRECT',
     catchAll,
   ],
 };
@@ -41,8 +41,8 @@ void main() {
       expect(rules, contains('IP-CIDR6,fc00::/7,DIRECT'));
       expect(rules.last, 'MATCH,Main');
       expect(rules, isNot(contains('DOMAIN-SUFFIX,qq.com,Main')));
-      expect(rules, isNot(contains('DOMAIN,foreign.example,DIRECT')));
-      expect(config['rules'], contains('DOMAIN,foreign.example,DIRECT'));
+      expect(rules, isNot(contains('DOMAIN,www.google.com,DIRECT')));
+      expect(config['rules'], contains('DOMAIN,www.google.com,DIRECT'));
     },
   );
 
@@ -76,26 +76,45 @@ void main() {
     expect(defaultRoutingRules(config).last, 'MATCH,Auto');
   });
 
+  test(
+    'automatic groups cannot select a direct route for overseas traffic',
+    () {
+      final config = subscription();
+      (config['proxy-groups'] as List<Map<String, dynamic>>).add({
+        'name': 'Auto',
+        'type': 'url-test',
+        'proxies': ['DIRECT', 'Node', 'REJECT'],
+      });
+      excludeDirectFromAutomaticGroups(config);
+      final groups = config['proxy-groups'] as List;
+      expect(groups.last['proxies'], ['Node']);
+      expect(groups.first['proxies'], ['REJECT', 'DIRECT']);
+    },
+  );
+
   test('ignores cycles, relay and hidden groups during fallback', () {
     final config = subscription(catchAll: 'MATCH,DIRECT');
-    (config['proxy-groups'] as List).insertAll(0, [
-      {
-        'name': 'Cycle',
-        'type': 'select',
-        'proxies': ['Cycle'],
-      },
-      {
-        'name': 'Relay',
-        'type': 'relay',
-        'proxies': ['Node'],
-      },
-      {
-        'name': 'Hidden',
-        'type': 'select',
-        'hidden': true,
-        'proxies': ['Node'],
-      },
-    ]);
+    (config['proxy-groups'] as List<Map<String, dynamic>>).insertAll(
+      0,
+      <Map<String, dynamic>>[
+        {
+          'name': 'Cycle',
+          'type': 'select',
+          'proxies': ['Cycle'],
+        },
+        {
+          'name': 'Relay',
+          'type': 'relay',
+          'proxies': ['Node'],
+        },
+        {
+          'name': 'Hidden',
+          'type': 'select',
+          'hidden': true,
+          'proxies': ['Node'],
+        },
+      ],
+    );
     expect(defaultRoutingRules(config).last, 'MATCH,Main');
     expect(() => defaultRoutingRules({}), throwsStateError);
   });
@@ -153,7 +172,7 @@ void main() {
         addedRules: [Rule.parse('DOMAIN,special.example,DIRECT')],
         defaultUA: 'Clash Harmony/test',
       );
-      final result = await makeRealProfileTask(state, useDefaultRouting: true);
+      final result = await makeRealProfileTask(state, isOhos: true);
       final yaml = loadYaml(result.a) as Map;
       final rules = yaml['rules'] as List;
       expect(rules.first, 'DOMAIN,special.example,DIRECT');
@@ -163,10 +182,7 @@ void main() {
         'system://',
       ]);
 
-      final ordinary = await makeRealProfileTask(
-        state,
-        useDefaultRouting: false,
-      );
+      final ordinary = await makeRealProfileTask(state, isOhos: false);
       expect((loadYaml(ordinary.a) as Map)['rules'], contains('MATCH,DIRECT'));
       expect(config['rules'], contains('MATCH,DIRECT'));
     },
@@ -185,7 +201,7 @@ void main() {
       addedRules: [],
       defaultUA: 'Clash Harmony/test',
     );
-    final result = await makeRealProfileTask(state, useDefaultRouting: true);
+    final result = await makeRealProfileTask(state, isOhos: true);
     expect((loadYaml(result.a) as Map)['rules'], ['MATCH,DIRECT']);
   });
 }

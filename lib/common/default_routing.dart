@@ -71,6 +71,28 @@ List<String> defaultRoutingRules(Map<String, dynamic> config) {
   ];
 }
 
+void excludeDirectFromAutomaticGroups(Map<String, dynamic> config) {
+  final direct = {
+    'DIRECT',
+    'REJECT',
+    'REJECT-DROP',
+    'PASS',
+    for (final proxy in (config['proxies'] as List? ?? []).cast<Map>())
+      if (['direct', 'reject', 'reject-drop', 'pass'].contains(proxy['type']))
+        proxy['name'] as String,
+  };
+  config['proxy-groups'] = [
+    for (final group in (config['proxy-groups'] as List? ?? []).cast<Map>())
+      {
+        ...group,
+        if (['url-test', 'fallback', 'load-balance'].contains(group['type']))
+          'proxies': (group['proxies'] as List? ?? [])
+              .where((name) => !direct.contains(name))
+              .toList(),
+      },
+  ];
+}
+
 void applyDefaultDns(Map<String, dynamic> config) {
   final dns = Map<String, dynamic>.from(config['dns'] as Map? ?? {});
   const directDns = [
