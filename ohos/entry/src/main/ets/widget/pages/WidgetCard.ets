@@ -16,7 +16,7 @@ struct WidgetCard {
     .width('100%')
     .backgroundColor($r('sys.color.comp_background_primary'))
     .onAppear(() => {
-      this.title = 'FlClash Simple'
+      this.title = 'Clash Harmony'
       postCardAction(this, {  
         action: 'call',
         bundleName: 'com.follow.clash.simple',

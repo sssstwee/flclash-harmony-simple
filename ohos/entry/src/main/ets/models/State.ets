@@ -41,7 +41,7 @@ export class State {
   startTip: string = "Starting VPN..."
   stopTip: string = "Stopping VPN..."
   crashlytics: boolean = true
-  currentProfileName: string = "FlClash"
+  currentProfileName: string = "Clash Harmony"
   stopText: string = "Stop"
   onlyStatisticsProxy: boolean = false
   vpnOptions: VpnOptions | null = null
