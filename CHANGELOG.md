@@ -1,3 +1,8 @@
+## v0.8.94-simple.2026101202
+
+- 移除普通调试侧载无法授予的分应用选择和旧媒体访问权限声明，修复 HarmonyOS 7 安装失败。
+- 保留 VPN 后台运行权限；签名 Profile 需包含 `ohos.permission.KEEP_BACKGROUND_RUNNING_SYSTEM` 的 ACL 授权。
+
 ## v0.8.93
 
 - Support custom overwrite

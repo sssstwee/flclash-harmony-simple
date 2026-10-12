@@ -90,30 +90,6 @@
         "reason": "$string:permission_reason_keep_background_running_system"
       },
       {
-        "name": "ohos.permission.USE_FRAUD_APP_PICKER",
-        "reason": "$string:permission_reason_use_fraud_app_picker"
-      },
-      {
-        "name": "ohos.permission.READ_MEDIA",
-        "reason": "$string:permission_reason_read_media",
-        "usedScene": {
-          "abilities": [
-            "EntryAbility"
-          ],
-          "when": "inuse"
-        }
-      },
-      {
-        "name": "ohos.permission.WRITE_MEDIA",
-        "reason": "$string:permission_reason_write_media",
-        "usedScene": {
-          "abilities": [
-            "EntryAbility"
-          ],
-          "when": "inuse"
-        }
-      },
-      {
         "name": "ohos.permission.CAMERA",
         "reason": "$string:permission_reason_camera",
         "usedScene": {

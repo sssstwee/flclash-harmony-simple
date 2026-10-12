@@ -30,6 +30,8 @@
 
 工作流沿用上游 CI 的 SDK 和工具链，输出未签名 HAP。安装前需要使用与 `com.follow.clash.simple` 对应、包含目标手机 UDID 的 HarmonyOS 调试证书和 profile 签名；证书、私钥和订阅链接不得提交进公开仓库。真机的 VPN 授权仍需设备所有者完成。
 
+Profile 的 ACL 授权需包含 `ohos.permission.KEEP_BACKGROUND_RUNNING_SYSTEM`，以支持手机后台任务。简洁版移除了分应用选择及旧媒体访问的权限声明；鸿蒙分应用选择不提供应用列表，订阅导入仍使用系统文件选择器。
+
 ## 真机验收
 
 - 导入成功、错误链接、订阅到期、全部节点超时、取消 VPN 授权。
