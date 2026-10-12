@@ -554,5 +554,21 @@
   "geoSkipped": "{name} пропущено",
   "geoUpdated": "{name} обновлено",
   "secondsCount": "{count} секунд",
-  "entriesCount": "{count} записей"
+  "entriesCount": "{count} записей",
+  "simpleHome": "Подключение",
+  "simpleImport": "Добавить подписку",
+  "simpleImportHint": "Вставьте ссылку подписки Clash / Mihomo, чтобы начать.",
+  "simpleNoSubscription": "Подписка не добавлена",
+  "simpleSubscriptionReady": "Подписка готова",
+  "simpleReady": "Готово к подключению",
+  "simpleRunning": "Прокси запущен",
+  "simpleWorking": "Подготовка подключения…",
+  "simpleReadyHint": "Нажмите «Подключить» для автоматического выбора маршрута. Разрешите VPN при первом запуске.",
+  "simpleRoute": "Маршрут",
+  "simpleAutoRoute": "Автоматический выбор",
+  "simpleConnect": "Подключить",
+  "simpleDisconnect": "Отключить",
+  "simpleImportFailed": "Не удалось загрузить подписку. Проверьте ссылку и сеть.",
+  "simpleNoRoute": "Нет доступного маршрута. Проверьте подписку или выберите узел в настройках.",
+  "simpleConnectFailed": "Не удалось запустить прокси. Проверьте разрешение VPN и повторите попытку."
 }

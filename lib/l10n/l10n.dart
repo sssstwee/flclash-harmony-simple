@@ -4533,6 +4533,151 @@ class AppLocalizations {
       args: [count],
     );
   }
+
+  /// `Connect`
+  String get simpleHome {
+    return Intl.message('Connect', name: 'simpleHome', desc: '', args: []);
+  }
+
+  /// `Import subscription`
+  String get simpleImport {
+    return Intl.message(
+      'Import subscription',
+      name: 'simpleImport',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Paste a Clash / Mihomo subscription URL to get started.`
+  String get simpleImportHint {
+    return Intl.message(
+      'Paste a Clash / Mihomo subscription URL to get started.',
+      name: 'simpleImportHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No subscription yet`
+  String get simpleNoSubscription {
+    return Intl.message(
+      'No subscription yet',
+      name: 'simpleNoSubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Subscription ready`
+  String get simpleSubscriptionReady {
+    return Intl.message(
+      'Subscription ready',
+      name: 'simpleSubscriptionReady',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Ready to connect`
+  String get simpleReady {
+    return Intl.message(
+      'Ready to connect',
+      name: 'simpleReady',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Proxy started`
+  String get simpleRunning {
+    return Intl.message(
+      'Proxy started',
+      name: 'simpleRunning',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Preparing connection…`
+  String get simpleWorking {
+    return Intl.message(
+      'Preparing connection…',
+      name: 'simpleWorking',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Tap connect to choose an available route. Allow VPN access when prompted.`
+  String get simpleReadyHint {
+    return Intl.message(
+      'Tap connect to choose an available route. Allow VPN access when prompted.',
+      name: 'simpleReadyHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Route`
+  String get simpleRoute {
+    return Intl.message('Route', name: 'simpleRoute', desc: '', args: []);
+  }
+
+  /// `Automatic selection`
+  String get simpleAutoRoute {
+    return Intl.message(
+      'Automatic selection',
+      name: 'simpleAutoRoute',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connect`
+  String get simpleConnect {
+    return Intl.message('Connect', name: 'simpleConnect', desc: '', args: []);
+  }
+
+  /// `Disconnect`
+  String get simpleDisconnect {
+    return Intl.message(
+      'Disconnect',
+      name: 'simpleDisconnect',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not import. Check the URL and your network, then try again.`
+  String get simpleImportFailed {
+    return Intl.message(
+      'Could not import. Check the URL and your network, then try again.',
+      name: 'simpleImportFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No available route. Check your subscription or choose a node in Settings.`
+  String get simpleNoRoute {
+    return Intl.message(
+      'No available route. Check your subscription or choose a node in Settings.',
+      name: 'simpleNoRoute',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Could not start the proxy. Check VPN permission and try again.`
+  String get simpleConnectFailed {
+    return Intl.message(
+      'Could not start the proxy. Check VPN permission and try again.',
+      name: 'simpleConnectFailed',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

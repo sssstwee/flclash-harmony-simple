@@ -765,6 +765,36 @@ class MessageLookup extends MessageLookupByLibrary {
     "shrink": MessageLookupByLibrary.simpleMessage("縮小"),
     "silentLaunch": MessageLookupByLibrary.simpleMessage("バックグラウンド起動"),
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage("バックグラウンドで起動"),
+    "simpleAutoRoute": MessageLookupByLibrary.simpleMessage("自動選択"),
+    "simpleConnect": MessageLookupByLibrary.simpleMessage("接続"),
+    "simpleConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "起動に失敗しました。VPN 権限を確認して再試行してください。",
+    ),
+    "simpleDisconnect": MessageLookupByLibrary.simpleMessage("切断"),
+    "simpleHome": MessageLookupByLibrary.simpleMessage("接続"),
+    "simpleImport": MessageLookupByLibrary.simpleMessage("サブスクリプションを追加"),
+    "simpleImportFailed": MessageLookupByLibrary.simpleMessage(
+      "読み込みに失敗しました。URL とネットワークを確認してください。",
+    ),
+    "simpleImportHint": MessageLookupByLibrary.simpleMessage(
+      "Clash / Mihomo のサブスクリプション URL を貼り付けて開始します。",
+    ),
+    "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
+      "利用可能な経路がありません。設定でノードを選択してください。",
+    ),
+    "simpleNoSubscription": MessageLookupByLibrary.simpleMessage(
+      "サブスクリプションがありません",
+    ),
+    "simpleReady": MessageLookupByLibrary.simpleMessage("接続準備完了"),
+    "simpleReadyHint": MessageLookupByLibrary.simpleMessage(
+      "接続すると利用可能な経路を自動選択します。初回は VPN アクセスを許可してください。",
+    ),
+    "simpleRoute": MessageLookupByLibrary.simpleMessage("経路"),
+    "simpleRunning": MessageLookupByLibrary.simpleMessage("プロキシ起動済み"),
+    "simpleSubscriptionReady": MessageLookupByLibrary.simpleMessage(
+      "設定を読み込みました",
+    ),
+    "simpleWorking": MessageLookupByLibrary.simpleMessage("接続を準備中…"),
     "size": MessageLookupByLibrary.simpleMessage("サイズ"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Socksポート"),
     "sort": MessageLookupByLibrary.simpleMessage("並び替え"),

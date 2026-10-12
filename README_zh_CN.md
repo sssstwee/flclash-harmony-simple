@@ -1,3 +1,11 @@
+# FlClash 鸿蒙简洁版
+
+导入订阅 → 自动选线 → 一键连接。基于 [tljk/FlClash-ohos](https://github.com/tljk/FlClash-ohos/tree/v0.8.94-ohos)，保留 GPL-3.0 许可与上游版权。这是独立二开版本，鸿蒙 7 兼容性待真机验证。
+
+[使用说明与安装要求](README_SIMPLE.md) · [GitHub Actions 构建](../../actions)
+
+下方保留上游说明。
+
 <div>
 
 [**English**](README.md)

@@ -554,5 +554,21 @@
   "geoSkipped": "{name} スキップ済み",
   "geoUpdated": "{name} 更新済み",
   "secondsCount": "{count} 秒",
-  "entriesCount": "{count} エントリ"
+  "entriesCount": "{count} エントリ",
+  "simpleHome": "接続",
+  "simpleImport": "サブスクリプションを追加",
+  "simpleImportHint": "Clash / Mihomo のサブスクリプション URL を貼り付けて開始します。",
+  "simpleNoSubscription": "サブスクリプションがありません",
+  "simpleSubscriptionReady": "設定を読み込みました",
+  "simpleReady": "接続準備完了",
+  "simpleRunning": "プロキシ起動済み",
+  "simpleWorking": "接続を準備中…",
+  "simpleReadyHint": "接続すると利用可能な経路を自動選択します。初回は VPN アクセスを許可してください。",
+  "simpleRoute": "経路",
+  "simpleAutoRoute": "自動選択",
+  "simpleConnect": "接続",
+  "simpleDisconnect": "切断",
+  "simpleImportFailed": "読み込みに失敗しました。URL とネットワークを確認してください。",
+  "simpleNoRoute": "利用可能な経路がありません。設定でノードを選択してください。",
+  "simpleConnectFailed": "起動に失敗しました。VPN 権限を確認して再試行してください。"
 }

@@ -992,6 +992,40 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "Запуск в фоновом режиме",
     ),
+    "simpleAutoRoute": MessageLookupByLibrary.simpleMessage(
+      "Автоматический выбор",
+    ),
+    "simpleConnect": MessageLookupByLibrary.simpleMessage("Подключить"),
+    "simpleConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось запустить прокси. Проверьте разрешение VPN и повторите попытку.",
+    ),
+    "simpleDisconnect": MessageLookupByLibrary.simpleMessage("Отключить"),
+    "simpleHome": MessageLookupByLibrary.simpleMessage("Подключение"),
+    "simpleImport": MessageLookupByLibrary.simpleMessage("Добавить подписку"),
+    "simpleImportFailed": MessageLookupByLibrary.simpleMessage(
+      "Не удалось загрузить подписку. Проверьте ссылку и сеть.",
+    ),
+    "simpleImportHint": MessageLookupByLibrary.simpleMessage(
+      "Вставьте ссылку подписки Clash / Mihomo, чтобы начать.",
+    ),
+    "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
+      "Нет доступного маршрута. Проверьте подписку или выберите узел в настройках.",
+    ),
+    "simpleNoSubscription": MessageLookupByLibrary.simpleMessage(
+      "Подписка не добавлена",
+    ),
+    "simpleReady": MessageLookupByLibrary.simpleMessage("Готово к подключению"),
+    "simpleReadyHint": MessageLookupByLibrary.simpleMessage(
+      "Нажмите «Подключить» для автоматического выбора маршрута. Разрешите VPN при первом запуске.",
+    ),
+    "simpleRoute": MessageLookupByLibrary.simpleMessage("Маршрут"),
+    "simpleRunning": MessageLookupByLibrary.simpleMessage("Прокси запущен"),
+    "simpleSubscriptionReady": MessageLookupByLibrary.simpleMessage(
+      "Подписка готова",
+    ),
+    "simpleWorking": MessageLookupByLibrary.simpleMessage(
+      "Подготовка подключения…",
+    ),
     "size": MessageLookupByLibrary.simpleMessage("Размер"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Socks-порт"),
     "sort": MessageLookupByLibrary.simpleMessage("Сортировка"),

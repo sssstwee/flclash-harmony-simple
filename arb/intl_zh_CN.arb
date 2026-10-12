@@ -554,5 +554,21 @@
   "geoSkipped": "{name} 已跳过",
   "geoUpdated": "{name} 已更新",
   "secondsCount": "{count} 秒",
-  "entriesCount": "{count} 个条目"
+  "entriesCount": "{count} 个条目",
+  "simpleHome": "连接",
+  "simpleImport": "导入订阅",
+  "simpleImportHint": "粘贴 Clash / Mihomo 订阅链接即可开始。",
+  "simpleNoSubscription": "还未添加订阅",
+  "simpleSubscriptionReady": "订阅已就绪",
+  "simpleReady": "准备连接",
+  "simpleRunning": "代理已启动",
+  "simpleWorking": "正在准备连接…",
+  "simpleReadyHint": "点击连接会自动选择可用线路，首次使用请允许系统 VPN 授权。",
+  "simpleRoute": "线路",
+  "simpleAutoRoute": "自动选择",
+  "simpleConnect": "连接",
+  "simpleDisconnect": "断开",
+  "simpleImportFailed": "导入失败，请检查订阅链接和网络后重试。",
+  "simpleNoRoute": "没有可用线路，请检查订阅，或在设置里手动选线。",
+  "simpleConnectFailed": "启动失败，请检查 VPN 授权后重试。"
 }

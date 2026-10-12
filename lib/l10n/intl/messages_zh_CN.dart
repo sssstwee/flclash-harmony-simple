@@ -657,6 +657,32 @@ class MessageLookup extends MessageLookupByLibrary {
     "shrink": MessageLookupByLibrary.simpleMessage("紧凑"),
     "silentLaunch": MessageLookupByLibrary.simpleMessage("静默启动"),
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage("后台启动"),
+    "simpleAutoRoute": MessageLookupByLibrary.simpleMessage("自动选择"),
+    "simpleConnect": MessageLookupByLibrary.simpleMessage("连接"),
+    "simpleConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "启动失败，请检查 VPN 授权后重试。",
+    ),
+    "simpleDisconnect": MessageLookupByLibrary.simpleMessage("断开"),
+    "simpleHome": MessageLookupByLibrary.simpleMessage("连接"),
+    "simpleImport": MessageLookupByLibrary.simpleMessage("导入订阅"),
+    "simpleImportFailed": MessageLookupByLibrary.simpleMessage(
+      "导入失败，请检查订阅链接和网络后重试。",
+    ),
+    "simpleImportHint": MessageLookupByLibrary.simpleMessage(
+      "粘贴 Clash / Mihomo 订阅链接即可开始。",
+    ),
+    "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
+      "没有可用线路，请检查订阅，或在设置里手动选线。",
+    ),
+    "simpleNoSubscription": MessageLookupByLibrary.simpleMessage("还未添加订阅"),
+    "simpleReady": MessageLookupByLibrary.simpleMessage("准备连接"),
+    "simpleReadyHint": MessageLookupByLibrary.simpleMessage(
+      "点击连接会自动选择可用线路，首次使用请允许系统 VPN 授权。",
+    ),
+    "simpleRoute": MessageLookupByLibrary.simpleMessage("线路"),
+    "simpleRunning": MessageLookupByLibrary.simpleMessage("代理已启动"),
+    "simpleSubscriptionReady": MessageLookupByLibrary.simpleMessage("订阅已就绪"),
+    "simpleWorking": MessageLookupByLibrary.simpleMessage("正在准备连接…"),
     "size": MessageLookupByLibrary.simpleMessage("尺寸"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Socks端口"),
     "sort": MessageLookupByLibrary.simpleMessage("排序"),

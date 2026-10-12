@@ -554,5 +554,21 @@
   "geoSkipped": "{name} skipped",
   "geoUpdated": "{name} updated",
   "secondsCount": "{count} seconds",
-  "entriesCount": "{count} entries"
+  "entriesCount": "{count} entries",
+  "simpleHome": "Connect",
+  "simpleImport": "Import subscription",
+  "simpleImportHint": "Paste a Clash / Mihomo subscription URL to get started.",
+  "simpleNoSubscription": "No subscription yet",
+  "simpleSubscriptionReady": "Subscription ready",
+  "simpleReady": "Ready to connect",
+  "simpleRunning": "Proxy started",
+  "simpleWorking": "Preparing connection…",
+  "simpleReadyHint": "Tap connect to choose an available route. Allow VPN access when prompted.",
+  "simpleRoute": "Route",
+  "simpleAutoRoute": "Automatic selection",
+  "simpleConnect": "Connect",
+  "simpleDisconnect": "Disconnect",
+  "simpleImportFailed": "Could not import. Check the URL and your network, then try again.",
+  "simpleNoRoute": "No available route. Check your subscription or choose a node in Settings.",
+  "simpleConnectFailed": "Could not start the proxy. Check VPN permission and try again."
 }

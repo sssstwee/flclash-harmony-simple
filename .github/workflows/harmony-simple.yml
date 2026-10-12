@@ -1,0 +1,86 @@
+name: HarmonyOS Simple
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: harmony-simple-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up HarmonyOS SDK
+        uses: ErBWs/setup-ohos@v2.0.0
+        with:
+          version: 26.0.0.821
+          cache: true
+
+      - name: Set up HarmonyOS Flutter
+        run: |
+          git clone -b 3.44.9+ohos-0.0.1-canary1 --depth 1 https://gitcode.com/CPF-Flutter/flutter_flutter.git "$RUNNER_TOOL_CACHE/flutter-ohos"
+          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" tag 3.44.10
+          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
+          echo "$RUNNER_TOOL_CACHE/flutter-ohos/bin" >> "$GITHUB_PATH"
+          echo "$RUNNER_TOOL_CACHE/flutter-ohos/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Dart dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: harmony-flutter-3.44.10-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
+
+      - name: Install dependencies
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: http.version
+          GIT_CONFIG_VALUE_0: HTTP/1.1
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test --reporter expanded
+
+      - name: Set up Go bootstrap
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.4'
+          cache-dependency-path: core/go.sum
+
+      - name: Set up HarmonyOS Go
+        run: |
+          git clone -b release-branch.go1.24 --depth 1 https://gitcode.com/openharmony-sig/ohos_golang_go.git "$RUNNER_TOOL_CACHE/ohos-go"
+          cd "$RUNNER_TOOL_CACHE/ohos-go/src"
+          ./make.bash
+          echo "GOROOT=$RUNNER_TOOL_CACHE/ohos-go" >> "$GITHUB_ENV"
+          echo "$RUNNER_TOOL_CACHE/ohos-go/bin" >> "$GITHUB_PATH"
+
+      - name: Build unsigned HarmonyOS packages
+        run: dart setup.dart ohos --env stable -v
+
+      - name: Checksums
+        run: |
+          cd dist
+          find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: FlClash-Simple-HarmonyOS-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

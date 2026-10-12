@@ -11,6 +11,8 @@ import 'package:fl_clash/views/application_setting.dart';
 import 'package:fl_clash/views/backup_and_restore.dart';
 import 'package:fl_clash/views/config/config.dart';
 import 'package:fl_clash/views/hotkey.dart';
+import 'package:fl_clash/views/profiles/profiles.dart';
+import 'package:fl_clash/views/proxies/proxies.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -93,6 +95,18 @@ class _ToolViewState extends ConsumerState<ToolsView> {
       ),
     );
     final items = [
+      if (system.isOhos) ...[
+        ListItem.open(
+          leading: const Icon(Icons.folder_outlined),
+          title: Text(context.appLocalizations.profiles),
+          delegate: const OpenDelegate(widget: ProfilesView()),
+        ),
+        ListItem.open(
+          leading: const Icon(Icons.alt_route),
+          title: Text(context.appLocalizations.proxies),
+          delegate: const OpenDelegate(widget: ProxiesView()),
+        ),
+      ],
       Consumer(
         builder: (_, ref, _) {
           final state = ref.watch(moreToolsSelectorStateProvider);
@@ -111,7 +125,9 @@ class _ToolViewState extends ConsumerState<ToolsView> {
       ..._getOtherList(vm2.b),
     ];
     return CommonScaffold(
-      title: context.appLocalizations.tools,
+      title: system.isOhos
+          ? context.appLocalizations.settings
+          : context.appLocalizations.tools,
       body: ListView.builder(
         key: toolsStoreKey,
         itemCount: items.length,

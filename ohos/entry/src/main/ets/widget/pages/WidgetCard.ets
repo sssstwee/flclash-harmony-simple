@@ -16,10 +16,10 @@ struct WidgetCard {
     .width('100%')
     .backgroundColor($r('sys.color.comp_background_primary'))
     .onAppear(() => {
-      this.title = 'FlClash'
+      this.title = 'FlClash Simple'
       postCardAction(this, {  
         action: 'call',
-        bundleName: 'com.follow.clash',
+        bundleName: 'com.follow.clash.simple',
         abilityName: 'TempAbility',
         params: {
           method: 'call'
@@ -29,7 +29,7 @@ struct WidgetCard {
     .onClick(() => {
       postCardAction(this, {
         action: 'router',
-        bundleName: 'com.follow.clash',
+        bundleName: 'com.follow.clash.simple',
         abilityName: 'EntryAbility'
       })
     })

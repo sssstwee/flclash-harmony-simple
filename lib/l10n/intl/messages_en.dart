@@ -945,6 +945,40 @@ class MessageLookup extends MessageLookupByLibrary {
     "silentLaunchDesc": MessageLookupByLibrary.simpleMessage(
       "Start in the background",
     ),
+    "simpleAutoRoute": MessageLookupByLibrary.simpleMessage(
+      "Automatic selection",
+    ),
+    "simpleConnect": MessageLookupByLibrary.simpleMessage("Connect"),
+    "simpleConnectFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not start the proxy. Check VPN permission and try again.",
+    ),
+    "simpleDisconnect": MessageLookupByLibrary.simpleMessage("Disconnect"),
+    "simpleHome": MessageLookupByLibrary.simpleMessage("Connect"),
+    "simpleImport": MessageLookupByLibrary.simpleMessage("Import subscription"),
+    "simpleImportFailed": MessageLookupByLibrary.simpleMessage(
+      "Could not import. Check the URL and your network, then try again.",
+    ),
+    "simpleImportHint": MessageLookupByLibrary.simpleMessage(
+      "Paste a Clash / Mihomo subscription URL to get started.",
+    ),
+    "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
+      "No available route. Check your subscription or choose a node in Settings.",
+    ),
+    "simpleNoSubscription": MessageLookupByLibrary.simpleMessage(
+      "No subscription yet",
+    ),
+    "simpleReady": MessageLookupByLibrary.simpleMessage("Ready to connect"),
+    "simpleReadyHint": MessageLookupByLibrary.simpleMessage(
+      "Tap connect to choose an available route. Allow VPN access when prompted.",
+    ),
+    "simpleRoute": MessageLookupByLibrary.simpleMessage("Route"),
+    "simpleRunning": MessageLookupByLibrary.simpleMessage("Proxy started"),
+    "simpleSubscriptionReady": MessageLookupByLibrary.simpleMessage(
+      "Subscription ready",
+    ),
+    "simpleWorking": MessageLookupByLibrary.simpleMessage(
+      "Preparing connection…",
+    ),
     "size": MessageLookupByLibrary.simpleMessage("Size"),
     "socksPort": MessageLookupByLibrary.simpleMessage("Socks Port"),
     "sort": MessageLookupByLibrary.simpleMessage("Sort"),
