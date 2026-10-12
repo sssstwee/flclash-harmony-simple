@@ -27,6 +27,7 @@ void main() {
           hosts: {'test.internal': '192.168.1.2'},
         ),
         excludeSSIDs: ['Home'],
+        overrideDns: true,
       );
       final result = harmonyConfigDefaults(old);
       expect(result.currentProfileId, 17);
@@ -37,7 +38,7 @@ void main() {
       expect(result.themeProps.themeMode, ThemeMode.system);
       expect(result.vpnProps, defaultVpnProps);
       expect(result.networkProps, defaultNetworkProps);
-      expect(result.overrideDns, isTrue);
+      expect(result.overrideDns, isFalse);
       expect(result.patchClashConfig, harmonyPatchConfig);
       expect(result.patchClashConfig.mode, Mode.rule);
       expect(result.patchClashConfig.allowLan, isFalse);

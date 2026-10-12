@@ -20,7 +20,7 @@ Config harmonyConfigDefaults(Config config) => config.copyWith(
   themeProps: defaultThemeProps.copyWith(themeMode: ThemeMode.system),
   proxiesStyleProps: defaultProxiesStyleProps,
   patchClashConfig: harmonyPatchConfig,
-  overrideDns: true,
+  overrideDns: false,
   excludeSSIDs: [],
   definedPackages: {},
 );
