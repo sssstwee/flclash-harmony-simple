@@ -305,6 +305,33 @@ class MessageLookup extends MessageLookupByLibrary {
     "go": MessageLookupByLibrary.simpleMessage("前往"),
     "goDownload": MessageLookupByLibrary.simpleMessage("前往下载"),
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage("前往配置脚本"),
+    "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
+      "国内和内网直连，国外网络自动使用代理。",
+    ),
+    "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
+      "暂时无法获取可用线路，请稍后点击连接重试。",
+    ),
+    "harmonyConnecting": MessageLookupByLibrary.simpleMessage("正在连接…"),
+    "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
+      "用户名或密码错误。",
+    ),
+    "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage("正在断开…"),
+    "harmonyLogin": MessageLookupByLibrary.simpleMessage("登录"),
+    "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
+      "登录后自动获取线路，无需手动添加订阅。",
+    ),
+    "harmonyLogout": MessageLookupByLibrary.simpleMessage("退出登录"),
+    "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
+      "尝试次数过多，请一分钟后重试。",
+    ),
+    "harmonyRequired": MessageLookupByLibrary.simpleMessage("请填写此项。"),
+    "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
+      "暂时无法连接服务，请检查网络后重试。",
+    ),
+    "harmonySessionExpired": MessageLookupByLibrary.simpleMessage(
+      "登录已过期，请重新登录。",
+    ),
+    "harmonyUsername": MessageLookupByLibrary.simpleMessage("用户名"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage("是否缓存修改"),
     "hideFromList": MessageLookupByLibrary.simpleMessage("从列表中隐藏"),
     "host": MessageLookupByLibrary.simpleMessage("主机"),
@@ -671,9 +698,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "simpleImportHint": MessageLookupByLibrary.simpleMessage(
       "粘贴 Clash / Mihomo 订阅链接即可开始。",
     ),
-    "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
-      "没有可用线路，请检查订阅，或在设置里手动选线。",
-    ),
+    "simpleNoRoute": MessageLookupByLibrary.simpleMessage("没有可用线路，请稍后点击连接重试。"),
     "simpleNoSubscription": MessageLookupByLibrary.simpleMessage("还未添加订阅"),
     "simpleReady": MessageLookupByLibrary.simpleMessage("准备连接"),
     "simpleReadyHint": MessageLookupByLibrary.simpleMessage(

@@ -53,8 +53,10 @@ class ApplicationState extends ConsumerState<Application> {
       } else {
         exit(0);
       }
-      _autoUpdateProfilesTask();
-      _initLink();
+      if (!system.isOhos) {
+        _autoUpdateProfilesTask();
+        _initLink();
+      }
       app?.initShortcuts();
     });
   }

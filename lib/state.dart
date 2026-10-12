@@ -303,7 +303,9 @@ class GlobalState {
     }
     launchUrl(
       Uri.parse(url),
-      mode: Platform.isOhos ? LaunchMode.externalApplication : LaunchMode.platformDefault,
+      mode: Platform.isOhos
+          ? LaunchMode.externalApplication
+          : LaunchMode.platformDefault,
     );
   }
 
@@ -325,7 +327,9 @@ class GlobalState {
       });
     };
     container.read(systemActionProvider.notifier).updateTray();
-    container.read(profilesActionProvider.notifier).autoUpdateProfiles();
+    if (!system.isOhos) {
+      container.read(profilesActionProvider.notifier).autoUpdateProfiles();
+    }
     container.read(commonActionProvider.notifier).autoCheckUpdate();
     autoLaunch?.updateStatus(container.read(appSettingProvider).autoLaunch);
     if (!container.read(appSettingProvider).silentLaunch) {
@@ -338,7 +342,12 @@ class GlobalState {
     await _showCrashlyticsTip();
     await container.read(coreActionProvider.notifier).connectCore();
     await container.read(coreActionProvider.notifier).initCore();
-    await container.read(setupActionProvider.notifier).initStatus();
+    if (system.isOhos) {
+      // Native connections are started only after server authorization.
+      await container.read(setupActionProvider.notifier).updateStatus(false);
+    } else {
+      await container.read(setupActionProvider.notifier).initStatus();
+    }
     container.read(initProvider.notifier).value = true;
     permissions.check();
   }

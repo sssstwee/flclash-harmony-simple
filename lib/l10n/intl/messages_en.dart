@@ -433,6 +433,37 @@ class MessageLookup extends MessageLookupByLibrary {
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage(
       "Go to configure script",
     ),
+    "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
+      "Domestic and local networks connect directly. Overseas networks use the proxy automatically.",
+    ),
+    "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
+      "Unable to download valid connection settings. Try connecting again later.",
+    ),
+    "harmonyConnecting": MessageLookupByLibrary.simpleMessage("Connecting…"),
+    "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
+      "Incorrect username or password.",
+    ),
+    "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage(
+      "Disconnecting…",
+    ),
+    "harmonyLogin": MessageLookupByLibrary.simpleMessage("Sign in"),
+    "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
+      "Sign in to download your connection settings automatically.",
+    ),
+    "harmonyLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
+    "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
+      "Too many attempts. Try again in one minute.",
+    ),
+    "harmonyRequired": MessageLookupByLibrary.simpleMessage(
+      "Please fill in this field.",
+    ),
+    "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
+      "Unable to reach the service. Check your network and try again.",
+    ),
+    "harmonySessionExpired": MessageLookupByLibrary.simpleMessage(
+      "Your session expired. Please sign in again.",
+    ),
+    "harmonyUsername": MessageLookupByLibrary.simpleMessage("Username"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage(
       "Do you want to cache the changes?",
     ),
@@ -962,7 +993,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Paste a Clash / Mihomo subscription URL to get started.",
     ),
     "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
-      "No available route. Check your subscription or choose a node in Settings.",
+      "No route is available. Try connecting again later.",
     ),
     "simpleNoSubscription": MessageLookupByLibrary.simpleMessage(
       "No subscription yet",

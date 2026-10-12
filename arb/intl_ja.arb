@@ -569,6 +569,19 @@
   "simpleConnect": "接続",
   "simpleDisconnect": "切断",
   "simpleImportFailed": "読み込みに失敗しました。URL とネットワークを確認してください。",
-  "simpleNoRoute": "利用可能な経路がありません。設定でノードを選択してください。",
-  "simpleConnectFailed": "起動に失敗しました。VPN 権限を確認して再試行してください。"
+  "simpleNoRoute": "利用可能な接続先がありません。後でもう一度接続してください。",
+  "simpleConnectFailed": "起動に失敗しました。VPN 権限を確認して再試行してください。",
+  "harmonyLogin": "ログイン",
+  "harmonyLoginHint": "ログインすると接続設定を自動取得します。",
+  "harmonyUsername": "ユーザー名",
+  "harmonyLogout": "ログアウト",
+  "harmonyRequired": "この項目を入力してください。",
+  "harmonyCredentialsError": "ユーザー名またはパスワードが違います。",
+  "harmonySessionExpired": "ログインの有効期限が切れました。再ログインしてください。",
+  "harmonyRateLimited": "試行回数が多すぎます。1分後に再試行してください。",
+  "harmonyServiceError": "サービスに接続できません。ネットワークを確認してください。",
+  "harmonyConfigError": "接続設定を取得できません。後でもう一度接続してください。",
+  "harmonyConnecting": "接続中…",
+  "harmonyDisconnecting": "切断中…",
+  "harmonyAutomaticHint": "中国国内とローカルネットワークは直接接続し、海外は自動でプロキシを使用します。"
 }

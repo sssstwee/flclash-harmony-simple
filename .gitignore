@@ -75,3 +75,9 @@ devtools_options.yaml
 # FVM Version Cache
 .fvm/
 .fvmrc
+
+# Cloudflare local state and secrets
+backend/node_modules/
+backend/.wrangler/
+backend/.dev.vars*
+backend/.env*

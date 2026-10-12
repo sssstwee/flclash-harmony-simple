@@ -1,0 +1,34 @@
+{
+  "name": "clash-harmony-api",
+  "version": "1.0.0",
+  "description": "Cloudflare login and protected configuration service for Clash Harmony",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "types": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "account": "node scripts/account.mjs",
+    "config": "node scripts/config.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "GPL-3.0-only",
+  "dependencies": {
+    "better-auth": "^1.7.7",
+    "kysely-d1": "^0.4.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "^1.4.0",
+    "@cloudflare/workers-types": "^5.20261012.1",
+    "@types/node": "^26.6.5",
+    "auth": "^1.7.7",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.149.0"
+  }
+}

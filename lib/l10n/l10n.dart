@@ -4659,10 +4659,10 @@ class AppLocalizations {
     );
   }
 
-  /// `No available route. Check your subscription or choose a node in Settings.`
+  /// `No route is available. Try connecting again later.`
   String get simpleNoRoute {
     return Intl.message(
-      'No available route. Check your subscription or choose a node in Settings.',
+      'No route is available. Try connecting again later.',
       name: 'simpleNoRoute',
       desc: '',
       args: [],
@@ -4674,6 +4674,126 @@ class AppLocalizations {
     return Intl.message(
       'Could not start the proxy. Check VPN permission and try again.',
       name: 'simpleConnectFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sign in`
+  String get harmonyLogin {
+    return Intl.message('Sign in', name: 'harmonyLogin', desc: '', args: []);
+  }
+
+  /// `Sign in to download your connection settings automatically.`
+  String get harmonyLoginHint {
+    return Intl.message(
+      'Sign in to download your connection settings automatically.',
+      name: 'harmonyLoginHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Username`
+  String get harmonyUsername {
+    return Intl.message(
+      'Username',
+      name: 'harmonyUsername',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sign out`
+  String get harmonyLogout {
+    return Intl.message('Sign out', name: 'harmonyLogout', desc: '', args: []);
+  }
+
+  /// `Please fill in this field.`
+  String get harmonyRequired {
+    return Intl.message(
+      'Please fill in this field.',
+      name: 'harmonyRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Incorrect username or password.`
+  String get harmonyCredentialsError {
+    return Intl.message(
+      'Incorrect username or password.',
+      name: 'harmonyCredentialsError',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Your session expired. Please sign in again.`
+  String get harmonySessionExpired {
+    return Intl.message(
+      'Your session expired. Please sign in again.',
+      name: 'harmonySessionExpired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Too many attempts. Try again in one minute.`
+  String get harmonyRateLimited {
+    return Intl.message(
+      'Too many attempts. Try again in one minute.',
+      name: 'harmonyRateLimited',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unable to reach the service. Check your network and try again.`
+  String get harmonyServiceError {
+    return Intl.message(
+      'Unable to reach the service. Check your network and try again.',
+      name: 'harmonyServiceError',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Unable to download valid connection settings. Try connecting again later.`
+  String get harmonyConfigError {
+    return Intl.message(
+      'Unable to download valid connection settings. Try connecting again later.',
+      name: 'harmonyConfigError',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connecting…`
+  String get harmonyConnecting {
+    return Intl.message(
+      'Connecting…',
+      name: 'harmonyConnecting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Disconnecting…`
+  String get harmonyDisconnecting {
+    return Intl.message(
+      'Disconnecting…',
+      name: 'harmonyDisconnecting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Domestic and local networks connect directly. Overseas networks use the proxy automatically.`
+  String get harmonyAutomaticHint {
+    return Intl.message(
+      'Domestic and local networks connect directly. Overseas networks use the proxy automatically.',
+      name: 'harmonyAutomaticHint',
       desc: '',
       args: [],
     );

@@ -448,6 +448,35 @@ class MessageLookup extends MessageLookupByLibrary {
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage(
       "Перейти к настройке скрипта",
     ),
+    "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
+      "Сети Китая и локальные сети подключаются напрямую, остальные — через прокси.",
+    ),
+    "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
+      "Не удалось загрузить настройки. Повторите подключение позже.",
+    ),
+    "harmonyConnecting": MessageLookupByLibrary.simpleMessage("Подключение…"),
+    "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
+      "Неверное имя пользователя или пароль.",
+    ),
+    "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage("Отключение…"),
+    "harmonyLogin": MessageLookupByLibrary.simpleMessage("Войти"),
+    "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
+      "После входа настройки подключения загрузятся автоматически.",
+    ),
+    "harmonyLogout": MessageLookupByLibrary.simpleMessage("Выйти"),
+    "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
+      "Слишком много попыток. Повторите через минуту.",
+    ),
+    "harmonyRequired": MessageLookupByLibrary.simpleMessage(
+      "Заполните это поле.",
+    ),
+    "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
+      "Сервис недоступен. Проверьте сеть и повторите попытку.",
+    ),
+    "harmonySessionExpired": MessageLookupByLibrary.simpleMessage(
+      "Сеанс истёк. Войдите снова.",
+    ),
+    "harmonyUsername": MessageLookupByLibrary.simpleMessage("Имя пользователя"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage(
       "Хотите сохранить изменения в кэше?",
     ),
@@ -1009,7 +1038,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Вставьте ссылку подписки Clash / Mihomo, чтобы начать.",
     ),
     "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
-      "Нет доступного маршрута. Проверьте подписку или выберите узел в настройках.",
+      "Нет доступных маршрутов. Повторите подключение позже.",
     ),
     "simpleNoSubscription": MessageLookupByLibrary.simpleMessage(
       "Подписка не добавлена",

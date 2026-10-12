@@ -343,6 +343,33 @@ class MessageLookup extends MessageLookupByLibrary {
     "go": MessageLookupByLibrary.simpleMessage("移動"),
     "goDownload": MessageLookupByLibrary.simpleMessage("ダウンロードへ"),
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage("スクリプト設定に移動"),
+    "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
+      "中国国内とローカルネットワークは直接接続し、海外は自動でプロキシを使用します。",
+    ),
+    "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
+      "接続設定を取得できません。後でもう一度接続してください。",
+    ),
+    "harmonyConnecting": MessageLookupByLibrary.simpleMessage("接続中…"),
+    "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
+      "ユーザー名またはパスワードが違います。",
+    ),
+    "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage("切断中…"),
+    "harmonyLogin": MessageLookupByLibrary.simpleMessage("ログイン"),
+    "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
+      "ログインすると接続設定を自動取得します。",
+    ),
+    "harmonyLogout": MessageLookupByLibrary.simpleMessage("ログアウト"),
+    "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
+      "試行回数が多すぎます。1分後に再試行してください。",
+    ),
+    "harmonyRequired": MessageLookupByLibrary.simpleMessage("この項目を入力してください。"),
+    "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
+      "サービスに接続できません。ネットワークを確認してください。",
+    ),
+    "harmonySessionExpired": MessageLookupByLibrary.simpleMessage(
+      "ログインの有効期限が切れました。再ログインしてください。",
+    ),
+    "harmonyUsername": MessageLookupByLibrary.simpleMessage("ユーザー名"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage("変更をキャッシュしますか？"),
     "hideFromList": MessageLookupByLibrary.simpleMessage("リストから隠す"),
     "host": MessageLookupByLibrary.simpleMessage("ホスト"),
@@ -780,7 +807,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Clash / Mihomo のサブスクリプション URL を貼り付けて開始します。",
     ),
     "simpleNoRoute": MessageLookupByLibrary.simpleMessage(
-      "利用可能な経路がありません。設定でノードを選択してください。",
+      "利用可能な接続先がありません。後でもう一度接続してください。",
     ),
     "simpleNoSubscription": MessageLookupByLibrary.simpleMessage(
       "サブスクリプションがありません",

@@ -1,7 +1,7 @@
 name: fl_clash
 description: A multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.
 publish_to: 'none'
-version: 0.8.94+2026101204
+version: 0.8.94+2026101205
 environment:
   sdk: '>=3.8.0 <4.0.0'
 
@@ -69,6 +69,10 @@ dependencies:
   flutter_svg: ^2.1.0
   flutter_cache_manager: ^3.4.1
   crypto: ^3.0.3
+  flutter_secure_storage_ohos:
+    git:
+      url: https://github.com/ClosedHarmony/flutter_secure_storage_ohos
+      ref: 545fb022eed8ce7891028d4851a617b9a8328177
   yaml_writer:
     git:
       url: https://github.com/chen08209/yaml_writer

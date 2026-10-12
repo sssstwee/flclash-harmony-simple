@@ -537,6 +537,15 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.12.0"
+  flutter_secure_storage_ohos:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: "545fb022eed8ce7891028d4851a617b9a8328177"
+      resolved-ref: "545fb022eed8ce7891028d4851a617b9a8328177"
+      url: "https://github.com/ClosedHarmony/flutter_secure_storage_ohos"
+    source: git
+    version: "1.0.0"
   flutter_svg:
     dependency: "direct main"
     description:

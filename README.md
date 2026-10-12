@@ -1,6 +1,6 @@
-# FlClash Simple for HarmonyOS
+# Clash Harmony
 
-A minimal HarmonyOS fork: import a Clash/Mihomo subscription, then connect with automatic route selection. Based on [tljk/FlClash-ohos](https://github.com/tljk/FlClash-ohos/tree/v0.8.94-ohos), under GPL-3.0. This is an independent fork; HarmonyOS 7 device support awaits real-device verification.
+A minimal HarmonyOS fork: sign in with a username and password, then connect with automatic route selection. Configuration is delivered through an authenticated Cloudflare Workers / D1 service. Based on [tljk/FlClash-ohos](https://github.com/tljk/FlClash-ohos/tree/v0.8.94-ohos), under GPL-3.0. This is an independent fork.
 
 [简洁版说明与安装要求](README_SIMPLE.md) · [GitHub Actions builds](../../actions)
 

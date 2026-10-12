@@ -569,6 +569,19 @@
   "simpleConnect": "Connect",
   "simpleDisconnect": "Disconnect",
   "simpleImportFailed": "Could not import. Check the URL and your network, then try again.",
-  "simpleNoRoute": "No available route. Check your subscription or choose a node in Settings.",
-  "simpleConnectFailed": "Could not start the proxy. Check VPN permission and try again."
+  "simpleNoRoute": "No route is available. Try connecting again later.",
+  "simpleConnectFailed": "Could not start the proxy. Check VPN permission and try again.",
+  "harmonyLogin": "Sign in",
+  "harmonyLoginHint": "Sign in to download your connection settings automatically.",
+  "harmonyUsername": "Username",
+  "harmonyLogout": "Sign out",
+  "harmonyRequired": "Please fill in this field.",
+  "harmonyCredentialsError": "Incorrect username or password.",
+  "harmonySessionExpired": "Your session expired. Please sign in again.",
+  "harmonyRateLimited": "Too many attempts. Try again in one minute.",
+  "harmonyServiceError": "Unable to reach the service. Check your network and try again.",
+  "harmonyConfigError": "Unable to download valid connection settings. Try connecting again later.",
+  "harmonyConnecting": "Connecting…",
+  "harmonyDisconnecting": "Disconnecting…",
+  "harmonyAutomaticHint": "Domestic and local networks connect directly. Overseas networks use the proxy automatically."
 }
