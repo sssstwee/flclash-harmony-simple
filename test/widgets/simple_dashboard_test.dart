@@ -37,7 +37,7 @@ void main() {
 
   testWidgets('a new user sees import as the primary action', (tester) async {
     await render(tester);
-    expect(find.text('还未添加订阅'), findsOneWidget);
+    expect(find.text('Clash Harmony'), findsOneWidget);
     final button = tester.widget<FilledButton>(find.byType(FilledButton));
     expect(
       find.descendant(
@@ -48,6 +48,8 @@ void main() {
     );
     expect(button.onPressed, isNotNull);
     expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(IconButton), findsNothing);
+    expect(find.byType(ListTile), findsNothing);
   });
 
   testWidgets(
@@ -60,6 +62,12 @@ void main() {
       );
       await render(tester, profile: profile);
       expect(find.text('Example'), findsOneWidget);
+      expect(find.byType(IconButton), findsNothing);
+      expect(find.byType(ListTile), findsNothing);
+      expect(find.byType(FilledButton), findsOneWidget);
+      expect(find.byType(Card), findsNothing);
+      expect(find.text('设置'), findsNothing);
+      expect(find.text('DNS'), findsNothing);
       expect(
         find.descendant(
           of: find.byType(FilledButton),
@@ -70,7 +78,9 @@ void main() {
       await render(tester, profile: profile, running: true);
       expect(find.text('代理已启动'), findsOneWidget);
       expect(find.text('断开'), findsOneWidget);
-      expect(tester.widget<ListTile>(find.byType(ListTile)).onTap, isNull);
+      expect(find.byType(IconButton), findsNothing);
+      expect(find.byType(ListTile), findsNothing);
+      expect(find.byType(FilledButton), findsOneWidget);
     },
   );
 

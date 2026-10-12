@@ -6,7 +6,6 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/views/tools.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -143,21 +142,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView> {
     final texts = context.appLocalizations;
     final profile = ref.watch(currentProfileProvider);
     final running = ref.watch(isStartProvider);
-    final groupName = profile?.currentGroupName;
-    final route = groupName == null
-        ? null
-        : ref.watch(selectedProxyNameProvider(groupName));
     return CommonScaffold(
       title: appDisplayName,
-      actions: [
-        IconButton(
-          tooltip: texts.settings,
-          onPressed: _busy
-              ? null
-              : () => BaseNavigator.push(context, const ToolsView()),
-          icon: const Icon(Icons.settings_outlined),
-        ),
-      ],
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -188,26 +174,12 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 32),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.link),
-                  title: Text(profile?.realLabel ?? texts.simpleNoSubscription),
-                  subtitle: Text(
-                    profile == null
-                        ? texts.simpleImportHint
-                        : texts.simpleSubscriptionReady,
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _busy || running ? null : _import,
-                ),
-              ),
-              if (profile != null) ...[
-                const SizedBox(height: 12),
+              if (profile != null)
                 Text(
-                  '${texts.simpleRoute}: ${route ?? texts.simpleAutoRoute}',
+                  profile.realLabel,
                   textAlign: TextAlign.center,
+                  style: context.textTheme.bodySmall,
                 ),
-              ],
               const SizedBox(height: 24),
               FilledButton.icon(
                 style: FilledButton.styleFrom(

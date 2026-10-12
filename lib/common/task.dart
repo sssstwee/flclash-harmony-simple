@@ -102,7 +102,7 @@ Future<VM2<String, String>> _makeRealProfileTask(
   final profilesPath = data.profilesPath;
   final profileId = data.profileId;
   final overrideDns = data.overrideDns;
-  final addedRules = data.addedRules;
+  final addedRules = isOhos ? const <Rule>[] : data.addedRules;
   final appendSystemDns = data.appendSystemDns;
   final defaultUA = data.defaultUA;
   String getProvidersFilePathInner(String type, String url) {
@@ -224,7 +224,7 @@ Future<VM2<String, String>> _makeRealProfileTask(
     }
   }
   List<String> rules = [];
-  if (data.rules.isEmpty) {
+  if (isOhos || data.rules.isEmpty) {
     if (isOhos) {
       excludeDirectFromAutomaticGroups(rawConfig);
       rules = defaultRoutingRules(rawConfig);
@@ -272,7 +272,7 @@ Future<VM2<String, String>> _makeRealProfileTask(
   } else {
     rules = data.rules.map((item) => item.rawValue).toList();
   }
-  if (data.proxyGroups.isNotEmpty) {
+  if (!isOhos && data.proxyGroups.isNotEmpty) {
     rawConfig['proxy-groups'] = data.proxyGroups;
   }
   rawConfig['rules'] = rules;

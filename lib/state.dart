@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:animations/animations.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'package:fl_clash/common/harmony_defaults.dart';
 import 'package:fl_clash/common/theme.dart';
 import 'package:fl_clash/widgets/dialog.dart';
 import 'package:fl_clash/widgets/list.dart';
@@ -84,7 +85,7 @@ class GlobalState {
     final appStateOverrides = buildAppStateOverrides(appState);
     packageInfo = await PackageInfo.fromPlatform();
     final configMap = await preferences.getConfigMap();
-    final config = await migration.migrationIfNeeded(
+    var config = await migration.migrationIfNeeded(
       configMap,
       sync: (data) async {
         final newConfigMap = data.configMap;
@@ -102,11 +103,18 @@ class GlobalState {
         return config;
       },
     );
+    if (system.isOhos) {
+      config = harmonyConfigDefaults(config);
+      await preferences.saveConfig(config);
+    }
     final configOverrides = buildConfigOverrides(config);
     container = ProviderContainer(
       overrides: [...appStateOverrides, ...configOverrides],
     );
-    final profiles = await database.profilesDao.query().get();
+    var profiles = await database.profilesDao.query().get();
+    if (system.isOhos) {
+      profiles = profiles.map(harmonyProfileDefaults).toList();
+    }
     container.read(profilesProvider.notifier).setAndReorder(profiles);
     await AppLocalizations.load(
       utils.getLocaleForString(config.appSettingProps.locale) ??

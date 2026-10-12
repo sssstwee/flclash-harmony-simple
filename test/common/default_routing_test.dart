@@ -186,7 +186,8 @@ void main() {
       final result = await makeRealProfileTask(state, isOhos: true);
       final yaml = loadYaml(result.a) as Map;
       final rules = yaml['rules'] as List;
-      expect(rules.first, 'DOMAIN,special.example,DIRECT');
+      expect(rules.first, 'GEOSITE,private,DIRECT');
+      expect(rules, isNot(contains('DOMAIN,special.example,DIRECT')));
       expect(rules, contains('GEOSITE,cn,DIRECT'));
       expect(rules.last, 'MATCH,Main');
       expect(yaml['dns']['nameserver-policy']['geosite:private'], [
@@ -199,22 +200,30 @@ void main() {
     },
   );
 
-  test('keeps explicit custom overwrite rules', () async {
-    final state = MakeRealProfileState(
-      profilesPath: '/tmp/clash-harmony-test',
-      profileId: 1,
-      rawConfig: subscription(),
-      realPatchConfig: const PatchClashConfig(),
-      overrideDns: false,
-      appendSystemDns: false,
-      proxyGroups: [],
-      rules: [Rule.parse('DOMAIN,custom.example,DIRECT')],
-      addedRules: [],
-      defaultUA: 'Clash Harmony/test',
-    );
-    final result = await makeRealProfileTask(state, isOhos: true);
-    expect((loadYaml(result.a) as Map)['rules'], [
-      'DOMAIN,custom.example,DIRECT',
-    ]);
-  });
+  test(
+    'ignores old custom rules on HarmonyOS and preserves other platforms',
+    () async {
+      final state = MakeRealProfileState(
+        profilesPath: '/tmp/clash-harmony-test',
+        profileId: 1,
+        rawConfig: subscription(),
+        realPatchConfig: const PatchClashConfig(),
+        overrideDns: false,
+        appendSystemDns: false,
+        proxyGroups: [],
+        rules: [Rule.parse('DOMAIN,custom.example,DIRECT')],
+        addedRules: [],
+        defaultUA: 'Clash Harmony/test',
+      );
+      final result = await makeRealProfileTask(state, isOhos: true);
+      final rules = (loadYaml(result.a) as Map)['rules'] as List;
+      expect(rules, contains('GEOSITE,cn,DIRECT'));
+      expect(rules.last, 'MATCH,Main');
+      expect(rules, isNot(contains('DOMAIN,custom.example,DIRECT')));
+      final ordinary = await makeRealProfileTask(state, isOhos: false);
+      expect((loadYaml(ordinary.a) as Map)['rules'], [
+        'DOMAIN,custom.example,DIRECT',
+      ]);
+    },
+  );
 }
