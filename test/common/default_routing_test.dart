@@ -89,6 +89,17 @@ void main() {
       final groups = config['proxy-groups'] as List;
       expect(groups.last['proxies'], ['Node']);
       expect(groups.first['proxies'], ['REJECT', 'DIRECT']);
+      final directOnly = <String, dynamic>{
+        'proxy-groups': [
+          {
+            'name': 'Unused',
+            'type': 'url-test',
+            'proxies': ['DIRECT'],
+          },
+        ],
+      };
+      excludeDirectFromAutomaticGroups(directOnly);
+      expect(directOnly['proxy-groups'][0]['proxies'], ['DIRECT']);
     },
   );
 

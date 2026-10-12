@@ -85,7 +85,14 @@ void excludeDirectFromAutomaticGroups(Map<String, dynamic> config) {
     for (final group in (config['proxy-groups'] as List? ?? []).cast<Map>())
       {
         ...group,
-        if (['url-test', 'fallback', 'load-balance'].contains(group['type']))
+        if (['url-test', 'fallback', 'load-balance'].contains(group['type']) &&
+            ((group['proxies'] as List? ?? []).any(
+                  (name) => !direct.contains(name),
+                ) ||
+                (group['use'] as List? ?? []).isNotEmpty ||
+                group['include-all'] == true ||
+                group['include-all-proxies'] == true ||
+                group['include-all-providers'] == true))
           'proxies': (group['proxies'] as List? ?? [])
               .where((name) => !direct.contains(name))
               .toList(),
