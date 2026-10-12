@@ -161,7 +161,17 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await renderLogin(tester, SignedOutApi());
-      await tester.scrollUntilVisible(find.byType(FilledButton), 100);
+      final listScrollable = find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.byType(FilledButton),
+        100,
+        scrollable: listScrollable,
+      );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(
         app(
@@ -172,7 +182,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.byType(FilledButton), 100);
+      await tester.scrollUntilVisible(
+        find.byType(FilledButton),
+        100,
+        scrollable: listScrollable,
+      );
       expect(tester.takeException(), isNull);
     },
   );
