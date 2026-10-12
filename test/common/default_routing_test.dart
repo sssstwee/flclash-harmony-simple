@@ -208,11 +208,13 @@ void main() {
       overrideDns: false,
       appendSystemDns: false,
       proxyGroups: [],
-      rules: [Rule.parse('MATCH,DIRECT')],
+      rules: [Rule.parse('DOMAIN,custom.example,DIRECT')],
       addedRules: [],
       defaultUA: 'Clash Harmony/test',
     );
     final result = await makeRealProfileTask(state, isOhos: true);
-    expect((loadYaml(result.a) as Map)['rules'], ['MATCH,DIRECT']);
+    expect((loadYaml(result.a) as Map)['rules'], [
+      'DOMAIN,custom.example,DIRECT',
+    ]);
   });
 }
