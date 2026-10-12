@@ -34,6 +34,13 @@ class Adapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+class FailingStore extends MemoryStore {
+  @override
+  Future<void> write(String value) async => throw StateError('storage failed');
+  @override
+  Future<void> delete() async => throw StateError('storage failed');
+}
+
 ResponseBody jsonBody(
   Object? data, [
   int status = 200,
@@ -49,6 +56,47 @@ ResponseBody jsonBody(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test(
+    'storage failures fail closed and still revoke the server session',
+    () async {
+      final store = FailingStore();
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      var signOuts = 0;
+      http.httpClientAdapter = Adapter((request) {
+        if (request.path == '/api/auth/sign-in/username') {
+          return jsonBody({}, 200, {
+            'set-auth-token': ['signed-session'],
+          });
+        }
+        if (request.path == '/api/auth/sign-out') {
+          signOuts++;
+          return jsonBody({'success': true});
+        }
+        return jsonBody({
+          'session': {
+            'expiresAt': DateTime.now()
+                .add(const Duration(days: 7))
+                .toIso8601String(),
+          },
+          'user': {'username': 'harmony'},
+        });
+      });
+      final api = HarmonyAccountApi(http: http, storage: store);
+      await expectLater(
+        api.login('harmony', 'password'),
+        throwsA(HarmonyAccountError.unavailable),
+      );
+      expect(api.isAuthorized, isFalse);
+      api.session = HarmonySession(
+        'signed-session',
+        'harmony',
+        DateTime.now().add(const Duration(days: 7)),
+      );
+      await expectLater(api.logout(), throwsStateError);
+      expect(api.isAuthorized, isFalse);
+      expect(signOuts, 1);
+    },
+  );
   test(
     'signed tokens are stored securely, config uses authorization, logout removes access',
     () async {

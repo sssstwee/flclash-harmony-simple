@@ -137,17 +137,21 @@ class HarmonyAccountApi {
   Future<void> logout() async {
     final token = session?.token;
     // Clearing local authorization must succeed even without a network.
-    await clear();
-    if (token == null) return;
     try {
-      await _request(
-        '/api/auth/sign-out',
-        method: 'POST',
-        data: {},
-        token: token,
-      );
-    } catch (_) {
-      // The server session also expires automatically.
+      await clear();
+    } finally {
+      if (token != null) {
+        try {
+          await _request(
+            '/api/auth/sign-out',
+            method: 'POST',
+            data: {},
+            token: token,
+          );
+        } catch (_) {
+          // The server session also expires automatically.
+        }
+      }
     }
   }
 

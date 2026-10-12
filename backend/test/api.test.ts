@@ -77,7 +77,7 @@ test('wrong passwords fail and repeated attempts are throttled in D1', async () 
 
 test('missing settings return a retryable error and oversized auth input is refused', async () => {
   const token = await login();
-  
+
   const response = await request('/v1/config', { headers: bearer(token) });
   expect(response.status).toBe(503);
   expect(await response.text()).not.toContain('private subscription');
