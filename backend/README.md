@@ -17,6 +17,14 @@
 
 应用的默认 API 地址位于 `lib/common/harmony_account.dart`。部署到其他账号时同步修改该地址再用 GitHub Actions 构建应用。
 
+## 免费访问入口
+
+手机默认访问 `https://auth.example.com`，使用 Cloudflare 提供的免费域名；无需购买或续费自有域名。Pages 入口通过 Service Binding 调用 `clash-harmony-api` Worker，账号、认证密钥及配置继续保存在原来的 Worker / D1 中。
+
+在 `backend/gateway` 目录执行 `npx wrangler pages project create clash-harmony-api --production-branch main --force` 首次创建 Pages 项目，然后执行 `npx wrangler pages deploy public --project-name clash-harmony-api --branch main` 部署。当前 Wrangler 首次创建需要 `--force` 保留 Pages 模式；项目创建后，后续部署不再使用该选项。其他账号若无法使用同名项目，修改网关配置及应用地址为实际分配的 pages.dev 地址。
+
+网关使用原生 Service Binding 转发请求及响应，不通过手机无法解析的 workers.dev 公共地址发起网络请求。
+
 ## 接口与验证
 
 - `POST /api/auth/sign-in/username`：用户名和密码登录，返回签名会话头 `set-auth-token`。
