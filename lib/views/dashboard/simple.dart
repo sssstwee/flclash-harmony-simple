@@ -9,7 +9,6 @@ import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
-import 'package:fl_clash/state.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -153,13 +152,14 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
       await _api.clear();
       _remoteProfile = null;
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _error = expired
               ? context.appLocalizations.harmonySessionExpired
               : null;
         });
+      }
     }
   }
 

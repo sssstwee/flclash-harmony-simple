@@ -58,6 +58,7 @@ jobs:
         with:
           path: ~/.pub-cache
           key: harmony-flutter-3.44.10-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: harmony-flutter-3.44.10-${{ runner.os }}-
 
       - name: Install dependencies
         env:

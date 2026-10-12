@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/harmony_account.dart';
@@ -190,8 +189,9 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (call) async {
             calls.add(call);
-            if (call.method == 'write')
+            if (call.method == 'write') {
               saved = call.arguments['value'] as String;
+            }
             if (call.method == 'delete') saved = null;
             return call.method == 'read' ? saved : null;
           });

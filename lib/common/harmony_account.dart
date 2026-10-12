@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 
@@ -23,7 +21,7 @@ class HarmonySessionStore {
 
   Map<String, Object> _arguments([String? value]) => {
     'key': _key,
-    if (value != null) 'value': value,
+    'value': ?value,
     'options': <String, String>{
       'ohosKeyCipherAlgorithm': 'RSA_ECB_OAEPwithSHA_256andMGF1Padding',
       'ohosStorageCipherAlgorithm': 'AES_GCM_NoPadding',

@@ -105,14 +105,18 @@ void main() {
           tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
           busy ? isNull : isNotNull,
         );
-        if (phase == ConnectionPhase.connected)
+        if (phase == ConnectionPhase.connected) {
           expect(find.text('断开'), findsOneWidget);
-        if (phase == ConnectionPhase.disconnected)
+        }
+        if (phase == ConnectionPhase.disconnected) {
           expect(find.text('连接'), findsOneWidget);
-        if (phase == ConnectionPhase.connecting)
+        }
+        if (phase == ConnectionPhase.connecting) {
           expect(find.text('正在连接…'), findsNWidgets(2));
-        if (phase == ConnectionPhase.disconnecting)
+        }
+        if (phase == ConnectionPhase.disconnecting) {
           expect(find.text('正在断开…'), findsNWidgets(2));
+        }
         expect(find.byType(ListTile), findsNothing);
         expect(find.text('DNS'), findsNothing);
         expect(tester.takeException(), isNull);
@@ -126,8 +130,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       app(
-        MediaQuery(
-          data: const MediaQueryData(disableAnimations: true),
+        const MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
           child: SimpleConnectionPanel(
             phase: ConnectionPhase.disconnecting,
             username: 'harmony',
