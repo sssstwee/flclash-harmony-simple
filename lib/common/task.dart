@@ -6,6 +6,7 @@ import 'package:archive/archive_io.dart';
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -83,18 +84,20 @@ Future<List<Group>> _toGroupsTask(ComputeGroupsState state) async {
 }
 
 Future<VM2<String, String>> makeRealProfileTask(
-  MakeRealProfileState data,
-) async {
-  return compute<MakeRealProfileState, VM2<String, String>>(
+  MakeRealProfileState data, {
+  bool? useDefaultRouting,
+}) async {
+  return compute<(MakeRealProfileState, bool), VM2<String, String>>(
     _makeRealProfileTask,
-    data,
+    (data, useDefaultRouting ?? system.isOhos),
   );
 }
 
 Future<VM2<String, String>> _makeRealProfileTask(
-  MakeRealProfileState data,
+  (MakeRealProfileState, bool) params,
 ) async {
-  final rawConfig = Map.from(data.rawConfig);
+  final (data, useDefaultRouting) = params;
+  final rawConfig = Map<String, dynamic>.from(data.rawConfig);
   final realPatchConfig = data.realPatchConfig;
   final profilesPath = data.profilesPath;
   final profileId = data.profileId;
@@ -222,7 +225,10 @@ Future<VM2<String, String>> _makeRealProfileTask(
   }
   List<String> rules = [];
   if (data.rules.isEmpty) {
-    if (rawConfig['rules'] != null) {
+    if (useDefaultRouting) {
+      rules = defaultRoutingRules(rawConfig);
+      applyDefaultDns(rawConfig);
+    } else if (rawConfig['rules'] != null) {
       rules = List<String>.from(rawConfig['rules']);
     }
     if (addedRules.isNotEmpty) {

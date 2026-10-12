@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -92,7 +93,9 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView> {
       final config = await coreController.getConfig(profile.id);
       final group = connectionGroup(
         groups,
-        List<String>.from(config['rules'] ?? const <String>[]),
+        system.isOhos
+            ? defaultRoutingRules(config)
+            : List<String>.from(config['rules'] ?? const <String>[]),
       );
       final selected = group == null
           ? null
@@ -145,7 +148,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView> {
         ? null
         : ref.watch(selectedProxyNameProvider(groupName));
     return CommonScaffold(
-      title: texts.simpleHome,
+      title: appDisplayName,
       actions: [
         IconButton(
           tooltip: texts.settings,

@@ -134,7 +134,7 @@ class AboutView extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            appName,
+                            appDisplayName,
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           Text(

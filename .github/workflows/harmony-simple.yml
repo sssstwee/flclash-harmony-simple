@@ -1,4 +1,4 @@
-name: HarmonyOS Simple
+name: Clash Harmony
 
 on:
   push:
@@ -80,7 +80,7 @@ jobs:
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
-          name: FlClash-Simple-HarmonyOS-${{ github.sha }}
+          name: Clash-Harmony-HarmonyOS-${{ github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 14
