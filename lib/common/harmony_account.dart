@@ -253,7 +253,10 @@ class HarmonyAccountApi {
       }
     }
     if (storageFailure != null) {
-      Error.throwWithStackTrace(storageFailure!, storageStackTrace ?? StackTrace.current);
+      Error.throwWithStackTrace(
+        storageFailure,
+        storageStackTrace ?? StackTrace.current,
+      );
     }
   }
 

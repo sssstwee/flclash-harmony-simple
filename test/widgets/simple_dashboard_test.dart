@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
@@ -13,7 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class SignedOutApi extends HarmonyAccountApi {
-  SignedOutApi() : super(http: Dio(BaseOptions(baseUrl: 'https://api.example.test')));
+  SignedOutApi()
+    : super(http: Dio(BaseOptions(baseUrl: 'https://api.example.test')));
 
   int logins = 0;
 
@@ -27,6 +27,7 @@ class SignedOutApi extends HarmonyAccountApi {
   }
 }
 
+/// Avoids bootstrap/profile sync and path/database init during widget tests.
 class IdleHarmonySimple extends HarmonySimple {
   @override
   HarmonySimpleState build() => const HarmonySimpleState(bootstrapping: false);
@@ -36,6 +37,38 @@ class IdleHarmonySimple extends HarmonySimple {
 
   @override
   Future<void> checkSession() async {}
+
+  @override
+  Future<void> login(String username, String password) async {
+    if (state.busy) return;
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      final session = await _api.login(username, password);
+      state = state.copyWith(session: session, clearError: true);
+    } on HarmonyAccountError catch (error) {
+      state = state.copyWith(error: _harmonyErrorMessage(error));
+    } catch (_) {
+      state = state.copyWith(
+        error: AppLocalizations.current.harmonyServiceError,
+      );
+    } finally {
+      state = state.copyWith(busy: false);
+    }
+  }
+
+  String _harmonyErrorMessage(HarmonyAccountError error) {
+    return switch (error) {
+      HarmonyAccountError.credentials =>
+        AppLocalizations.current.harmonyCredentialsError,
+      HarmonyAccountError.expired =>
+        AppLocalizations.current.harmonySessionExpired,
+      HarmonyAccountError.rateLimited =>
+        AppLocalizations.current.harmonyRateLimited,
+      HarmonyAccountError.config => AppLocalizations.current.harmonyConfigError,
+      HarmonyAccountError.unavailable =>
+        AppLocalizations.current.harmonyServiceError,
+    };
+  }
 }
 
 Finder get primaryFilledButton => find.descendant(
@@ -43,42 +76,47 @@ Finder get primaryFilledButton => find.descendant(
   matching: find.byType(FilledButton),
 );
 
+Widget app(Widget child) => MaterialApp(
+  locale: const Locale('zh', 'CN'),
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
+  supportedLocales: const [Locale('zh', 'CN')],
+  home: Scaffold(body: child),
+);
+
+Widget scoped({
+  required Widget child,
+  SignedOutApi? api,
+  bool connectionPanel = false,
+}) {
+  return ProviderScope(
+    overrides: [
+      harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
+      initProvider.overrideWithValue(true),
+      isStartProvider.overrideWithValue(false),
+      if (api != null) harmonyAccountApiProvider.overrideWithValue(api),
+      if (connectionPanel) ...[
+        totalTrafficProvider.overrideWithValue(const Traffic()),
+        trafficsProvider.overrideWithValue(FixedList(0)),
+      ],
+    ],
+    child: child,
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
     await AppLocalizations.load(const Locale('zh', 'CN'));
   });
 
-  Widget app(Widget child) => MaterialApp(
-    locale: const Locale('zh', 'CN'),
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    supportedLocales: const [Locale('zh', 'CN')],
-    home: Scaffold(body: child),
-  );
-
-  List<Override> dashboardOverrides(SignedOutApi api) => [
-    harmonyAccountApiProvider.overrideWithValue(api),
-    harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
-    initProvider.overrideWithValue(true),
-    isStartProvider.overrideWithValue(false),
-  ];
-
-  List<Override> connectionOverrides() => [
-    totalTrafficProvider.overrideWithValue(const Traffic()),
-    trafficsProvider.overrideWithValue(FixedList(0)),
-  ];
-
   Future<void> renderLogin(WidgetTester tester, SignedOutApi api) async {
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: dashboardOverrides(api),
-        child: app(const SimpleDashboardView()),
-      ),
+      scoped(api: api, child: app(const SimpleDashboardView())),
     );
     await tester.pumpAndSettle();
   }
@@ -98,6 +136,7 @@ void main() {
       expect(find.text('请填写此项。'), findsNWidgets(2));
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.byType(ListTile), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 
@@ -116,6 +155,7 @@ void main() {
       tester.widget<EditableText>(find.byType(EditableText).last).controller.text,
       isEmpty,
     );
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets(
@@ -123,8 +163,8 @@ void main() {
     (tester) async {
       for (final phase in ConnectionPhase.values) {
         await tester.pumpWidget(
-          ProviderScope(
-            overrides: connectionOverrides(),
+          scoped(
+            connectionPanel: true,
             child: app(
               SimpleConnectionPanel(
                 phase: phase,
@@ -159,7 +199,7 @@ void main() {
         expect(find.text('DNS'), findsNothing);
         expect(tester.takeException(), isNull);
       }
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 
@@ -167,8 +207,8 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: connectionOverrides(),
+      scoped(
+        connectionPanel: true,
         child: app(
           const MediaQuery(
             data: MediaQueryData(disableAnimations: true),
@@ -190,6 +230,7 @@ void main() {
       isNotNull,
     );
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets(
@@ -215,8 +256,8 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: connectionOverrides(),
+        scoped(
+          connectionPanel: true,
           child: app(
             const SimpleConnectionPanel(
               phase: ConnectionPhase.disconnected,
@@ -238,6 +279,7 @@ void main() {
         scrollable: connectionScrollable,
       );
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 }

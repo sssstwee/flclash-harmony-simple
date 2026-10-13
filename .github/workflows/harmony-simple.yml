@@ -124,6 +124,7 @@ jobs:
           git -C "$OHOS_GO_DIR" remote add origin https://gitcode.com/openharmony-sig/ohos_golang_go.git
           git -C "$OHOS_GO_DIR" fetch --depth 1 origin "$OHOS_GO_SHA"
           git -C "$OHOS_GO_DIR" checkout FETCH_HEAD
+          git -C "$OHOS_GO_DIR" log -1 --format='OHOS Go commit: %H %s'
           cd "$OHOS_GO_DIR/src"
           ./make.bash
           echo "GOROOT=$OHOS_GO_DIR" >> "$GITHUB_ENV"
