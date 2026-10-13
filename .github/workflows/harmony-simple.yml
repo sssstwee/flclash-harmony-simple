@@ -21,8 +21,8 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
       app: ${{ steps.filter.outputs.app }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
@@ -41,8 +41,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -67,23 +67,29 @@ jobs:
         run: grep -v '^#' .github/harmony-pinned-shas.env >> "$GITHUB_ENV"
 
       - name: Set up HarmonyOS SDK
-        uses: ErBWs/setup-ohos@4dbb63025116eb6165ceac58a4bf47cbdc5ac721 # v2.0.0
+        uses: ErBWs/setup-ohos@v2.0.0
         with:
           version: 26.0.0.821
           cache: true
 
       - name: Set up HarmonyOS Flutter
         run: |
-          git clone https://gitcode.com/CPF-Flutter/flutter_flutter.git "$RUNNER_TOOL_CACHE/flutter-ohos"
-          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" checkout "$FLUTTER_OHOS_SHA"
-          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" tag 3.44.10
-          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
-          echo "$RUNNER_TOOL_CACHE/flutter-ohos/bin" >> "$GITHUB_PATH"
-          echo "$RUNNER_TOOL_CACHE/flutter-ohos/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
+          set -euo pipefail
+          FLUTTER_DIR="$RUNNER_TOOL_CACHE/flutter-ohos"
+          rm -rf "$FLUTTER_DIR"
+          mkdir -p "$FLUTTER_DIR"
+          git -C "$FLUTTER_DIR" init
+          git -C "$FLUTTER_DIR" remote add origin https://gitcode.com/CPF-Flutter/flutter_flutter.git
+          git -C "$FLUTTER_DIR" fetch --depth 1 origin "$FLUTTER_OHOS_SHA"
+          git -C "$FLUTTER_DIR" checkout FETCH_HEAD
+          git -C "$FLUTTER_DIR" tag 3.44.10
+          git -C "$FLUTTER_DIR" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
+          echo "$FLUTTER_DIR/bin" >> "$GITHUB_PATH"
+          echo "$FLUTTER_DIR/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Cache Dart dependencies
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+        uses: actions/cache@v4
         with:
           path: ~/.pub-cache
           key: harmony-flutter-3.44.10-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
@@ -103,30 +109,25 @@ jobs:
         run: flutter test --reporter expanded
 
       - name: Set up Go bootstrap
-        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        uses: actions/setup-go@v5
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
-      - name: Cache HarmonyOS Go toolchain
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57
-        id: ohos-go-cache
-        with:
-          path: ${{ runner.tool_cache }}/ohos-go
-          key: ohos-go-${{ env.OHOS_GO_SHA }}-${{ runner.os }}
-
       - name: Set up HarmonyOS Go
-        if: steps.ohos-go-cache.outputs.cache-hit != 'true'
         run: |
-          git clone https://gitcode.com/openharmony-sig/ohos_golang_go.git "$RUNNER_TOOL_CACHE/ohos-go"
-          git -C "$RUNNER_TOOL_CACHE/ohos-go" checkout "$OHOS_GO_SHA"
-          cd "$RUNNER_TOOL_CACHE/ohos-go/src"
+          set -euo pipefail
+          OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
+          rm -rf "$OHOS_GO_DIR"
+          mkdir -p "$OHOS_GO_DIR"
+          git -C "$OHOS_GO_DIR" init
+          git -C "$OHOS_GO_DIR" remote add origin https://gitcode.com/openharmony-sig/ohos_golang_go.git
+          git -C "$OHOS_GO_DIR" fetch --depth 1 origin "$OHOS_GO_SHA"
+          git -C "$OHOS_GO_DIR" checkout FETCH_HEAD
+          cd "$OHOS_GO_DIR/src"
           ./make.bash
-
-      - name: Export HarmonyOS Go
-        run: |
-          echo "GOROOT=$RUNNER_TOOL_CACHE/ohos-go" >> "$GITHUB_ENV"
-          echo "$RUNNER_TOOL_CACHE/ohos-go/bin" >> "$GITHUB_PATH"
+          echo "GOROOT=$OHOS_GO_DIR" >> "$GITHUB_ENV"
+          echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
         run: dart setup.dart ohos --env stable -v
@@ -137,7 +138,7 @@ jobs:
           find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
       - name: Upload packages
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        uses: actions/upload-artifact@v4
         with:
           name: Clash-Harmony-HarmonyOS-${{ github.sha }}
           path: dist/
