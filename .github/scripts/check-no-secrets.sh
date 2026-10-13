@@ -22,10 +22,9 @@ fail() {
   exit 1
 }
 
-# Known leaked identifiers (rotate if ever deployed).
+# Substring of a previously leaked workers.dev hostname (not a full URL).
 FORBIDDEN=(
   'tokenforsell'
-  '00000000-0000-0000-0000-000000000000'
 )
 
 for needle in "${FORBIDDEN[@]}"; do
@@ -52,7 +51,7 @@ if rg -n \
   fail 'deploy-specific clash-harmony-api *.dev URL in tracked files'
 fi
 
-# Real D1 UUIDs in wrangler (placeholder all-zero and example tokens only).
+# D1 database_id must stay placeholder-only in wrangler configs.
 if rg -n \
   'database_id": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"' \
   backend/wrangler.jsonc backend/wrangler.local.jsonc.example 2>/dev/null \
@@ -60,6 +59,21 @@ if rg -n \
   | rg -v 'YOUR-D1-DATABASE-UUID' >/dev/null 2>&1; then
   fail 'non-placeholder database_id in wrangler config'
 fi
+
+# Fingerprint of a rotated D1 id: sha256 of the UUID string, literal not stored in git.
+LEAKED_D1_SHA256='1c446b78d3d383b101f11be506a5817e398b263157e402093ac02ccc0b198f21'
+while IFS= read -r uuid; do
+  case "$uuid" in
+    00000000-0000-0000-0000-000000000000 | YOUR-D1-DATABASE-UUID) continue ;;
+  esac
+  hash=$(printf '%s' "$uuid" | sha256sum | awk '{print $1}')
+  if [ "$hash" = "$LEAKED_D1_SHA256" ]; then
+    fail 'leaked D1 database_id fingerprint detected'
+  fi
+done < <(
+  rg -o --no-filename '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+    "${EXCLUDES[@]}" "${SCAN_PATHS[@]}" 2>/dev/null | sort -u
+)
 
 # Mihomo/Clash subscription-shaped secrets in tests (allow example.org fixtures).
 if rg -n \
