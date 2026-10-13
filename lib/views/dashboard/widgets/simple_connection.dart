@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter/material.dart';
@@ -204,7 +203,7 @@ class _NodeCard extends StatelessWidget {
                   if (delayMs != null && delayMs! > 0) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${texts.harmonyLatency}: ${delayMs} ms',
+                      '${texts.harmonyLatency}: $delayMs ms',
                       style: context.textTheme.bodySmall,
                     ),
                   ],

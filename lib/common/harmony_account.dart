@@ -201,7 +201,7 @@ class HarmonyAccountApi {
       token: session!.token,
       responseType: ResponseType.stream,
       headers: {
-        if (ifModifiedSince != null) 'If-Modified-Since': ifModifiedSince,
+        'If-Modified-Since': ?ifModifiedSince,
       },
     );
     if (response.statusCode == 304) {
