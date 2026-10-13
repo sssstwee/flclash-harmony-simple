@@ -29,6 +29,11 @@ class SignedOutApi extends HarmonyAccountApi {
 }
 
 /// Avoids bootstrap/profile sync and path/database init during widget tests.
+class _EmptyProfiles extends Profiles {
+  @override
+  List<Profile> build() => [];
+}
+
 class IdleHarmonySimple extends HarmonySimple {
   @override
   HarmonySimpleState build() => const HarmonySimpleState(bootstrapping: false);
@@ -93,19 +98,18 @@ Widget app(Widget child) => MaterialApp(
 
 Widget scoped({
   required Widget child,
-  SignedOutApi? api,
-  bool connectionPanel = false,
+  required SignedOutApi api,
 }) {
   return ProviderScope(
+    key: UniqueKey(),
     overrides: [
       harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
+      harmonyAccountApiProvider.overrideWithValue(api),
+      profilesProvider.overrideWith(_EmptyProfiles.new),
       initProvider.overrideWithValue(true),
       isStartProvider.overrideWithValue(false),
-      if (api != null) harmonyAccountApiProvider.overrideWithValue(api),
-      if (connectionPanel) ...[
-        totalTrafficProvider.overrideWithValue(const Traffic()),
-        trafficsProvider.overrideWithValue(FixedList(0)),
-      ],
+      totalTrafficProvider.overrideWithValue(const Traffic()),
+      trafficsProvider.overrideWithValue(FixedList(0)),
     ],
     child: child,
   );
@@ -121,7 +125,8 @@ void main() {
     await tester.pumpWidget(
       scoped(api: api, child: app(const SimpleDashboardView())),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
   }
 
   testWidgets(
@@ -134,7 +139,8 @@ void main() {
       expect(find.text('导入订阅'), findsNothing);
       expect(find.text('连接'), findsNothing);
       await tester.tap(find.byType(FilledButton));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
       expect(api.logins, 0);
       expect(find.text('请填写此项。'), findsNWidgets(2));
       expect(find.byType(NavigationBar), findsNothing);
@@ -167,7 +173,7 @@ void main() {
       for (final phase in ConnectionPhase.values) {
         await tester.pumpWidget(
           scoped(
-            connectionPanel: true,
+            api: SignedOutApi(),
             child: app(
               SimpleConnectionPanel(
                 phase: phase,
@@ -211,7 +217,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       scoped(
-        connectionPanel: true,
+        api: SignedOutApi(),
         child: app(
           const MediaQuery(
             data: MediaQueryData(disableAnimations: true),
@@ -260,7 +266,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(
         scoped(
-          connectionPanel: true,
+          api: SignedOutApi(),
           child: app(
             const SimpleConnectionPanel(
               phase: ConnectionPhase.disconnected,
