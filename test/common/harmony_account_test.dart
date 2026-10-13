@@ -7,8 +7,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 class MemoryStore extends HarmonySessionStore {
   String? token;
+  String? meta;
+  String? lastModified;
+
   @override
   Future<String?> read() async => token;
+
   @override
   Future<void> write(String value) async {
     token = value;
@@ -17,6 +21,39 @@ class MemoryStore extends HarmonySessionStore {
   @override
   Future<void> delete() async {
     token = null;
+  }
+
+  @override
+  Future<String?> readMeta() async => meta;
+
+  @override
+  Future<void> writeMeta(String value) async {
+    meta = value;
+  }
+
+  @override
+  Future<void> deleteMeta() async {
+    meta = null;
+  }
+
+  @override
+  Future<String?> readConfigLastModified() async => lastModified;
+
+  @override
+  Future<void> writeConfigLastModified(String value) async {
+    lastModified = value;
+  }
+
+  @override
+  Future<void> deleteConfigLastModified() async {
+    lastModified = null;
+  }
+
+  @override
+  Future<void> clearAll() async {
+    token = null;
+    meta = null;
+    lastModified = null;
   }
 }
 
@@ -128,7 +165,8 @@ void main() {
       await api.login(' harmony ', 'password');
       expect(store.token, 'signed-session');
       expect(api.isAuthorized, isTrue);
-      expect(utf8.decode(await api.downloadConfig()), 'proxies: []');
+      final download = await api.downloadConfig();
+      expect(utf8.decode(download.bytes!), 'proxies: []');
       expect(await api.restore(), isNotNull);
       await api.logout();
       expect(store.token, isNull);
@@ -162,6 +200,26 @@ void main() {
       expect(api.isAuthorized, isFalse);
     },
   );
+
+  test('restore keeps cached session metadata when the service is unavailable', () async {
+    final store = MemoryStore()
+      ..token = 'saved-token'
+      ..meta = jsonEncode({
+        'username': 'offline-user',
+        'expiresAt': DateTime.now().add(const Duration(days: 2)).toIso8601String(),
+      });
+    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+    http.httpClientAdapter = Adapter(
+      (_) => throw DioException(
+        requestOptions: RequestOptions(path: '/api/auth/get-session'),
+        type: DioExceptionType.connectionError,
+      ),
+    );
+    final api = HarmonyAccountApi(http: http, storage: store);
+    final session = await api.restore();
+    expect(session?.username, 'offline-user');
+    expect(api.isAuthorized, isTrue);
+  });
 
   test(
     'plaintext API endpoints are refused before credentials are sent',

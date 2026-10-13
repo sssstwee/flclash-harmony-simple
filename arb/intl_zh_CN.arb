@@ -583,5 +583,15 @@
   "harmonyConfigError": "暂时无法获取可用线路，请稍后点击连接重试。",
   "harmonyConnecting": "正在连接…",
   "harmonyDisconnecting": "正在断开…",
-  "harmonyAutomaticHint": "国内和内网直连，国外网络自动使用代理。"
+  "harmonyAutomaticHint": "国内和内网直连，国外网络自动使用代理。",
+  "harmonyOfflineConfig": "正在使用缓存配置（离线）",
+  "harmonyRetry": "重试",
+  "harmonyCurrentNode": "当前节点",
+  "harmonySwitchNode": "切换节点",
+  "harmonySessionTraffic": "本次流量",
+  "harmonyUpload": "上传",
+  "harmonyDownload": "下载",
+  "harmonyLatency": "延迟",
+  "harmonyAccount": "账号",
+  "simpleErrorState": "连接异常"
 }

@@ -3,6 +3,8 @@ name: Clash Harmony
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -13,15 +15,34 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceeaa725780c679367b822 # v4.2.2
+      - uses: dorny/paths-filter@de90cc6fb38fc0960ad1525564a0ee512265133e # v3.0.2
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            app:
+              - '**'
+              - '!backend/**'
+
   backend:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceeaa725780c679367b822
+      - uses: actions/setup-node@cdca3a1c4d2560c1653e9c2490b38a6a8b2f2b8 # v4.3.0
         with:
           node-version: '22'
           cache: npm
@@ -30,23 +51,31 @@ jobs:
       - run: npm run check
 
   build:
-    needs: backend
+    needs: [changes, backend]
+    if: |
+      always() &&
+      (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
+      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceeaa725780c679367b822
         with:
           submodules: recursive
 
+      - name: Load pinned gitcode SHAs
+        run: grep -v '^#' .github/harmony-pinned-shas.env >> "$GITHUB_ENV"
+
       - name: Set up HarmonyOS SDK
-        uses: ErBWs/setup-ohos@v2.0.0
+        uses: ErBWs/setup-ohos@4dbb63025116eb6165ceac58a4bf47cbdc5ac721 # v2.0.0
         with:
           version: 26.0.0.821
           cache: true
 
       - name: Set up HarmonyOS Flutter
         run: |
-          git clone -b 3.44.9+ohos-0.0.1-canary1 --depth 1 https://gitcode.com/CPF-Flutter/flutter_flutter.git "$RUNNER_TOOL_CACHE/flutter-ohos"
+          git clone https://gitcode.com/CPF-Flutter/flutter_flutter.git "$RUNNER_TOOL_CACHE/flutter-ohos"
+          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" checkout "$FLUTTER_OHOS_SHA"
           git -C "$RUNNER_TOOL_CACHE/flutter-ohos" tag 3.44.10
           git -C "$RUNNER_TOOL_CACHE/flutter-ohos" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
           echo "$RUNNER_TOOL_CACHE/flutter-ohos/bin" >> "$GITHUB_PATH"
@@ -54,7 +83,7 @@ jobs:
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Cache Dart dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@6849a6489920fbf316ea4802ad8aaf3faa865a7ec # v4.2.0
         with:
           path: ~/.pub-cache
           key: harmony-flutter-3.44.10-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
@@ -74,16 +103,28 @@ jobs:
         run: flutter test --reporter expanded
 
       - name: Set up Go bootstrap
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40a3aa93f1adb4d15848a469875b3b32da6c1d87 # v5.5.0
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
+      - name: Cache HarmonyOS Go toolchain
+        uses: actions/cache@6849a6489920fbf316ea4802ad8aaf3faa865a7ec
+        id: ohos-go-cache
+        with:
+          path: ${{ runner.tool_cache }}/ohos-go
+          key: ohos-go-${{ env.OHOS_GO_SHA }}-${{ runner.os }}
+
       - name: Set up HarmonyOS Go
+        if: steps.ohos-go-cache.outputs.cache-hit != 'true'
         run: |
-          git clone -b release-branch.go1.24 --depth 1 https://gitcode.com/openharmony-sig/ohos_golang_go.git "$RUNNER_TOOL_CACHE/ohos-go"
+          git clone https://gitcode.com/openharmony-sig/ohos_golang_go.git "$RUNNER_TOOL_CACHE/ohos-go"
+          git -C "$RUNNER_TOOL_CACHE/ohos-go" checkout "$OHOS_GO_SHA"
           cd "$RUNNER_TOOL_CACHE/ohos-go/src"
           ./make.bash
+
+      - name: Export HarmonyOS Go
+        run: |
           echo "GOROOT=$RUNNER_TOOL_CACHE/ohos-go" >> "$GITHUB_ENV"
           echo "$RUNNER_TOOL_CACHE/ohos-go/bin" >> "$GITHUB_PATH"
 
@@ -96,7 +137,7 @@ jobs:
           find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@65c4c2721f348754186459653c2cc4b5de04d1b # v4.6.0
         with:
           name: Clash-Harmony-HarmonyOS-${{ github.sha }}
           path: dist/

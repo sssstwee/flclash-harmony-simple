@@ -76,12 +76,17 @@ Future<({String name, Map<String, String> selections})?> autoSelectProxy(
     return delays[name];
   }
 
-  for (final candidate in candidates.where(
-    (item) => automatic.contains(item.name),
-  )) {
-    final value = await delay(candidate.name);
-    if (value != null && value > 0) return candidate;
+  final automaticCandidates = candidates
+      .where((item) => automatic.contains(item.name))
+      .toList();
+  for (var offset = 0; offset < automaticCandidates.length; offset += 6) {
     if (elapsed.elapsed >= const Duration(seconds: 24)) return null;
+    final batch = automaticCandidates.skip(offset).take(6).toList();
+    await Future.wait(batch.map((candidate) => delay(candidate.name)));
+    for (final candidate in batch) {
+      final value = delays[candidate.name];
+      if (value != null && value > 0) return candidate;
+    }
   }
   final manual = candidates
       .where((item) => !automatic.contains(item.name))

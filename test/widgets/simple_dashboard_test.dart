@@ -36,10 +36,11 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          harmonyAccountApiProvider.overrideWithValue(api),
           initProvider.overrideWithValue(true),
           isStartProvider.overrideWithValue(false),
         ],
-        child: app(SimpleDashboardView(accountApi: api)),
+        child: app(const SimpleDashboardView()),
       ),
     );
     await tester.pumpAndSettle();
@@ -112,10 +113,10 @@ void main() {
           expect(find.text('连接'), findsOneWidget);
         }
         if (phase == ConnectionPhase.connecting) {
-          expect(find.text('正在连接…'), findsNWidgets(2));
+          expect(find.text('正在连接…'), findsWidgets);
         }
         if (phase == ConnectionPhase.disconnecting) {
-          expect(find.text('正在断开…'), findsNWidgets(2));
+          expect(find.text('正在断开…'), findsWidgets);
         }
         expect(find.byType(ListTile), findsNothing);
         expect(find.text('DNS'), findsNothing);

@@ -9,7 +9,11 @@ const request = (path: string, init?: RequestInit) => exports.default.fetch(url(
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 beforeEach(async () => {
-  await env.DB.batch(['session', 'account', 'user', 'rateLimit', 'proxy_config'].map(table => env.DB.prepare(`DELETE FROM "${table}"`)));
+  await env.DB.batch(
+    ['session', 'account', 'user', 'rateLimit', 'proxy_config', 'config_fetch_audit', 'config_api_rate_limit'].map(
+      table => env.DB.prepare(`DELETE FROM "${table}"`),
+    ),
+  );
 
   const hash = await hashPassword(password);
   const date = new Date().toISOString();
@@ -18,7 +22,6 @@ beforeEach(async () => {
     env.DB.prepare('INSERT INTO account (id,accountId,providerId,userId,password,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?)').bind('test-account', 'test-user', 'credential', 'test-user', hash, date, date),
   ]);
 });
-
 
 async function login() {
   const response = await request('/api/auth/sign-in/username', {
@@ -32,6 +35,12 @@ async function login() {
   return token!;
 }
 
+async function seedDefaultConfig(content = config) {
+  await env.DB.prepare(
+    'INSERT INTO proxy_config (scope, scope_key, content, updated_at) VALUES (?, ?, ?, ?)',
+  ).bind('default', '', content, new Date().toISOString()).run();
+}
+
 test('configuration requires authentication and public registration is disabled', async () => {
   expect((await request('/v1/config')).status).toBe(401);
   expect((await request('/v1/config', { headers: bearer('forged') })).status).toBe(401);
@@ -42,7 +51,7 @@ test('login, protected configuration, session inspection and logout work end to 
   const token = await login();
   const session = await request('/api/auth/get-session', { headers: bearer(token) });
   expect((await session.json() as { user: { username: string } }).user.username).toBe('tester');
-  await env.DB.prepare('INSERT INTO proxy_config VALUES (1,?,?)').bind(config, new Date().toISOString()).run();
+  await seedDefaultConfig();
   const response = await request('/v1/config', { headers: bearer(token) });
   expect(response.status).toBe(200);
   expect(response.headers.get('Cache-Control')).toBe('private, no-store');
@@ -82,4 +91,55 @@ test('missing settings return a retryable error and oversized auth input is refu
   expect(response.status).toBe(503);
   expect(await response.text()).not.toContain('private subscription');
   expect((await request('/api/auth/sign-in/username', { method: 'POST', body: 'x'.repeat(5000) })).status).toBe(413);
+});
+
+test('rejects oversized auth bodies even when Content-Length lies', async () => {
+  const response = await request('/api/auth/sign-in/username', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Content-Length': '10' },
+    body: 'x'.repeat(5000),
+  });
+  expect(response.status).toBe(413);
+});
+
+test('config downloads are rate limited per user', async () => {
+  const token = await login();
+  await seedDefaultConfig();
+  const statuses: number[] = [];
+  for (let i = 0; i < 31; i++) {
+    statuses.push((await request('/v1/config', { headers: bearer(token) })).status);
+  }
+  expect(statuses.filter(status => status === 200).length).toBe(30);
+  expect(statuses.at(-1)).toBe(429);
+});
+
+test('returns 304 when configuration is unchanged', async () => {
+  const token = await login();
+  await seedDefaultConfig();
+  const first = await request('/v1/config', { headers: bearer(token) });
+  const lastModified = first.headers.get('Last-Modified');
+  expect(lastModified).toBeTruthy();
+  const second = await request('/v1/config', {
+    headers: { ...bearer(token), 'If-Modified-Since': lastModified! },
+  });
+  expect(second.status).toBe(304);
+});
+
+test('prefers per-user configuration with default fallback and logs fetches', async () => {
+  const token = await login();
+  await seedDefaultConfig('proxies: []');
+  await env.DB.prepare(
+    'INSERT INTO proxy_config (scope, scope_key, content, updated_at) VALUES (?, ?, ?, ?)',
+  ).bind('user', 'test-user', config, new Date().toISOString()).run();
+  const response = await request('/v1/config', { headers: bearer(token) });
+  expect(response.status).toBe(200);
+  expect(await response.text()).toBe(config);
+  const audit = await env.DB.prepare('SELECT scope, scope_key FROM config_fetch_audit').first<{ scope: string; scope_key: string }>();
+  expect(audit?.scope).toBe('user');
+  expect(audit?.scope_key).toBe('test-user');
+});
+
+test('wrong HTTP method on config returns 404', async () => {
+  const token = await login();
+  expect((await request('/v1/config', { method: 'POST', headers: bearer(token) })).status).toBe(404);
 });

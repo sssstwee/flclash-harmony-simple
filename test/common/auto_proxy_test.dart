@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -130,4 +131,29 @@ void main() {
       expect(result, isNull);
     },
   );
+
+  test('stops within the 24 second budget when every automatic group times out', () {
+    fakeAsync((async) {
+      final root = Group(
+        name: 'Main',
+        type: GroupType.Selector,
+        all: List.generate(
+          8,
+          (index) => Proxy(name: 'Auto$index', type: 'URLTest'),
+        ),
+      );
+      final groups = <Group>[
+        root,
+        for (var i = 0; i < 8; i++)
+          Group(name: 'Auto$i', type: GroupType.URLTest, all: [fast]),
+      ];
+      Object? result;
+      autoSelectProxy(root, groups, (_) async {
+        await Future<void>.delayed(const Duration(seconds: 8));
+        return null;
+      }).then((value) => result = value);
+      async.elapse(const Duration(seconds: 25));
+      expect(result, isNull);
+    });
+  });
 }

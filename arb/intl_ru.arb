@@ -583,5 +583,15 @@
   "harmonyConfigError": "Не удалось загрузить настройки. Повторите подключение позже.",
   "harmonyConnecting": "Подключение…",
   "harmonyDisconnecting": "Отключение…",
-  "harmonyAutomaticHint": "Сети Китая и локальные сети подключаются напрямую, остальные — через прокси."
+  "harmonyAutomaticHint": "Сети Китая и локальные сети подключаются напрямую, остальные — через прокси.",
+  "harmonyOfflineConfig": "Using cached settings (offline)",
+  "harmonyRetry": "Try again",
+  "harmonyCurrentNode": "Current node",
+  "harmonySwitchNode": "Switch node",
+  "harmonySessionTraffic": "Session traffic",
+  "harmonyUpload": "Upload",
+  "harmonyDownload": "Download",
+  "harmonyLatency": "Latency",
+  "harmonyAccount": "Account",
+  "simpleErrorState": "Connection error"
 }

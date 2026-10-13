@@ -433,6 +433,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage(
       "Go to configure script",
     ),
+    "harmonyAccount": MessageLookupByLibrary.simpleMessage("Account"),
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
       "Domestic and local networks connect directly. Overseas networks use the proxy automatically.",
     ),
@@ -440,6 +441,18 @@ class MessageLookup extends MessageLookupByLibrary {
       "Unable to download valid connection settings. Try connecting again later.",
     ),
     "harmonyConnecting": MessageLookupByLibrary.simpleMessage("Connecting…"),
+    "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("Current node"),
+    "harmonyDownload": MessageLookupByLibrary.simpleMessage("Download"),
+    "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
+    "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
+      "Using cached settings (offline)",
+    ),
+    "harmonyRetry": MessageLookupByLibrary.simpleMessage("Try again"),
+    "harmonySessionTraffic": MessageLookupByLibrary.simpleMessage(
+      "Session traffic",
+    ),
+    "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("Switch node"),
+    "harmonyUpload": MessageLookupByLibrary.simpleMessage("Upload"),
     "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
       "Incorrect username or password.",
     ),
@@ -983,6 +996,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "simpleConnectFailed": MessageLookupByLibrary.simpleMessage(
       "Could not start the proxy. Check VPN permission and try again.",
     ),
+    "simpleErrorState": MessageLookupByLibrary.simpleMessage("Connection error"),
     "simpleDisconnect": MessageLookupByLibrary.simpleMessage("Disconnect"),
     "simpleHome": MessageLookupByLibrary.simpleMessage("Connect"),
     "simpleImport": MessageLookupByLibrary.simpleMessage("Import subscription"),

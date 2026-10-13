@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "clash-harmony-api",
+  "workers_dev": true,
+  "vars": {
+    "AUTH_ORIGIN": "https://YOUR-SUBDOMAIN.workers.dev"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "clash-harmony-auth",
+      "database_id": "YOUR-D1-DATABASE-UUID"
+    }
+  ]
+}
