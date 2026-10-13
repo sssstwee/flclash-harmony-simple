@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:fl_clash/common/fixed.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
@@ -43,7 +44,9 @@ class IdleHarmonySimple extends HarmonySimple {
     if (state.busy) return;
     state = state.copyWith(busy: true, clearError: true);
     try {
-      final session = await _api.login(username, password);
+      final session = await ref
+          .read(harmonyAccountApiProvider)
+          .login(username, password);
       state = state.copyWith(session: session, clearError: true);
     } on HarmonyAccountError catch (error) {
       state = state.copyWith(error: _harmonyErrorMessage(error));

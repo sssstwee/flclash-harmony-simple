@@ -15,15 +15,21 @@
 
 现有订阅使用 IP 与非标准端口，配置由管理员拉取后存入 D1。订阅内容更新后重新执行第 6 步；服务端不会定时刷新上游订阅，手机端会自动取得已同步的新配置。导入接受 Clash/Mihomo YAML，当前 SQL 导入限制约为 90 KB。
 
-应用的默认 API 地址位于 `lib/common/harmony_account.dart`。部署到其他账号时同步修改该地址再用 GitHub Actions 构建应用。
+客户端 API 地址通过 **`CLASH_HARMONY_API_URL`** 注入（见仓库根目录 `env.json.example` → 本地 `env.json`，或 GitHub Actions 变量 `CLASH_HARMONY_API_URL`）。仓库内默认仅为 `https://auth.example.com` 占位，不含真实域名。
 
-## 免费访问入口
+## 免费访问入口（Pages 网关）
 
-手机默认访问 `https://auth.example.com`，使用 Cloudflare 提供的免费域名；无需购买或续费自有域名。Pages 入口通过 Service Binding 调用 `clash-harmony-api` Worker，账号、认证密钥及配置继续保存在原来的 Worker / D1 中。
+推荐使用 Cloudflare **Pages** 作为公网 HTTPS 入口（`*.pages.dev` 或自定义域名），通过 **Service Binding** 转发到同名 Worker；账号、密钥与配置仍在 Worker / D1。在 `backend/gateway` 创建 Pages 项目并 `wrangler pages deploy public`；项目名与 Worker 服务名按你的账号调整。网关仅转发白名单路径（见 `gateway/public/_worker.js`），不在仓库中保存具体域名。
 
-在 `backend/gateway` 目录执行 `npx wrangler pages project create clash-harmony-api --production-branch main --force` 首次创建 Pages 项目，然后执行 `npx wrangler pages deploy public --project-name clash-harmony-api --branch main` 部署。当前 Wrangler 首次创建需要 `--force` 保留 Pages 模式；项目创建后，后续部署不再使用该选项。其他账号若无法使用同名项目，修改网关配置及应用地址为实际分配的 pages.dev 地址。
+## 密钥与变量（仅名称）
 
-网关使用原生 Service Binding 转发请求及响应，不通过手机无法解析的 workers.dev 公共地址发起网络请求。
+| 名称 | 类型 | 说明 |
+|------|------|------|
+| `BETTER_AUTH_SECRET` | Cloudflare Secret | Better Auth 签名密钥 |
+| `AUTH_ORIGIN` | Worker 变量 / `wrangler.local.jsonc` | 对外 HTTPS 源，与客户端一致 |
+| D1 `database_id` | 绑定 | 仅写在 gitignore 的 `wrangler.local.jsonc` |
+| `SUBSCRIPTION_URL` | 运维 JSON（gitignore） | `npm run config` 拉取订阅；模板 `secrets.example.json` |
+| `CLASH_HARMONY_API_URL` | App `env.json` / GitHub Variable | 打包进 HAP 的 API 根地址 |
 
 ## 接口与验证
 

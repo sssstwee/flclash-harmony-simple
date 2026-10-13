@@ -3,7 +3,7 @@
   "name": "clash-harmony-api",
   "workers_dev": true,
   "vars": {
-    "AUTH_ORIGIN": "https://YOUR-SUBDOMAIN.workers.dev"
+    "AUTH_ORIGIN": "https://YOUR-PAGES-OR-WORKERS-ORIGIN.example"
   },
   "d1_databases": [
     {

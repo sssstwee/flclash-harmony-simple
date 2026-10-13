@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 
+/// Production builds must set [CLASH_HARMONY_API_URL] (see `env.json.example`).
 const harmonyApiUrl = String.fromEnvironment(
   'CLASH_HARMONY_API_URL',
   defaultValue: 'https://auth.example.com',

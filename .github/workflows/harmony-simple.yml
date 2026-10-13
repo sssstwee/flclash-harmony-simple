@@ -15,6 +15,14 @@ permissions:
   contents: read
 
 jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for committed secrets
+        run: bash .github/scripts/check-no-secrets.sh
+
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -33,7 +41,7 @@ jobs:
               - '!backend/**'
 
   backend:
-    needs: changes
+    needs: [changes, secrets-scan]
     if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -51,7 +59,7 @@ jobs:
       - run: npm run check
 
   build:
-    needs: [changes, backend]
+    needs: [changes, backend, secrets-scan]
     if: |
       always() &&
       (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
@@ -131,7 +139,22 @@ jobs:
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
-        run: dart setup.dart ohos --env stable -v
+        env:
+          CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
+        run: |
+          set -euo pipefail
+          API_URL="${CLASH_HARMONY_API_URL:-https://auth.example.com}"
+          cp env.json.example env.json
+          API_URL="$API_URL" python3 - <<'PY'
+          import json, os
+          with open("env.json") as f:
+              data = json.load(f)
+          data["CLASH_HARMONY_API_URL"] = os.environ["API_URL"]
+          with open("env.json", "w") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          PY
+          dart setup.dart ohos --env stable -v
 
       - name: Checksums
         run: |

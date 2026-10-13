@@ -19,23 +19,54 @@ flowchart LR
 ```
 
 - **App** (`lib/`, `ohos/`): login, cached config, connect/disconnect, auto route selection.
-- **Pages gateway** (`backend/gateway/`): public `*.pages.dev` entry, security headers, path allowlist.
+- **Pages gateway** (`backend/gateway/`): public HTTPS entry (your `*.pages.dev` or custom domain), security headers, path allowlist.
 - **Worker** (`backend/src/`): auth, per-user config resolution, rate limits, audit log.
 - **D1**: Better Auth tables + `proxy_config` (default / per-user / per-group).
 
-## Secrets & deploy (summary)
+## Required configuration (names only)
 
-1. Copy `backend/wrangler.local.jsonc.example` → local `backend/wrangler.local.jsonc` (gitignored): set your **D1 `database_id`**, optional `workers_dev`, and `AUTH_ORIGIN`.
-2. `BETTER_AUTH_SECRET` via `wrangler secret put` (≥ 32 random chars).
-3. Apply migrations: `npx wrangler d1 migrations apply clash-harmony-auth --remote`.
-4. Accounts: `npm run account -- USER --remote --print-password` (password shown once; not written to disk by default).
-5. Config: private JSON `{"SUBSCRIPTION_URL":"..."}` → `npm run config -- /path/secrets.json --remote` (default). Per-user: `--scope=user --scope-key=<userId>`; per-group: `--scope=group --scope-key=<group>`.
+No real API URLs, D1 IDs, subscriptions, or credentials belong in git. Use local/gitignored files and platform secrets.
 
-Details: [backend/README.md](backend/README.md).
+### GitHub Actions (repository **Variables** / **Secrets**)
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| `CLASH_HARMONY_API_URL` | Variable (optional) | Public HTTPS origin baked into release HAP via `env.json` at build time. If unset, CI uses `https://auth.example.com`. |
+
+### Cloudflare Worker (`backend/`)
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| `BETTER_AUTH_SECRET` | Secret (`wrangler secret put`) | Better Auth signing key (≥ 32 random chars). |
+| `AUTH_ORIGIN` | Var (in gitignored `wrangler.local.jsonc` or dashboard) | Public HTTPS origin of the auth API (must match what clients use). |
+| D1 `database_id` | Resource binding | In gitignored `wrangler.local.jsonc` only; committed `wrangler.jsonc` uses an all-zero placeholder. |
+
+### Cloudflare Pages gateway (`backend/gateway/`)
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| Pages project name | Dashboard | Your gateway project (Service Binding to the Worker above). |
+| `API` service binding | `wrangler.jsonc` | Binds to the Worker service name you deploy. |
+
+### HarmonyOS app build (local / CI)
+
+| Name | Kind | Purpose |
+|------|------|---------|
+| `CLASH_HARMONY_API_URL` | `dart-define` / `env.json` | Copy [`env.json.example`](env.json.example) → gitignored `env.json` for `dart setup.dart` / Flutter builds. |
+
+### Operator-only files (never commit)
+
+| File | Purpose |
+|------|---------|
+| `backend/wrangler.local.jsonc` | Real `database_id`, `AUTH_ORIGIN`, optional `workers_dev`. Template: [`backend/wrangler.local.jsonc.example`](backend/wrangler.local.jsonc.example). |
+| `backend/secrets.json` or any `*.secrets.json` | `SUBSCRIPTION_URL` for `npm run config`. Template: [`backend/secrets.example.json`](backend/secrets.example.json). |
+| `env.json` | Flutter `CLASH_HARMONY_API_URL` for packaged builds. |
+
+Deploy steps: [backend/README.md](backend/README.md).
 
 ## Build & CI
 
-GitHub Actions workflow **Clash Harmony** (`.github/workflows/harmony-simple.yml`): backend tests, Flutter analyze/test, unsigned HAP on app changes. Uses pinned gitcode SHAs in [`.github/harmony-pinned-shas.env`](.github/harmony-pinned-shas.env).
+GitHub Actions workflow **Clash Harmony** (`.github/workflows/harmony-simple.yml`): secret pattern scan, backend tests, Flutter analyze/test, unsigned HAP on app changes. Uses pinned gitcode SHAs in [`.github/harmony-pinned-shas.env`](.github/harmony-pinned-shas.env).
 
 ## Repo layout note
 
