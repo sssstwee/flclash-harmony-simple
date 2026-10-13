@@ -1,17 +1,25 @@
-import 'package:fl_clash/l10n/l10n.dart';
+import 'package:dio/dio.dart';
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/harmony_account.dart';
-import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
+import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/harmony_simple.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/simple.dart';
+import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class SignedOutApi extends HarmonyAccountApi {
+  SignedOutApi() : super(http: Dio(BaseOptions(baseUrl: 'https://api.example.test')));
+
   int logins = 0;
+
   @override
   Future<HarmonySession?> restore() async => null;
+
   @override
   Future<HarmonySession> login(String username, String password) async {
     logins++;
@@ -19,7 +27,28 @@ class SignedOutApi extends HarmonyAccountApi {
   }
 }
 
+class IdleHarmonySimple extends HarmonySimple {
+  @override
+  HarmonySimpleState build() => const HarmonySimpleState(bootstrapping: false);
+
+  @override
+  Future<void> bootstrap() async {}
+
+  @override
+  Future<void> checkSession() async {}
+}
+
+Finder get primaryFilledButton => find.descendant(
+  of: find.byType(SimpleConnectionPanel),
+  matching: find.byType(FilledButton),
+);
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await AppLocalizations.load(const Locale('zh', 'CN'));
+  });
+
   Widget app(Widget child) => MaterialApp(
     locale: const Locale('zh', 'CN'),
     localizationsDelegates: const [
@@ -32,14 +61,22 @@ void main() {
     home: Scaffold(body: child),
   );
 
+  List<Override> dashboardOverrides(SignedOutApi api) => [
+    harmonyAccountApiProvider.overrideWithValue(api),
+    harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
+    initProvider.overrideWithValue(true),
+    isStartProvider.overrideWithValue(false),
+  ];
+
+  List<Override> connectionOverrides() => [
+    totalTrafficProvider.overrideWithValue(const Traffic()),
+    trafficsProvider.overrideWithValue(FixedList(0)),
+  ];
+
   Future<void> renderLogin(WidgetTester tester, SignedOutApi api) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          harmonyAccountApiProvider.overrideWithValue(api),
-          initProvider.overrideWithValue(true),
-          isStartProvider.overrideWithValue(false),
-        ],
+        overrides: dashboardOverrides(api),
         child: app(const SimpleDashboardView()),
       ),
     );
@@ -76,10 +113,7 @@ void main() {
     expect(api.logins, 1);
     expect(find.text('用户名或密码错误。'), findsOneWidget);
     expect(
-      tester
-          .widget<EditableText>(find.byType(EditableText).last)
-          .controller
-          .text,
+      tester.widget<EditableText>(find.byType(EditableText).last).controller.text,
       isEmpty,
     );
   });
@@ -89,12 +123,15 @@ void main() {
     (tester) async {
       for (final phase in ConnectionPhase.values) {
         await tester.pumpWidget(
-          app(
-            SimpleConnectionPanel(
-              phase: phase,
-              username: 'harmony',
-              onToggle: () {},
-              onLogout: () {},
+          ProviderScope(
+            overrides: connectionOverrides(),
+            child: app(
+              SimpleConnectionPanel(
+                phase: phase,
+                username: 'harmony',
+                onToggle: () {},
+                onLogout: () {},
+              ),
             ),
           ),
         );
@@ -103,7 +140,7 @@ void main() {
             phase == ConnectionPhase.connecting ||
             phase == ConnectionPhase.disconnecting;
         expect(
-          tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+          tester.widget<FilledButton>(primaryFilledButton).onPressed,
           busy ? isNull : isNotNull,
         );
         if (phase == ConnectionPhase.connected) {
@@ -130,12 +167,15 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      app(
-        const MediaQuery(
-          data: MediaQueryData(disableAnimations: true),
-          child: SimpleConnectionPanel(
-            phase: ConnectionPhase.disconnecting,
-            username: 'harmony',
+      ProviderScope(
+        overrides: connectionOverrides(),
+        child: app(
+          const MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnecting,
+              username: 'harmony',
+            ),
           ),
         ),
       ),
@@ -162,7 +202,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await renderLogin(tester, SignedOutApi());
-      final listScrollable = find
+      final loginScrollable = find
           .descendant(
             of: find.byType(ListView),
             matching: find.byType(Scrollable),
@@ -171,22 +211,31 @@ void main() {
       await tester.scrollUntilVisible(
         find.byType(FilledButton),
         100,
-        scrollable: listScrollable,
+        scrollable: loginScrollable,
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(
-        app(
-          const SimpleConnectionPanel(
-            phase: ConnectionPhase.disconnected,
-            username: 'harmony',
+        ProviderScope(
+          overrides: connectionOverrides(),
+          child: app(
+            const SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnected,
+              username: 'harmony',
+            ),
           ),
         ),
       );
       await tester.pumpAndSettle();
+      final connectionScrollable = find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first;
       await tester.scrollUntilVisible(
-        find.byType(FilledButton),
+        primaryFilledButton,
         100,
-        scrollable: listScrollable,
+        scrollable: connectionScrollable,
       );
       expect(tester.takeException(), isNull);
     },

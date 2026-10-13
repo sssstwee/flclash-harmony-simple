@@ -75,6 +75,8 @@ class FailingStore extends MemoryStore {
   Future<void> write(String value) async => throw StateError('storage failed');
   @override
   Future<void> delete() async => throw StateError('storage failed');
+  @override
+  Future<void> clearAll() async => throw StateError('storage failed');
 }
 
 ResponseBody jsonBody(

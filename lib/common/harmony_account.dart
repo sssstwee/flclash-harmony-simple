@@ -231,7 +231,15 @@ class HarmonyAccountApi {
 
   Future<void> logout() async {
     final token = session?.token;
-    await clear();
+    Object? storageFailure;
+    StackTrace? storageStackTrace;
+    try {
+      await clear();
+    } catch (error, stackTrace) {
+      storageFailure = error;
+      storageStackTrace = stackTrace;
+      session = null;
+    }
     if (token != null) {
       try {
         await _request(
@@ -243,6 +251,9 @@ class HarmonyAccountApi {
       } catch (_) {
         // The server session also expires automatically.
       }
+    }
+    if (storageFailure != null) {
+      Error.throwWithStackTrace(storageFailure!, storageStackTrace ?? StackTrace.current);
     }
   }
 
