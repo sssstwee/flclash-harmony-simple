@@ -3,7 +3,6 @@ import 'package:fl_clash/common/fixed.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/providers/harmony_simple.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/simple.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
@@ -43,40 +42,6 @@ class IdleHarmonySimple extends HarmonySimple {
 
   @override
   Future<void> checkSession() async {}
-
-  @override
-  Future<void> login(String username, String password) async {
-    if (state.busy) return;
-    state = state.copyWith(busy: true, clearError: true);
-    try {
-      final session = await ref
-          .read(harmonyAccountApiProvider)
-          .login(username, password);
-      state = state.copyWith(session: session, clearError: true);
-    } on HarmonyAccountError catch (error) {
-      state = state.copyWith(error: _harmonyErrorMessage(error));
-    } catch (_) {
-      state = state.copyWith(
-        error: AppLocalizations.current.harmonyServiceError,
-      );
-    } finally {
-      state = state.copyWith(busy: false);
-    }
-  }
-
-  String _harmonyErrorMessage(HarmonyAccountError error) {
-    return switch (error) {
-      HarmonyAccountError.credentials =>
-        AppLocalizations.current.harmonyCredentialsError,
-      HarmonyAccountError.expired =>
-        AppLocalizations.current.harmonySessionExpired,
-      HarmonyAccountError.rateLimited =>
-        AppLocalizations.current.harmonyRateLimited,
-      HarmonyAccountError.config => AppLocalizations.current.harmonyConfigError,
-      HarmonyAccountError.unavailable =>
-        AppLocalizations.current.harmonyServiceError,
-    };
-  }
 }
 
 Finder get primaryFilledButton => find.descendant(
@@ -96,10 +61,7 @@ Widget app(Widget child) => MaterialApp(
   home: Scaffold(body: child),
 );
 
-Widget scoped({
-  required Widget child,
-  required SignedOutApi api,
-}) {
+Widget scoped({required Widget child, required SignedOutApi api}) {
   return ProviderScope(
     key: UniqueKey(),
     overrides: [
@@ -161,7 +123,10 @@ void main() {
     expect(api.logins, 1);
     expect(find.text('用户名或密码错误。'), findsOneWidget);
     expect(
-      tester.widget<EditableText>(find.byType(EditableText).last).controller.text,
+      tester
+          .widget<EditableText>(find.byType(EditableText).last)
+          .controller
+          .text,
       isEmpty,
     );
     await tester.pumpWidget(const SizedBox.shrink());

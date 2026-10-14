@@ -5,13 +5,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "types": "wrangler types",
+    "types": "wrangler types --config wrangler.jsonc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "check": "node --check gateway/public/_worker.js && npm run typecheck && npm test && wrangler deploy --dry-run",
-    "deploy": "wrangler deploy",
+    "test": "vitest run --dir test",
+    "check": "node --check gateway/public/_worker.js && node --check scripts/account.mjs && node --check scripts/config.mjs && node --check scripts/operations.mjs && npm run typecheck && npm test && npm run test:scripts",
+    "deploy": "wrangler deploy --config wrangler.local.jsonc",
     "account": "node scripts/account.mjs",
-    "config": "node scripts/config.mjs"
+    "config": "node scripts/config.mjs",
+    "test:scripts": "node --test scripts/test/*.test.mjs",
+    "bundle-check": "wrangler deploy --dry-run --config wrangler.jsonc",
+    "secret": "wrangler secret put BETTER_AUTH_SECRET --config wrangler.local.jsonc",
+    "migrate": "wrangler d1 migrations apply DB --remote --config wrangler.local.jsonc"
   },
   "keywords": [],
   "author": "",

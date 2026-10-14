@@ -219,16 +219,6 @@ class AppLocalizations {
     return Intl.message('English', name: 'en', desc: '', args: []);
   }
 
-  /// `Japanese`
-  String get ja {
-    return Intl.message('Japanese', name: 'ja', desc: '', args: []);
-  }
-
-  /// `Russian`
-  String get ru {
-    return Intl.message('Russian', name: 'ru', desc: '', args: []);
-  }
-
   /// `Simplified Chinese`
   String get zh_CN {
     return Intl.message(
@@ -4799,6 +4789,7 @@ class AppLocalizations {
     );
   }
 
+  /// `Using cached settings (offline)`
   String get harmonyOfflineConfig {
     return Intl.message(
       'Using cached settings (offline)',
@@ -4808,10 +4799,12 @@ class AppLocalizations {
     );
   }
 
+  /// `Try again`
   String get harmonyRetry {
     return Intl.message('Try again', name: 'harmonyRetry', desc: '', args: []);
   }
 
+  /// `Current node`
   String get harmonyCurrentNode {
     return Intl.message(
       'Current node',
@@ -4821,6 +4814,7 @@ class AppLocalizations {
     );
   }
 
+  /// `Switch node`
   String get harmonySwitchNode {
     return Intl.message(
       'Switch node',
@@ -4830,6 +4824,7 @@ class AppLocalizations {
     );
   }
 
+  /// `Session traffic`
   String get harmonySessionTraffic {
     return Intl.message(
       'Session traffic',
@@ -4839,10 +4834,12 @@ class AppLocalizations {
     );
   }
 
+  /// `Upload`
   String get harmonyUpload {
     return Intl.message('Upload', name: 'harmonyUpload', desc: '', args: []);
   }
 
+  /// `Download`
   String get harmonyDownload {
     return Intl.message(
       'Download',
@@ -4852,14 +4849,17 @@ class AppLocalizations {
     );
   }
 
+  /// `Latency`
   String get harmonyLatency {
     return Intl.message('Latency', name: 'harmonyLatency', desc: '', args: []);
   }
 
+  /// `Account`
   String get harmonyAccount {
     return Intl.message('Account', name: 'harmonyAccount', desc: '', args: []);
   }
 
+  /// `Connection error`
   String get simpleErrorState {
     return Intl.message(
       'Connection error',
@@ -4876,8 +4876,6 @@ class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {
   List<Locale> get supportedLocales {
     return const <Locale>[
       Locale.fromSubtags(languageCode: 'en'),
-      Locale.fromSubtags(languageCode: 'ja'),
-      Locale.fromSubtags(languageCode: 'ru'),
       Locale.fromSubtags(languageCode: 'zh', countryCode: 'CN'),
     ];
   }
