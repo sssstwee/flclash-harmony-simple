@@ -8,7 +8,7 @@
     "types": "wrangler types --config wrangler.jsonc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir test",
-    "check": "node --check gateway/public/_worker.js && node --check scripts/account.mjs && node --check scripts/config.mjs && node --check scripts/sync-subscription.mjs && node --check scripts/operations.mjs && npm run typecheck && npm test && npm run test:scripts",
+    "check": "node --check gateway/public/_worker.js && node --check scripts/account.mjs && node --check scripts/config.mjs && node --check src/config_write.mjs && node --check scripts/sync-subscription.mjs && node --check scripts/operations.mjs && npm run typecheck && npm test && npm run test:scripts",
     "deploy": "wrangler deploy --config wrangler.local.jsonc",
     "account": "node scripts/account.mjs",
     "config": "node scripts/config.mjs",

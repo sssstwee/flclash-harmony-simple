@@ -1,3 +1,4 @@
+import { configUpsertSql } from '../src/config_write.mjs';
 import { executeSql, isMain, parseOptions, quoteSql, readPrivateJson, resolveConfig, runCli } from './operations.mjs';
 
 const usage = 'Usage: npm run config -- PRIVATE_SECRETS_JSON [--remote|--local] [--scope=default|user|group] [--scope-key=ID] [--config PATH]';
@@ -71,7 +72,7 @@ export async function syncConfig(args, dependencies = {}) {
     throw new Error('Expected a Clash/Mihomo configuration with nonempty proxies or proxy-providers');
   }
   if (content.includes('\0')) throw new Error('Configuration must not contain NUL characters');
-  const sql = `INSERT INTO proxy_config (scope,scope_key,content,updated_at) VALUES (${quoteSql(scope)},${quoteSql(scopeKey)},${quoteSql(content)},${quoteSql(new Date().toISOString())}) ON CONFLICT(scope,scope_key) DO UPDATE SET content=excluded.content,updated_at=excluded.updated_at;`;
+  const sql = configUpsertSql([scope, scopeKey, content, new Date().toISOString()].map(quoteSql));
   if (Buffer.byteLength(sql) > 99_000) throw new Error('Configuration exceeds the SQL import limit');
   await (dependencies.executeSql ?? executeSql)(sql, { ...values, config: configPath });
   (dependencies.log ?? console.log)(`Configuration synced (${size} bytes) for scope=${scope}${scopeKey ? ` key=${scopeKey}` : ''}.`);

@@ -5,6 +5,7 @@
   "compatibility_date": "2026-10-12",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
+  "triggers": { "crons": ["*/5 * * * *"] },
   "vars": {
     "AUTH_ORIGIN": "https://auth.example.com"
   },

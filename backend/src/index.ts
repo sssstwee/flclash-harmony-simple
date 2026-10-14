@@ -1,3 +1,4 @@
+import { syncSubscription } from './subscription_sync';
 import { createAuth } from './auth';
 import {
   DEFAULT_MIN_CHECK_SECONDS,
@@ -170,6 +171,9 @@ async function loadConfigFor(user: AuthenticatedUser, env: Env): Promise<Authori
 }
 
 export default {
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(syncSubscription(env));
+  },
   async fetch(request, env, ctx) {
     try {
       const path = new URL(request.url).pathname;
