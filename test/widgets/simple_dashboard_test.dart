@@ -44,39 +44,7 @@ class IdleHarmonySimple extends HarmonySimple {
   @override
   Future<void> checkSession() async {}
 
-  @override
-  Future<void> login(String username, String password) async {
-    if (state.busy) return;
-    state = state.copyWith(busy: true, clearError: true);
-    try {
-      final session = await ref
-          .read(harmonyAccountApiProvider)
-          .login(username, password);
-      state = state.copyWith(session: session, clearError: true);
-    } on HarmonyAccountError catch (error) {
-      state = state.copyWith(error: _harmonyErrorMessage(error));
-    } catch (_) {
-      state = state.copyWith(
-        error: AppLocalizations.current.harmonyServiceError,
-      );
-    } finally {
-      state = state.copyWith(busy: false);
-    }
-  }
 
-  String _harmonyErrorMessage(HarmonyAccountError error) {
-    return switch (error) {
-      HarmonyAccountError.credentials =>
-        AppLocalizations.current.harmonyCredentialsError,
-      HarmonyAccountError.expired =>
-        AppLocalizations.current.harmonySessionExpired,
-      HarmonyAccountError.rateLimited =>
-        AppLocalizations.current.harmonyRateLimited,
-      HarmonyAccountError.config => AppLocalizations.current.harmonyConfigError,
-      HarmonyAccountError.unavailable =>
-        AppLocalizations.current.harmonyServiceError,
-    };
-  }
 }
 
 Finder get primaryFilledButton => find.descendant(

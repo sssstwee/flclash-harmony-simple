@@ -50,28 +50,28 @@ class Profiles extends _$Profiles {
     return ref.watch(profilesStreamProvider).value ?? [];
   }
 
-  void put(Profile profile) {
+  void put(Profile profile) => unawaited(putAndWait(profile));
+
+  Future<void> putAndWait(Profile profile) async {
     final previous = List<Profile>.from(state);
     final newProfile = previous.optimizeLabel(profile);
     state = previous.copyAndPut(newProfile, (item) => item.id == newProfile.id);
-    unawaited(
-      withRollback(
+    await withRollback(
         snapshot: previous,
         action: () => database.profiles.put(newProfile.toCompanion()),
         rollback: (v) => state = v,
-      ),
     );
   }
 
-  void del(int id) {
+  void del(int id) => unawaited(delAndWait(id));
+
+  Future<void> delAndWait(int id) async {
     final previous = List<Profile>.from(state);
     state = previous.where((e) => e.id != id).toList();
-    unawaited(
-      withRollback(
+    await withRollback(
         snapshot: previous,
         action: () => database.profiles.remove((t) => t.id.equals(id)),
         rollback: (v) => state = v,
-      ),
     );
   }
 

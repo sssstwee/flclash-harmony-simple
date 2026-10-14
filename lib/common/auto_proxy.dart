@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 
@@ -64,48 +66,71 @@ Future<({String name, Map<String, String> selections})?> autoSelectProxy(
   }
 
   collect(root, {}, {});
-  final delays = <String, int?>{};
-  final elapsed = Stopwatch()..start();
-  Future<int?> delay(String name) async {
-    if (delays.containsKey(name)) return delays[name];
-    try {
-      delays[name] = await measure(name).timeout(const Duration(seconds: 8));
-    } catch (_) {
-      delays[name] = null;
-    }
-    return delays[name];
+  final probes = <String, Future<int?>>{};
+  final deadline = Completer<void>();
+  var timedOut = false;
+  final timer = Timer(const Duration(seconds: 24), () {
+    timedOut = true;
+    deadline.complete();
+  });
+
+  Future<int?> delay(String name) {
+    if (timedOut) return Future<int?>.value();
+    return probes.putIfAbsent(name, () async {
+      try {
+        return await Future.any<int?>([
+          Future<int?>.sync(() => measure(name))
+              .timeout(const Duration(seconds: 8)),
+          deadline.future.then<int?>((_) => null),
+        ]);
+      } catch (_) {
+        return null;
+      }
+    });
   }
 
-  final automaticCandidates = candidates
-      .where((item) => automatic.contains(item.name))
-      .toList();
-  for (var offset = 0; offset < automaticCandidates.length; offset += 6) {
-    if (elapsed.elapsed >= const Duration(seconds: 24)) return null;
-    final batch = automaticCandidates.skip(offset).take(6).toList();
-    await Future.wait(batch.map((candidate) => delay(candidate.name)));
-    for (final candidate in batch) {
-      final value = delays[candidate.name];
-      if (value != null && value > 0) return candidate;
-    }
-  }
-  final manual = candidates
-      .where((item) => !automatic.contains(item.name))
-      .toList();
-  // Bound concurrent probes on a phone, including subscriptions with many nodes.
-  for (var offset = 0; offset < manual.length; offset += 6) {
-    final batch = manual.skip(offset).take(6).toList();
-    await Future.wait(batch.map((candidate) => delay(candidate.name)));
-    ({String name, Map<String, String> selections})? best;
-    var bestDelay = double.infinity;
-    for (final candidate in batch) {
-      final value = delays[candidate.name];
-      if (value != null && value > 0 && value < bestDelay) {
-        best = candidate;
-        bestDelay = value.toDouble();
+  Future<({String name, Map<String, String> selections})?> select() async {
+    final automaticCandidates = candidates
+        .where((item) => automatic.contains(item.name))
+        .toList();
+    final manual = candidates
+        .where((item) => !automatic.contains(item.name))
+        .toList();
+    for (final candidateSet in [automaticCandidates, manual]) {
+      for (var offset = 0; offset < candidateSet.length; offset += 6) {
+        if (timedOut) return null;
+        final batch = candidateSet.skip(offset).take(6).toList();
+        final values = await Future.wait(
+          batch.map((candidate) => delay(candidate.name)),
+        );
+        if (timedOut) return null;
+        ({String name, Map<String, String> selections})? best;
+        var bestDelay = double.infinity;
+        for (var index = 0; index < batch.length; index++) {
+          final value = values[index];
+          if (value == null || value <= 0) continue;
+          if (automatic.contains(batch[index].name)) return batch[index];
+          if (value < bestDelay) {
+            best = batch[index];
+            bestDelay = value.toDouble();
+          }
+        }
+        if (best != null) return best;
       }
     }
-    if (best != null) return best;
-    if (elapsed.elapsed >= const Duration(seconds: 24)) return null;
+    return null;
   }
-  return null;
+
+  try {
+    // This deadline spans automatic and manual batches together. Merely
+    // checking a stopwatch between batches can overshoot by a full probe.
+    return await Future.any([
+      select(),
+      deadline.future.then<({String name, Map<String, String> selections})?>(
+        (_) => null,
+      ),
+    ]);
+  } finally {
+    timer.cancel();
+  }
 }

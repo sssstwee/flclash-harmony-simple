@@ -211,26 +211,25 @@ extension ProfileExtension on Profile {
   }
 
   Future<Profile> saveFile(Uint8List bytes) async {
-    final path = await appPath.tempFilePath;
-    final tempFile = File(path);
-    await tempFile.safeWriteAsBytes(bytes);
-    final message = await coreController.validateConfig(path);
-    if (message.isNotEmpty) {
-      throw message;
+    // Validate in the destination directory, then replace the profile with a
+    // same-filesystem rename. A failed download/write never truncates the last
+    // accepted configuration, and parallel imports do not share a temp file.
+    final destination = await _getFile(false);
+    await destination.parent.create(recursive: true);
+    final temporary = await destination.parent.createTemp('.profile-');
+    final staged = File('${temporary.path}/config.yaml');
+    try {
+      await staged.writeAsBytes(bytes, flush: true);
+      final message = await coreController.validateConfig(staged.path);
+      if (message.isNotEmpty) throw message;
+      await staged.rename(destination.path);
+      return copyWith(lastUpdateDate: DateTime.now());
+    } finally {
+      await temporary.safeDelete(recursive: true);
     }
-    final mFile = await file;
-    await tempFile.copy(mFile.path);
-    await tempFile.safeDelete();
-    return copyWith(lastUpdateDate: DateTime.now());
   }
 
   Future<Profile> saveFileWithPath(String path) async {
-    final message = await coreController.validateConfig(path);
-    if (message.isNotEmpty) {
-      throw message;
-    }
-    final mFile = await file;
-    await File(path).copy(mFile.path);
-    return copyWith(lastUpdateDate: DateTime.now());
+    return saveFile(await File(path).readAsBytes());
   }
 }

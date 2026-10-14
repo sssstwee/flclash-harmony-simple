@@ -23,22 +23,32 @@ beforeEach(async () => {
   ]);
 });
 
-async function login() {
+async function login(username = 'tester') {
   const response = await request('/api/auth/sign-in/username', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '192.0.2.1' },
-    body: JSON.stringify({ username: 'tester', password }),
+    body: JSON.stringify({ username, password }),
   });
   expect(response.status).toBe(200);
+  expect(response.headers.get('Cache-Control')).toBe('no-store');
   const token = response.headers.get('set-auth-token');
   expect(token).toBeTruthy();
   await response.json();
   return token!;
 }
 
-async function seedDefaultConfig(content = config) {
+async function seedConfig(
+  scope: string,
+  scopeKey: string,
+  content = config,
+  updatedAt = new Date().toISOString(),
+) {
   await env.DB.prepare(
     'INSERT INTO proxy_config (scope, scope_key, content, updated_at) VALUES (?, ?, ?, ?)',
-  ).bind('default', '', content, new Date().toISOString()).run();
+  ).bind(scope, scopeKey, content, updatedAt).run();
+}
+
+async function seedDefaultConfig(content = config) {
+  await seedConfig('default', '', content);
 }
 
 test('configuration requires authentication and public registration is disabled', async () => {
@@ -113,16 +123,167 @@ test('config downloads are rate limited per user', async () => {
   expect(statuses.at(-1)).toBe(429);
 });
 
-test('returns 304 when configuration is unchanged', async () => {
+test.each([
+  { name: 'first use', initialCount: null, windowAge: 0, accepted: 30, requests: 40 },
+  { name: 'near the cap', initialCount: 29, windowAge: 0, accepted: 1, requests: 20 },
+  { name: 'expired window', initialCount: 30, windowAge: 60, accepted: 30, requests: 40 },
+])('config admission is atomic under concurrent $name requests', async scenario => {
+  const token = await login();
+  await seedDefaultConfig();
+  if (scenario.initialCount !== null) {
+    await env.DB.prepare(
+      'INSERT INTO config_api_rate_limit (user_id, window_start, request_count) VALUES (?, ?, ?)',
+    ).bind('test-user', Math.floor(Date.now() / 1000) - scenario.windowAge, scenario.initialCount).run();
+  }
+  const statuses = await Promise.all(Array.from({ length: scenario.requests }, async () => {
+    const response = await request('/v1/config', { headers: bearer(token) });
+    await response.text();
+    return response.status;
+  }));
+  expect(statuses.filter(status => status === 200)).toHaveLength(scenario.accepted);
+  expect(statuses.filter(status => status === 429)).toHaveLength(scenario.requests - scenario.accepted);
+  const counter = await env.DB.prepare(
+    'SELECT request_count FROM config_api_rate_limit WHERE user_id = ?',
+  ).bind('test-user').first<{ request_count: number }>();
+  expect(counter?.request_count).toBe(30);
+});
+
+test('exhausting one user limit does not throttle another user', async () => {
+  const token = await login();
+  const date = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO user (id,name,email,emailVerified,createdAt,updatedAt,username,displayUsername) VALUES (?,?,?,?,?,?,?,?)').bind('other-user', 'other', 'other@example.invalid', 0, date, date, 'other', 'other'),
+    env.DB.prepare("INSERT INTO account (id,accountId,providerId,userId,password,createdAt,updatedAt) SELECT 'other-account','other-user','credential','other-user',password,createdAt,updatedAt FROM account WHERE id = 'test-account'"),
+    env.DB.prepare('INSERT INTO config_api_rate_limit (user_id, window_start, request_count) VALUES (?, ?, ?)').bind('test-user', Math.floor(Date.now() / 1000), 30),
+  ]);
+  const otherToken = await login('other');
+  await seedDefaultConfig();
+  expect((await request('/v1/config', { headers: bearer(token) })).status).toBe(429);
+  expect((await request('/v1/config', { headers: bearer(otherToken) })).status).toBe(200);
+});
+
+test('returns 304 only for a matching representation ETag', async () => {
   const token = await login();
   await seedDefaultConfig();
   const first = await request('/v1/config', { headers: bearer(token) });
-  const lastModified = first.headers.get('Last-Modified');
-  expect(lastModified).toBeTruthy();
+  const etag = first.headers.get('ETag');
+  expect(etag).toMatch(/^"[a-f0-9]{64}"$/);
+  expect(first.headers.get('Last-Modified')).toBeTruthy();
   const second = await request('/v1/config', {
-    headers: { ...bearer(token), 'If-Modified-Since': lastModified! },
+    headers: { ...bearer(token), 'If-None-Match': etag! },
   });
   expect(second.status).toBe(304);
+  expect(second.headers.get('ETag')).toBe(etag);
+  expect(second.headers.get('Cache-Control')).toBe('private, no-store');
+  expect(second.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  expect(await second.text()).toBe('');
+});
+
+test('weak, list and wildcard ETag validators work only after authentication', async () => {
+  const token = await login();
+  await seedDefaultConfig();
+  const first = await request('/v1/config', { headers: bearer(token) });
+  const etag = first.headers.get('ETag')!;
+  for (const validator of [`W/${etag}`, `"unrelated", W/${etag}`, '*']) {
+    expect((await request('/v1/config', {
+      headers: { ...bearer(token), 'If-None-Match': validator },
+    })).status).toBe(304);
+  }
+  expect((await request('/v1/config', {
+    headers: { 'If-None-Match': etag },
+  })).status).toBe(401);
+  await env.DB.prepare('DELETE FROM session').run();
+  expect((await request('/v1/config', {
+    headers: { ...bearer(token), 'If-None-Match': etag },
+  })).status).toBe(401);
+});
+
+test('date-only and mismatching ETag requests cannot reuse stale settings', async () => {
+  const token = await login();
+  await seedDefaultConfig();
+  const first = await request('/v1/config', { headers: bearer(token) });
+  const conditionalHeaders: Record<string, string>[] = [
+    { 'If-Modified-Since': first.headers.get('Last-Modified')! },
+    { 'If-Modified-Since': 'Thu, 01 Jan 2099 00:00:00 GMT' },
+    { 'If-Modified-Since': 'not a date' },
+    { 'If-None-Match': '"different"', 'If-Modified-Since': 'Thu, 01 Jan 2099 00:00:00 GMT' },
+  ];
+  for (const headers of conditionalHeaders) {
+    expect((await request('/v1/config', { headers: { ...bearer(token), ...headers } })).status).toBe(200);
+  }
+});
+
+test('same-second content edits invalidate the previous ETag', async () => {
+  const token = await login();
+  await seedConfig('default', '', config, '2026-01-01T00:00:00.100Z');
+  const first = await request('/v1/config', { headers: bearer(token) });
+  await env.DB.prepare('UPDATE proxy_config SET content = ?, updated_at = ?')
+    .bind('proxies: []', '2026-01-01T00:00:00.900Z').run();
+  const changed = await request('/v1/config', {
+    headers: {
+      ...bearer(token),
+      'If-None-Match': first.headers.get('ETag')!,
+      'If-Modified-Since': first.headers.get('Last-Modified')!,
+    },
+  });
+  expect(changed.status).toBe(200);
+  expect(changed.headers.get('Last-Modified')).toBe(first.headers.get('Last-Modified'));
+  expect(changed.headers.get('ETag')).not.toBe(first.headers.get('ETag'));
+  expect(await changed.text()).toBe('proxies: []');
+});
+
+test('removing a user override returns an older fallback instead of 304', async () => {
+  const token = await login();
+  await seedConfig('default', '', 'proxies: []', '2025-01-01T00:00:00.000Z');
+  await seedConfig('user', 'test-user', config, '2026-01-01T00:00:00.000Z');
+  const first = await request('/v1/config', { headers: bearer(token) });
+  await env.DB.prepare('DELETE FROM proxy_config WHERE scope = ?').bind('user').run();
+  const fallback = await request('/v1/config', {
+    headers: {
+      ...bearer(token),
+      'If-None-Match': first.headers.get('ETag')!,
+      'If-Modified-Since': first.headers.get('Last-Modified')!,
+    },
+  });
+  expect(fallback.status).toBe(200);
+  expect(await fallback.text()).toBe('proxies: []');
+});
+
+test('group changes resolve current membership and invalidate old validators', async () => {
+  const token = await login();
+  await seedConfig('default', '', 'proxies: []', '2024-01-01T00:00:00.000Z');
+  await seedConfig('group', 'first', config, '2026-01-01T00:00:00.000Z');
+  await seedConfig('group', 'second', 'proxies: [second]', '2025-01-01T00:00:00.000Z');
+  await env.DB.prepare('UPDATE user SET config_group = ? WHERE id = ?').bind('first', 'test-user').run();
+  const first = await request('/v1/config', { headers: bearer(token) });
+  expect(await first.text()).toBe(config);
+  await env.DB.prepare('UPDATE user SET config_group = ? WHERE id = ?').bind('second', 'test-user').run();
+  const second = await request('/v1/config', {
+    headers: {
+      ...bearer(token),
+      'If-None-Match': first.headers.get('ETag')!,
+      'If-Modified-Since': first.headers.get('Last-Modified')!,
+    },
+  });
+  expect(second.status).toBe(200);
+  expect(await second.text()).toBe('proxies: [second]');
+  await env.DB.prepare('UPDATE user SET config_group = NULL WHERE id = ?').bind('test-user').run();
+  const fallback = await request('/v1/config', {
+    headers: { ...bearer(token), 'If-None-Match': second.headers.get('ETag')! },
+  });
+  expect(fallback.status).toBe(200);
+  expect(await fallback.text()).toBe('proxies: []');
+});
+
+test('a matching ETag never bypasses the per-user rate limit', async () => {
+  const token = await login();
+  await seedDefaultConfig();
+  const first = await request('/v1/config', { headers: bearer(token) });
+  await env.DB.prepare('UPDATE config_api_rate_limit SET request_count = 30').run();
+  const limited = await request('/v1/config', {
+    headers: { ...bearer(token), 'If-None-Match': first.headers.get('ETag')! },
+  });
+  expect(limited.status).toBe(429);
 });
 
 test('prefers per-user configuration with default fallback and logs fetches', async () => {

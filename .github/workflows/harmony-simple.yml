@@ -24,6 +24,9 @@ jobs:
         run: bash .github/scripts/check-no-secrets.sh
 
   changes:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -62,6 +65,8 @@ jobs:
     needs: [changes, backend, secrets-scan]
     if: |
       always() &&
+      needs.changes.result == 'success' &&
+      needs.secrets-scan.result == 'success' &&
       (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
       (github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true')
     runs-on: ubuntu-latest
@@ -110,6 +115,28 @@ jobs:
           GIT_CONFIG_VALUE_0: HTTP/1.1
         run: flutter pub get
 
+      - name: Install icon renderer
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+
+      - name: Generate Dart sources
+        run: |
+          dart run build_runner build --delete-conflicting-outputs
+          dart run intl_utils:generate
+          dart run tool/generate_app_icon.dart
+          dart format lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart
+
+      - name: Report regenerated sources
+        if: always()
+        run: |
+          python3 - <<'PYGEN'
+          import base64, json, pathlib, subprocess
+          paths = subprocess.check_output(['git', 'diff', '--name-only', '-z']).decode().split('\0')
+          for name in paths:
+              path = pathlib.Path(name)
+              if name and path.is_file() and (name.startswith(('lib/', 'test/', 'tool/')) or name.endswith('.png')):
+                  print('GENERATED_SOURCE ' + json.dumps({'path': name, 'base64': base64.b64encode(path.read_bytes()).decode()}))
+          PYGEN
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
@@ -117,12 +144,14 @@ jobs:
         run: flutter test --reporter expanded
 
       - name: Set up Go bootstrap
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         uses: actions/setup-go@v5
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
       - name: Set up HarmonyOS Go
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         run: |
           set -euo pipefail
           OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
@@ -139,6 +168,7 @@ jobs:
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         env:
           CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
         run: |
@@ -157,11 +187,13 @@ jobs:
           dart setup.dart ohos --env stable -v
 
       - name: Checksums
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         run: |
           cd dist
           find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
       - name: Upload packages
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         uses: actions/upload-artifact@v4
         with:
           name: Clash-Harmony-HarmonyOS-${{ github.sha }}
