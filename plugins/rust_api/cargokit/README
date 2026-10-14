@@ -1,11 +1,5 @@
-/// This is copied from Cargokit (which is the official way to use it currently)
-/// Details: https://fzyzcjy.github.io/flutter_rust_bridge/manual/integrate/builtin
+# Xiaomao AI Proxy
 
-Experimental repository to provide glue for seamlessly integrating cargo build
-with flutter plugins and packages.
+Xiaomao AI Proxy（小猫AI代理）is a proxy client for HarmonyOS.
 
-See https://matejknopp.com/post/flutter_plugin_in_rust_with_no_prebuilt_binaries/
-for a tutorial on how to use Cargokit.
-
-Example plugin available at https://github.com/irondash/hello_rust_ffi_plugin.
-
+Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/releases). If unsigned, sign it with a HarmonyOS debug certificate and profile containing your phone’s UDID, then install it using DevEco Studio with developer mode and USB debugging enabled on your HarmonyOS phone.
