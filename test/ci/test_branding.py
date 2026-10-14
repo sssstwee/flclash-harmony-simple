@@ -54,7 +54,8 @@ class BrandingTest(unittest.TestCase):
         self.assertEqual(info['CFBundleName'], BRAND)
         self.assertEqual(info['CFBundleIdentifier'], '$(PRODUCT_BUNDLE_IDENTIFIER)')
         self.assertIn('PRODUCT_NAME = FlClash', read('macos/Runner/Configs/AppInfo.xcconfig'))
-        self.assertIn(f'VALUE "ProductName", "{BRAND}"', read('windows/runner/Runner.rc'))
+        self.assertIn(f'VALUE "FileDescription", "{BRAND}"', read('windows/runner/Runner.rc'))
+        self.assertIn('VALUE "ProductName", "clash"', read('windows/runner/Runner.rc'))
         self.assertIn('/utf-8', read('windows/CMakeLists.txt'))
         self.assertIn('OriginalFilename", "FlClash.exe"', read('windows/runner/Runner.rc'))
         self.assertIn(f'window.Create(L"{BRAND}"', read('windows/runner/main.cpp'))
@@ -69,7 +70,9 @@ class BrandingTest(unittest.TestCase):
         for path in ['README.md', 'README_SIMPLE.md', 'README_zh_CN.md', 'backend/README.md']:
             self.assertTrue(read(path).startswith(f'# {BRAND}'))
         self.assertTrue(read('.github/workflows/harmony-simple.yml').startswith(f'name: {BRAND}\n'))
-        self.assertIn("app_name: 'xiaomao-ai-proxy'", read('distribute_options.yaml'))
+        self.assertIn("app_name: 'FlClash'", read('distribute_options.yaml'))
+        self.assertIn("'--artifact-name',\n      artifactNameTemplate", read('setup.dart'))
+        self.assertIn('xiaomao-ai-proxy-{{build_name}}-{{platform}}', read('setup.dart'))
         self.assertIn("f'xiaomao-ai-proxy-{sha[:12]}-unsigned.{extension}'",
                       read('.github/scripts/stage-dot-package.py'))
         self.assertIn("appName: '小猫AI代理'", read('backend/src/auth.ts'))
@@ -78,7 +81,11 @@ class BrandingTest(unittest.TestCase):
         for directory in ['lib', 'ohos', 'android', 'assets_source']:
             for path in (ROOT / directory).rglob('*'):
                 if path.is_file() and path.suffix in {'.dart', '.ets', '.json', '.xml', '.svg'}:
-                    self.assertNotIn('Clash Harmony', path.read_text(encoding='utf-8'), str(path))
+                    content = path.read_text(encoding='utf-8')
+                    if path == ROOT / 'lib/common/constant.dart':
+                        content = content.replace(
+                            "const legacyAppDisplayName = 'Clash Harmony';", '')
+                    self.assertNotIn('Clash Harmony', content, str(path))
 
 
 if __name__ == '__main__':

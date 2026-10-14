@@ -548,6 +548,79 @@ void main() {
     },
   );
 
+  for (final offline in [false, true]) {
+    test('legacy branded cache survives rename (offline: $offline)', () async {
+      final legacy = _profile().copyWith(label: legacyAppDisplayName);
+      final harness = _Harness(initial: [legacy]);
+      harness.cache();
+      final metadata = harness.api.metadata;
+      harness.api.downloads.add(
+        offline
+            ? HarmonyAccountError.unavailable
+            : const HarmonyConfigDownload(notModified: true),
+      );
+
+      await harness.notifier.bootstrap();
+
+      expect(harness.api.requests.single.etag, '"accepted-etag"');
+      expect(harness.state.remoteProfile?.id, 7);
+      expect(harness.state.remoteProfile?.label, appDisplayName);
+      expect(harness.state.usingCachedConfig, offline);
+      expect(harness.api.metadata, same(metadata));
+      expect(harness.files.bytes[7], orderedEquals(_config));
+      expect(harness.events, isNot(contains('save')));
+      expect(
+        harness.container.read(profilesProvider).single.label,
+        appDisplayName,
+      );
+      expect(harness.state.error, isNull);
+
+      await harness.notifier.logout();
+      expect(harness.container.read(profilesProvider), isEmpty);
+      expect(harness.files.deleted, contains(7));
+    });
+  }
+
+  test('label migration failure retains verified legacy offline cache', () async {
+    final harness = _Harness(
+      initial: [_profile().copyWith(label: legacyAppDisplayName)],
+    );
+    harness.cache();
+    harness.profiles.putFailure = StateError('database unavailable');
+    harness.api.downloads.add(HarmonyAccountError.unavailable);
+
+    await harness.notifier.bootstrap();
+
+    expect(harness.state.remoteProfile?.id, 7);
+    expect(harness.state.usingCachedConfig, isTrue);
+    expect(harness.state.error, isNull);
+    expect(harness.files.bytes[7], orderedEquals(_config));
+  });
+
+  test('logout joins a pending legacy label migration before cleanup', () async {
+    final harness = _Harness(
+      initial: [_profile().copyWith(label: legacyAppDisplayName)],
+    );
+    harness.cache();
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    harness.profiles.putHook = (_) async {
+      entered.complete();
+      await release.future;
+    };
+    final bootstrap = harness.notifier.bootstrap();
+    await entered.future;
+    final logout = harness.notifier.logout();
+    release.complete();
+    await Future.wait([bootstrap, logout]);
+
+    expect(harness.state.session, isNull);
+    expect(harness.state.remoteProfile, isNull);
+    expect(harness.container.read(profilesProvider), isEmpty);
+    expect(harness.files.bytes, isEmpty);
+    expect(harness.api.requests, isEmpty);
+  });
+
   test(
     'missing cache retries an unsolicited 304 once without validators',
     () async {
