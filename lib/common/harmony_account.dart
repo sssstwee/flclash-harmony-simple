@@ -7,6 +7,8 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
 import 'package:fl_clash/common/harmony_connect.dart';
+import 'package:fl_clash/common/harmony_remote_config.dart';
+import 'package:fl_clash/state.dart';
 import 'package:flutter/services.dart';
 
 /// Production builds must set [CLASH_HARMONY_API_URL] (see `env.json.example`).
@@ -413,12 +415,18 @@ class HarmonyAccountApi {
       }
       if (lastModified != null && lastModified.isNotEmpty) {
         await _storage.writeConfigLastModified(lastModified);
+      } else {
+        await _storage.deleteConfigLastModified();
       }
       if (etag != null && etag.isNotEmpty) {
         await _storage.writeConfigEtag(etag);
+      } else {
+        await _storage.deleteConfigEtag();
       }
       if (configVersion != null && configVersion.isNotEmpty) {
         await _storage.writeConfigVersion(configVersion);
+      } else {
+        await _storage.deleteConfigVersion();
       }
       _checkGeneration(generation);
     });
@@ -670,13 +678,28 @@ class HarmonyAccountApi {
     if (session?.token != token || !isAuthorized) {
       throw HarmonyAccountError.expired;
     }
-    final bytes = builder.takeBytes();
+    var bytes = builder.takeBytes();
     if (bytes.isEmpty) {
       throw HarmonyAccountError.config;
     }
     final lastModified = response.headers.value('last-modified');
     final etag = response.headers.value('etag');
-    final configVersion = response.headers.value('x-config-version');
+    var configVersion = response.headers.value('x-config-version');
+    if (utf8.decode(bytes).trimLeft().startsWith('{')) {
+      try {
+        final remote = HarmonyRemoteConfig.decode(
+          bytes,
+          '${globalState.packageInfo.version}+${globalState.packageInfo.buildNumber}',
+        );
+        if (configVersion != null && configVersion != remote.version) {
+          throw const FormatException('Version mismatch');
+        }
+        configVersion = remote.version;
+        bytes = remote.profileBytes;
+      } catch (_) {
+        throw HarmonyAccountError.config;
+      }
+    }
     final headerInterval = response.headers.value('profile-update-interval');
     return HarmonyConfigDownload(
       bytes: Uint8List.fromList(bytes),
@@ -863,7 +886,6 @@ class HarmonyAccountApi {
     _http.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();
-        client.badCertificateCallback = (_, _, _) => true;
         if (viaLocalProxy && port != null) {
           client.findProxy = (_) => 'PROXY localhost:$port';
         } else {
@@ -879,6 +901,7 @@ class HarmonyAccountApi {
         options: Options(
           method: method,
           responseType: responseType,
+          followRedirects: false,
           validateStatus: (status) =>
               status != null &&
               (status >= 200 && status < 300 ||

@@ -5,43 +5,86 @@ typedef HarmonyIssueCopy = ({String title, String detail, String action});
 
 HarmonyIssueCopy harmonyIssueCopy(
   AppLocalizations texts,
-  HarmonyUserIssue issue,
-) {
+  HarmonyUserIssue issue, {
+  Map overrides = const {},
+}) {
   return switch (issue) {
     HarmonyUserIssue.offlineCached => (
-      title: texts.harmonyIssueTitleOfflineCached,
-      detail: texts.harmonyIssueDetailOfflineCached,
-      action: texts.harmonyIssueActionOfflineCached,
+      title:
+          (overrides['harmonyIssueTitleOfflineCached'] as String? ??
+          texts.harmonyIssueTitleOfflineCached),
+      detail:
+          (overrides['harmonyIssueDetailOfflineCached'] as String? ??
+          texts.harmonyIssueDetailOfflineCached),
+      action:
+          (overrides['harmonyIssueActionOfflineCached'] as String? ??
+          texts.harmonyIssueActionOfflineCached),
     ),
     HarmonyUserIssue.subscriptionUnreachable => (
-      title: texts.harmonyIssueTitleSubscription,
-      detail: texts.harmonyIssueDetailSubscription,
-      action: texts.harmonyIssueActionSubscription,
+      title:
+          (overrides['harmonyIssueTitleSubscription'] as String? ??
+          texts.harmonyIssueTitleSubscription),
+      detail:
+          (overrides['harmonyIssueDetailSubscription'] as String? ??
+          texts.harmonyIssueDetailSubscription),
+      action:
+          (overrides['harmonyIssueActionSubscription'] as String? ??
+          texts.harmonyIssueActionSubscription),
     ),
     HarmonyUserIssue.authExpired => (
-      title: texts.harmonyIssueTitleAuthExpired,
-      detail: texts.harmonyIssueDetailAuthExpired,
-      action: texts.harmonyIssueActionAuthExpired,
+      title:
+          (overrides['harmonyIssueTitleAuthExpired'] as String? ??
+          texts.harmonyIssueTitleAuthExpired),
+      detail:
+          (overrides['harmonyIssueDetailAuthExpired'] as String? ??
+          texts.harmonyIssueDetailAuthExpired),
+      action:
+          (overrides['harmonyIssueActionAuthExpired'] as String? ??
+          texts.harmonyIssueActionAuthExpired),
     ),
     HarmonyUserIssue.vpnStartFailed => (
-      title: texts.harmonyIssueTitleVpnFailed,
-      detail: texts.harmonyIssueDetailVpnFailed,
-      action: texts.harmonyIssueActionVpnFailed,
+      title:
+          (overrides['harmonyIssueTitleVpnFailed'] as String? ??
+          texts.harmonyIssueTitleVpnFailed),
+      detail:
+          (overrides['harmonyIssueDetailVpnFailed'] as String? ??
+          texts.harmonyIssueDetailVpnFailed),
+      action:
+          (overrides['harmonyIssueActionVpnFailed'] as String? ??
+          texts.harmonyIssueActionVpnFailed),
     ),
     HarmonyUserIssue.noRoute => (
-      title: texts.harmonyIssueTitleNoRoute,
-      detail: texts.harmonyIssueDetailNoRoute,
-      action: texts.harmonyIssueActionNoRoute,
+      title:
+          (overrides['harmonyIssueTitleNoRoute'] as String? ??
+          texts.harmonyIssueTitleNoRoute),
+      detail:
+          (overrides['harmonyIssueDetailNoRoute'] as String? ??
+          texts.harmonyIssueDetailNoRoute),
+      action:
+          (overrides['harmonyIssueActionNoRoute'] as String? ??
+          texts.harmonyIssueActionNoRoute),
     ),
     HarmonyUserIssue.serviceUnreachable => (
-      title: texts.harmonyIssueTitleService,
-      detail: texts.harmonyIssueDetailService,
-      action: texts.harmonyIssueActionService,
+      title:
+          (overrides['harmonyIssueTitleService'] as String? ??
+          texts.harmonyIssueTitleService),
+      detail:
+          (overrides['harmonyIssueDetailService'] as String? ??
+          texts.harmonyIssueDetailService),
+      action:
+          (overrides['harmonyIssueActionService'] as String? ??
+          texts.harmonyIssueActionService),
     ),
     HarmonyUserIssue.rateLimited => (
-      title: texts.harmonyIssueTitleRateLimit,
-      detail: texts.harmonyIssueDetailRateLimit,
-      action: texts.harmonyIssueActionRateLimit,
+      title:
+          (overrides['harmonyIssueTitleRateLimit'] as String? ??
+          texts.harmonyIssueTitleRateLimit),
+      detail:
+          (overrides['harmonyIssueDetailRateLimit'] as String? ??
+          texts.harmonyIssueDetailRateLimit),
+      action:
+          (overrides['harmonyIssueActionRateLimit'] as String? ??
+          texts.harmonyIssueActionRateLimit),
     ),
   };
 }

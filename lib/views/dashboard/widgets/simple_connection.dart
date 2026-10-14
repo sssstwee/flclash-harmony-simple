@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import 'package:fl_clash/common/harmony_remote_ui.dart';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/common/harmony_config_freshness.dart';
@@ -59,21 +61,48 @@ class SimpleConnectionPanel extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
+    final runtime = ref.watch(harmonySimpleProvider).remoteRuntime;
     final busy =
         phase == ConnectionPhase.connecting ||
         phase == ConnectionPhase.disconnecting;
     final running = phase == ConnectionPhase.connected;
-    final issueCopy = issue == null ? null : harmonyIssueCopy(texts, issue!);
+    final issueCopy = issue == null
+        ? null
+        : harmonyIssueCopy(
+            texts,
+            issue!,
+            overrides: runtime['texts'] as Map? ?? {},
+          );
     final hasError =
         phase == ConnectionPhase.error || error != null || issueCopy != null;
     final status =
         issueCopy?.title ??
         switch (phase) {
-          ConnectionPhase.disconnected => texts.simpleReady,
-          ConnectionPhase.connecting => texts.harmonyConnecting,
-          ConnectionPhase.connected => texts.simpleRunning,
-          ConnectionPhase.disconnecting => texts.harmonyDisconnecting,
-          ConnectionPhase.error => texts.simpleErrorState,
+          ConnectionPhase.disconnected => remoteHarmonyText(
+            ref,
+            'simpleReady',
+            texts.simpleReady,
+          ),
+          ConnectionPhase.connecting => remoteHarmonyText(
+            ref,
+            'harmonyConnecting',
+            texts.harmonyConnecting,
+          ),
+          ConnectionPhase.connected => remoteHarmonyText(
+            ref,
+            'simpleRunning',
+            texts.simpleRunning,
+          ),
+          ConnectionPhase.disconnecting => remoteHarmonyText(
+            ref,
+            'harmonyDisconnecting',
+            texts.harmonyDisconnecting,
+          ),
+          ConnectionPhase.error => remoteHarmonyText(
+            ref,
+            'simpleErrorState',
+            texts.simpleErrorState,
+          ),
         };
     final traffic = ref.watch(totalTrafficProvider);
     final live = ref.watch(
@@ -85,6 +114,14 @@ class SimpleConnectionPanel extends ConsumerWidget {
       shrinkWrap: true,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       children: [
+        if (runtime['announcement'] case final String announcement)
+          if (announcement.isNotEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(announcement),
+              ),
+            ),
         ConnectionIndicator(phase: phase),
         const SizedBox(height: 12),
         _ConfigFreshnessRow(
@@ -113,16 +150,30 @@ class SimpleConnectionPanel extends ConsumerWidget {
           const SizedBox(height: 8),
           _IssueExplanation(
             copy: (
-              title: texts.harmonyIssueTitleOfflineCached,
-              detail: texts.harmonyIssueDetailOfflineCached,
-              action: texts.harmonyIssueActionOfflineCached,
+              title: remoteHarmonyText(
+                ref,
+                'harmonyIssueTitleOfflineCached',
+                texts.harmonyIssueTitleOfflineCached,
+              ),
+              detail: remoteHarmonyText(
+                ref,
+                'harmonyIssueDetailOfflineCached',
+                texts.harmonyIssueDetailOfflineCached,
+              ),
+              action: remoteHarmonyText(
+                ref,
+                'harmonyIssueActionOfflineCached',
+                texts.harmonyIssueActionOfflineCached,
+              ),
             ),
             emphasized: false,
           ),
         ],
         const SizedBox(height: 28),
         _NodeCard(
-          nodeName: nodeName ?? texts.simpleAutoRoute,
+          nodeName:
+              nodeName ??
+              remoteHarmonyText(ref, 'simpleAutoRoute', texts.simpleAutoRoute),
           delayMs: nodeDelayMs,
           onSwitch: busy ? null : onSwitchNode,
         ),
@@ -153,8 +204,12 @@ class SimpleConnectionPanel extends ConsumerWidget {
             busy
                 ? status
                 : running
-                ? texts.simpleDisconnect
-                : texts.simpleConnect,
+                ? remoteHarmonyText(
+                    ref,
+                    'simpleDisconnect',
+                    texts.simpleDisconnect,
+                  )
+                : remoteHarmonyText(ref, 'simpleConnect', texts.simpleConnect),
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
         ),
@@ -178,7 +233,13 @@ class SimpleConnectionPanel extends ConsumerWidget {
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: onRetry,
-                      child: Text(texts.harmonyRetry),
+                      child: Text(
+                        remoteHarmonyText(
+                          ref,
+                          'harmonyRetry',
+                          texts.harmonyRetry,
+                        ),
+                      ),
                     ),
                   ],
                 ],
@@ -190,7 +251,9 @@ class SimpleConnectionPanel extends ConsumerWidget {
           Center(
             child: TextButton(
               onPressed: onRetry,
-              child: Text(texts.harmonyRetry),
+              child: Text(
+                remoteHarmonyText(ref, 'harmonyRetry', texts.harmonyRetry),
+              ),
             ),
           ),
         ],
@@ -201,7 +264,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
   }
 }
 
-class _ConfigFreshnessRow extends StatelessWidget {
+class _ConfigFreshnessRow extends ConsumerWidget {
   final HarmonyConfigFreshness freshness;
   final bool configSyncInProgress;
   final VoidCallback? onRefresh;
@@ -216,29 +279,47 @@ class _ConfigFreshnessRow extends StatelessWidget {
     return DateFormat('HH:mm').format(time.toLocal());
   }
 
-  String _message(AppLocalizations texts) {
+  String _message(AppLocalizations texts, WidgetRef ref) {
     final kind = freshness.displayKind;
     return switch (kind) {
-      HarmonyConfigFreshnessKind.discoveringUpdate =>
+      HarmonyConfigFreshnessKind.discoveringUpdate => remoteHarmonyText(
+        ref,
+        'harmonyConfigFreshUpdating',
         texts.harmonyConfigFreshUpdating,
-      HarmonyConfigFreshnessKind.autoUpdated =>
+      ),
+      HarmonyConfigFreshnessKind.autoUpdated => remoteHarmonyText(
+        ref,
+        'harmonyConfigFreshAutoUpdated',
         texts.harmonyConfigFreshAutoUpdated,
-      HarmonyConfigFreshnessKind.checkFailedUsingCache =>
+      ),
+      HarmonyConfigFreshnessKind.checkFailedUsingCache => remoteHarmonyText(
+        ref,
+        'harmonyConfigFreshCheckFailed',
         texts.harmonyConfigFreshCheckFailed(
-          freshness.failureReason ?? texts.harmonyConfigCheckReasonServer,
+          freshness.failureReason ??
+              remoteHarmonyText(
+                ref,
+                'harmonyConfigCheckReasonServer',
+                texts.harmonyConfigCheckReasonServer,
+              ),
         ),
+      ),
       HarmonyConfigFreshnessKind.upToDate ||
-      HarmonyConfigFreshnessKind.unknown => texts.harmonyConfigFreshUpToDate(
-        freshness.versionShort ?? '—',
-        freshness.lastCheckedAt != null
-            ? _formatTime(freshness.lastCheckedAt!)
-            : '—',
+      HarmonyConfigFreshnessKind.unknown => remoteHarmonyText(
+        ref,
+        'harmonyConfigFreshUpToDate',
+        texts.harmonyConfigFreshUpToDate(
+          freshness.versionShort ?? '—',
+          freshness.lastCheckedAt != null
+              ? _formatTime(freshness.lastCheckedAt!)
+              : '—',
+        ),
       ),
     };
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
     final busy = freshness.refreshInProgress || configSyncInProgress;
     final kind = freshness.displayKind;
@@ -255,7 +336,7 @@ class _ConfigFreshnessRow extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                _message(texts),
+                _message(texts, ref),
                 style: context.textTheme.bodySmall?.copyWith(
                   color: color,
                   height: 1.35,
@@ -264,7 +345,11 @@ class _ConfigFreshnessRow extends StatelessWidget {
             ),
             IconButton(
               key: const Key('harmony_config_refresh'),
-              tooltip: texts.harmonyConfigRefreshTooltip,
+              tooltip: remoteHarmonyText(
+                ref,
+                'harmonyConfigRefreshTooltip',
+                texts.harmonyConfigRefreshTooltip,
+              ),
               onPressed: busy ? null : onRefresh,
               icon: busy
                   ? SizedBox.square(
@@ -328,7 +413,7 @@ class _IssueExplanation extends StatelessWidget {
   }
 }
 
-class _HomeInsightCard extends StatelessWidget {
+class _HomeInsightCard extends ConsumerWidget {
   final HarmonyHomeStatus homeStatus;
   final bool running;
   final bool showReconnectHint;
@@ -344,47 +429,109 @@ class _HomeInsightCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
     final lines = <String>[];
     if (homeStatus.routeKind != null) {
       lines.add(switch (homeStatus.routeKind!) {
-        HarmonyRouteKind.automaticGroup => texts.harmonyRouteReasonAuto,
-        HarmonyRouteKind.tcpPreferred => texts.harmonyRouteReasonTcp,
-        HarmonyRouteKind.manual => texts.harmonyRouteReasonManual,
+        HarmonyRouteKind.automaticGroup => remoteHarmonyText(
+          ref,
+          'harmonyRouteReasonAuto',
+          texts.harmonyRouteReasonAuto,
+        ),
+        HarmonyRouteKind.tcpPreferred => remoteHarmonyText(
+          ref,
+          'harmonyRouteReasonTcp',
+          texts.harmonyRouteReasonTcp,
+        ),
+        HarmonyRouteKind.manual => remoteHarmonyText(
+          ref,
+          'harmonyRouteReasonManual',
+          texts.harmonyRouteReasonManual,
+        ),
       });
     }
     final aiGroup = homeStatus.aiGroupName;
     if (aiGroup != null && aiGroup.isNotEmpty) {
-      lines.add(texts.harmonyAiRoutingHint(aiGroup));
+      lines.add(
+        remoteHarmonyText(
+          ref,
+          'harmonyAiRoutingHint',
+          texts.harmonyAiRoutingHint(aiGroup),
+        ),
+      );
     }
     lines.add(switch (homeStatus.networkKind) {
-      HarmonyNetworkKind.wifi => texts.harmonyNetworkWifi,
-      HarmonyNetworkKind.cellular => texts.harmonyNetworkCellular,
-      HarmonyNetworkKind.other => texts.harmonyNetworkOther,
-      HarmonyNetworkKind.unknown => texts.harmonyNetworkUnknown,
+      HarmonyNetworkKind.wifi => remoteHarmonyText(
+        ref,
+        'harmonyNetworkWifi',
+        texts.harmonyNetworkWifi,
+      ),
+      HarmonyNetworkKind.cellular => remoteHarmonyText(
+        ref,
+        'harmonyNetworkCellular',
+        texts.harmonyNetworkCellular,
+      ),
+      HarmonyNetworkKind.other => remoteHarmonyText(
+        ref,
+        'harmonyNetworkOther',
+        texts.harmonyNetworkOther,
+      ),
+      HarmonyNetworkKind.unknown => remoteHarmonyText(
+        ref,
+        'harmonyNetworkUnknown',
+        texts.harmonyNetworkUnknown,
+      ),
     });
     if (running && homeStatus.lastHealthCheckAt != null) {
       final time = _formatTime(homeStatus.lastHealthCheckAt!);
       lines.add(
         homeStatus.lastHealthCheckOk == true
-            ? texts.harmonyHealthCheckOk(time)
-            : texts.harmonyHealthCheckFailed(time),
+            ? remoteHarmonyText(
+                ref,
+                'harmonyHealthCheckOk',
+                texts.harmonyHealthCheckOk(time),
+              )
+            : remoteHarmonyText(
+                ref,
+                'harmonyHealthCheckFailed',
+                texts.harmonyHealthCheckFailed(time),
+              ),
       );
     }
     if (showReconnectHint && !running) {
       lines.add(
         homeStatus.autoReconnectArmed
-            ? texts.harmonyAutoReconnectOn
-            : texts.harmonyAutoReconnectOff,
+            ? remoteHarmonyText(
+                ref,
+                'harmonyAutoReconnectOn',
+                texts.harmonyAutoReconnectOn,
+              )
+            : remoteHarmonyText(
+                ref,
+                'harmonyAutoReconnectOff',
+                texts.harmonyAutoReconnectOff,
+              ),
       );
     }
     if (homeStatus.configFreshness.displayKind ==
         HarmonyConfigFreshnessKind.autoUpdated) {
-      lines.add(texts.harmonyConfigFreshAutoUpdated);
+      lines.add(
+        remoteHarmonyText(
+          ref,
+          'harmonyConfigFreshAutoUpdated',
+          texts.harmonyConfigFreshAutoUpdated,
+        ),
+      );
     } else if (homeStatus.lastConfigSyncAt != null) {
       lines.add(
-        texts.harmonyConfigSyncedAt(_formatTime(homeStatus.lastConfigSyncAt!)),
+        remoteHarmonyText(
+          ref,
+          'harmonyConfigSyncedAt',
+          texts.harmonyConfigSyncedAt(
+            _formatTime(homeStatus.lastConfigSyncAt!),
+          ),
+        ),
       );
     }
     if (lines.isEmpty) return const SizedBox.shrink();
@@ -397,7 +544,11 @@ class _HomeInsightCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              texts.harmonyStatusSection,
+              remoteHarmonyText(
+                ref,
+                'harmonyStatusSection',
+                texts.harmonyStatusSection,
+              ),
               style: context.textTheme.labelMedium?.copyWith(
                 color: context.colorScheme.primary,
               ),
@@ -421,7 +572,7 @@ class _HomeInsightCard extends StatelessWidget {
   }
 }
 
-class _NodeCard extends StatelessWidget {
+class _NodeCard extends ConsumerWidget {
   final String nodeName;
   final int? delayMs;
   final VoidCallback? onSwitch;
@@ -429,7 +580,7 @@ class _NodeCard extends StatelessWidget {
   const _NodeCard({required this.nodeName, this.delayMs, this.onSwitch});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
     return Card(
       elevation: 0,
@@ -443,7 +594,11 @@ class _NodeCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    texts.harmonyCurrentNode,
+                    remoteHarmonyText(
+                      ref,
+                      'harmonyCurrentNode',
+                      texts.harmonyCurrentNode,
+                    ),
                     style: context.textTheme.labelMedium,
                   ),
                   const SizedBox(height: 4),
@@ -456,7 +611,7 @@ class _NodeCard extends StatelessWidget {
                   if (delayMs != null && delayMs! > 0) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${texts.harmonyLatency}: $delayMs ms',
+                      '${remoteHarmonyText(ref, 'harmonyLatency', texts.harmonyLatency)}: $delayMs ms',
                       style: context.textTheme.bodySmall,
                     ),
                   ],
@@ -467,7 +622,11 @@ class _NodeCard extends StatelessWidget {
               IconButton.filledTonal(
                 onPressed: onSwitch,
                 icon: const Icon(Icons.swap_horiz_rounded),
-                tooltip: texts.harmonySwitchNode,
+                tooltip: remoteHarmonyText(
+                  ref,
+                  'harmonySwitchNode',
+                  texts.harmonySwitchNode,
+                ),
               ),
           ],
         ),
@@ -476,7 +635,7 @@ class _NodeCard extends StatelessWidget {
   }
 }
 
-class _TrafficCard extends StatelessWidget {
+class _TrafficCard extends ConsumerWidget {
   final String uploadTotal;
   final String downloadTotal;
   final String uploadSpeed;
@@ -490,7 +649,7 @@ class _TrafficCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
     return Card(
       elevation: 0,
@@ -501,7 +660,11 @@ class _TrafficCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              texts.harmonySessionTraffic,
+              remoteHarmonyText(
+                ref,
+                'harmonySessionTraffic',
+                texts.harmonySessionTraffic,
+              ),
               style: context.textTheme.labelMedium,
             ),
             const SizedBox(height: 12),
@@ -509,7 +672,11 @@ class _TrafficCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _TrafficStat(
-                    label: texts.harmonyUpload,
+                    label: remoteHarmonyText(
+                      ref,
+                      'harmonyUpload',
+                      texts.harmonyUpload,
+                    ),
                     total: uploadTotal,
                     speed: uploadSpeed,
                     icon: Icons.arrow_upward_rounded,
@@ -518,7 +685,11 @@ class _TrafficCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _TrafficStat(
-                    label: texts.harmonyDownload,
+                    label: remoteHarmonyText(
+                      ref,
+                      'harmonyDownload',
+                      texts.harmonyDownload,
+                    ),
                     total: downloadTotal,
                     speed: downloadSpeed,
                     icon: Icons.arrow_downward_rounded,
@@ -566,24 +737,29 @@ class _TrafficStat extends StatelessWidget {
   }
 }
 
-class _AccountFooter extends StatelessWidget {
+class _AccountFooter extends ConsumerWidget {
   final String username;
   final VoidCallback? onLogout;
 
   const _AccountFooter({required this.username, this.onLogout});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
     return Column(
       children: [
         Text(
-          '${texts.harmonyAccount}: $username',
+          '${remoteHarmonyText(ref, 'harmonyAccount', texts.harmonyAccount)}: $username',
           style: context.textTheme.bodySmall?.copyWith(
             color: context.colorScheme.onSurfaceVariant,
           ),
         ),
-        TextButton(onPressed: onLogout, child: Text(texts.harmonyLogout)),
+        TextButton(
+          onPressed: onLogout,
+          child: Text(
+            remoteHarmonyText(ref, 'harmonyLogout', texts.harmonyLogout),
+          ),
+        ),
       ],
     );
   }
