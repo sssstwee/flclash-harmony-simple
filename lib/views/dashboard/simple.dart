@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -7,6 +8,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,6 +27,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   final _username = TextEditingController();
   final _password = TextEditingController();
   Timer? _sessionTimer;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  List<ConnectivityResult>? _lastConnectivity;
 
   @override
   void initState() {
@@ -37,11 +41,22 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
       const Duration(minutes: 15),
       (_) => ref.read(harmonySimpleProvider.notifier).checkSession(),
     );
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      if (_lastConnectivity != null &&
+          listEquals(_lastConnectivity, results)) {
+        return;
+      }
+      _lastConnectivity = results;
+      unawaited(
+        ref.read(harmonySimpleProvider.notifier).handleNetworkChange(),
+      );
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _connectivitySub?.cancel();
     _sessionTimer?.cancel();
     _username.dispose();
     _password.dispose();

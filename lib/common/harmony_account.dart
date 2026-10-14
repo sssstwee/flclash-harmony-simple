@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:fl_clash/common/harmony_connect.dart';
 import 'package:flutter/services.dart';
 
 /// Production builds must set [CLASH_HARMONY_API_URL] (see `env.json.example`).
@@ -22,6 +23,8 @@ class HarmonySessionStore {
   static const _tokenKey = 'harmony_session';
   static const _metaKey = 'harmony_session_meta';
   static const _lastModifiedKey = 'harmony_config_lm';
+  static const _reconnectKey = 'harmony_vpn_reconnect';
+  static const _configRefreshKey = 'harmony_config_refresh_sec';
 
   Future<String?> read() => _channel.invokeMethod<String>('read', _arguments(_tokenKey));
 
@@ -48,10 +51,42 @@ class HarmonySessionStore {
   Future<void> deleteConfigLastModified() =>
       _channel.invokeMethod<void>('delete', _arguments(_lastModifiedKey));
 
+  Future<bool> readReconnectOnLaunch() async {
+    final raw = await _channel.invokeMethod<String>('read', _arguments(_reconnectKey));
+    return raw == '1';
+  }
+
+  Future<void> writeReconnectOnLaunch(bool value) => _channel.invokeMethod<void>(
+    'write',
+    _arguments(_reconnectKey, value ? '1' : '0'),
+  );
+
+  Future<void> deleteReconnectOnLaunch() =>
+      _channel.invokeMethod<void>('delete', _arguments(_reconnectKey));
+
+  Future<int?> readConfigRefreshSeconds() async {
+    final raw = await _channel.invokeMethod<String>(
+      'read',
+      _arguments(_configRefreshKey),
+    );
+    return int.tryParse(raw ?? '');
+  }
+
+  Future<void> writeConfigRefreshSeconds(int seconds) =>
+      _channel.invokeMethod<void>(
+        'write',
+        _arguments(_configRefreshKey, '$seconds'),
+      );
+
+  Future<void> deleteConfigRefreshSeconds() =>
+      _channel.invokeMethod<void>('delete', _arguments(_configRefreshKey));
+
   Future<void> clearAll() async {
     await delete();
     await deleteMeta();
     await deleteConfigLastModified();
+    await deleteReconnectOnLaunch();
+    await deleteConfigRefreshSeconds();
   }
 
   Map<String, Object?> _arguments(String key, [String? value]) => {
@@ -103,11 +138,13 @@ class HarmonyConfigDownload {
   final Uint8List? bytes;
   final String? lastModified;
   final bool notModified;
+  final Duration? profileUpdateInterval;
 
   const HarmonyConfigDownload({
     this.bytes,
     this.lastModified,
     this.notModified = false,
+    this.profileUpdateInterval,
   });
 }
 
@@ -132,6 +169,25 @@ class HarmonyAccountApi {
   bool get isAuthorized => session?.expiresAt.isAfter(DateTime.now()) == true;
 
   Future<String?> readConfigLastModified() => _storage.readConfigLastModified();
+
+  Future<bool> readReconnectOnLaunch() => _storage.readReconnectOnLaunch();
+
+  Future<void> setReconnectOnLaunch(bool value) =>
+      _storage.writeReconnectOnLaunch(value);
+
+  Future<Duration> readConfigRefreshInterval({
+    Duration fallback = const Duration(hours: 24),
+  }) async {
+    final seconds = await _storage.readConfigRefreshSeconds();
+    if (seconds == null || seconds <= 0) return fallback;
+    return Duration(seconds: seconds);
+  }
+
+  Future<void> saveConfigRefreshInterval(Duration interval) {
+    final seconds = interval.inSeconds;
+    if (seconds <= 0) return _storage.deleteConfigRefreshSeconds();
+    return _storage.writeConfigRefreshSeconds(seconds);
+  }
 
   Future<HarmonySession?> restore() async {
     final token = await _storage.read();
@@ -209,6 +265,7 @@ class HarmonyAccountApi {
       return HarmonyConfigDownload(
         notModified: true,
         lastModified: ifModifiedSince ?? await _storage.readConfigLastModified(),
+        profileUpdateInterval: null,
       );
     }
     final stream = response.data as ResponseBody;
@@ -227,7 +284,12 @@ class HarmonyAccountApi {
     if (lastModified != null && lastModified.isNotEmpty) {
       await _storage.writeConfigLastModified(lastModified);
     }
-    return HarmonyConfigDownload(bytes: Uint8List.fromList(bytes), lastModified: lastModified);
+    final headerInterval = response.headers.value('profile-update-interval');
+    return HarmonyConfigDownload(
+      bytes: Uint8List.fromList(bytes),
+      lastModified: lastModified,
+      profileUpdateInterval: profileUpdateIntervalFromHeader(headerInterval),
+    );
   }
 
   Future<void> logout() async {

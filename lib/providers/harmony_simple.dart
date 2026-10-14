@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
+import 'package:fl_clash/common/harmony_connect.dart';
+import 'package:fl_clash/common/proxy_transport.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -62,19 +65,32 @@ HarmonyAccountApi harmonyAccountApi(Ref ref) => harmonyAccount;
 
 @Riverpod(keepAlive: true)
 class HarmonySimple extends _$HarmonySimple {
+  static const _healthCheckInterval = Duration(minutes: 5);
+
   HarmonyAccountApi get _api => ref.read(harmonyAccountApiProvider);
 
+  Timer? _configRefreshTimer;
+  Timer? _healthCheckTimer;
+  Duration _configRefreshInterval = const Duration(hours: 24);
+
   @override
-  HarmonySimpleState build() => const HarmonySimpleState();
+  HarmonySimpleState build() {
+    ref.onDispose(_stopBackgroundTasks);
+    return const HarmonySimpleState();
+  }
 
   Future<void> bootstrap() async {
     state = state.copyWith(bootstrapping: true, clearError: true);
+    var shouldReconnect = false;
     try {
       final session = await _api.restore();
       if (session != null) {
         state = state.copyWith(session: session);
         await _cleanupOrphanRemoteProfiles();
         await _syncRemoteProfile(fallbackOnNetworkError: true);
+        shouldReconnect = await _api.readReconnectOnLaunch();
+        _configRefreshInterval = await _api.readConfigRefreshInterval();
+        _scheduleConfigRefresh();
       } else {
         state = state.copyWith(clearSession: true);
         await _cleanupOrphanRemoteProfiles();
@@ -87,6 +103,9 @@ class HarmonySimple extends _$HarmonySimple {
       state = state.copyWith(error: _message(error));
     } finally {
       state = state.copyWith(bootstrapping: false);
+      if (shouldReconnect && _api.session != null && !ref.read(isStartProvider)) {
+        unawaited(toggleConnect());
+      }
     }
   }
 
@@ -100,6 +119,20 @@ class HarmonySimple extends _$HarmonySimple {
       if (error == HarmonyAccountError.expired) {
         await logout(expired: true);
       }
+    } catch (_) {}
+  }
+
+  Future<void> handleNetworkChange() async {
+    if (!ref.read(isStartProvider) || state.busy) return;
+    await reevaluateRoute();
+  }
+
+  Future<void> reevaluateRoute() async {
+    if (state.busy || _api.session == null || !ref.read(isStartProvider)) {
+      return;
+    }
+    try {
+      await _applyBestRoute(showNoRouteError: false);
     } catch (_) {}
   }
 
@@ -121,6 +154,7 @@ class HarmonySimple extends _$HarmonySimple {
 
   Future<void> logout({bool expired = false}) async {
     state = state.copyWith(busy: true, clearError: true);
+    _stopBackgroundTasks();
     final profile = state.remoteProfile;
     state = state.copyWith(clearRemoteProfile: true, usingCachedConfig: false);
     try {
@@ -159,60 +193,12 @@ class HarmonySimple extends _$HarmonySimple {
     );
     try {
       if (running) {
+        await _api.setReconnectOnLaunch(false);
+        _stopBackgroundTasks();
         await setup.updateStatus(false);
         return;
       }
-      await _syncRemoteProfile(fallbackOnNetworkError: true);
-      final profile = state.remoteProfile;
-      if (profile == null) {
-        state = state.copyWith(error: _message(HarmonyAccountError.config));
-        return;
-      }
-      if (profile.id != ref.read(currentProfileIdProvider)) return;
-      ref
-          .read(patchClashConfigProvider.notifier)
-          .update((s) => s.copyWith(mode: Mode.rule));
-      ref
-          .read(vpnSettingProvider.notifier)
-          .update((s) => s.copyWith(enable: true));
-      await setup.applyProfile(force: true);
-      final groups = ref.read(groupsProvider);
-      final config = await coreController.getConfig(profile.id);
-      final group = connectionGroup(
-        groups,
-        system.isOhos
-            ? defaultRoutingRules(config)
-            : List<String>.from(config['rules'] ?? const <String>[]),
-      );
-      final selected = group == null
-          ? null
-          : await autoSelectProxy(
-              group,
-              groups,
-              (name) async => (await coreController.getDelay(
-                group.testUrl ?? ref.read(appSettingProvider).testUrl,
-                name,
-              )).value,
-            );
-      if (selected == null) {
-        state = state.copyWith(error: currentAppLocalizations.simpleNoRoute);
-        return;
-      }
-      for (final entry in selected.selections.entries.toList().reversed) {
-        await ref
-            .read(proxiesActionProvider.notifier)
-            .changeProxy(groupName: entry.key, proxyName: entry.value);
-        ref
-            .read(profilesActionProvider.notifier)
-            .updateCurrentSelectedMap(entry.key, entry.value);
-      }
-      ref
-          .read(proxiesActionProvider.notifier)
-          .updateCurrentGroupName(group!.name);
-      await setup.updateStatus(true, isInit: true);
-      if (!ref.read(isStartProvider)) {
-        state = state.copyWith(error: currentAppLocalizations.simpleConnectFailed);
-      }
+      await _connectVpn();
     } on HarmonyAccountError catch (error) {
       await setup.updateStatus(false);
       if (error == HarmonyAccountError.expired) {
@@ -226,6 +212,72 @@ class HarmonySimple extends _$HarmonySimple {
     } finally {
       state = state.copyWith(busy: false, disconnecting: false);
     }
+  }
+
+  Future<void> _connectVpn() async {
+    final setup = ref.read(setupActionProvider.notifier);
+    await _syncRemoteProfile(fallbackOnNetworkError: true);
+    final profile = state.remoteProfile;
+    if (profile == null) {
+      state = state.copyWith(error: _message(HarmonyAccountError.config));
+      return;
+    }
+    if (profile.id != ref.read(currentProfileIdProvider)) return;
+    ref
+        .read(patchClashConfigProvider.notifier)
+        .update((s) => s.copyWith(mode: Mode.rule));
+    ref.read(vpnSettingProvider.notifier).update((s) => s.copyWith(enable: true));
+    await setup.applyProfile(force: true);
+    final applied = await _applyBestRoute(showNoRouteError: true);
+    if (!applied) return;
+    await setup.updateStatus(true, isInit: true);
+    if (!ref.read(isStartProvider)) {
+      state = state.copyWith(error: currentAppLocalizations.simpleConnectFailed);
+      return;
+    }
+    await _api.setReconnectOnLaunch(true);
+    _scheduleConfigRefresh();
+    _scheduleHealthCheck();
+  }
+
+  Future<bool> _applyBestRoute({required bool showNoRouteError}) async {
+    final profile = state.remoteProfile;
+    if (profile == null) return false;
+    final groups = ref.read(groupsProvider);
+    final config = await coreController.getConfig(profile.id);
+    final rules = system.isOhos
+        ? defaultRoutingRules(config)
+        : List<String>.from(config['rules'] ?? const <String>[]);
+    final group = connectionGroup(groups, rules);
+    final transportKinds = transportKindsFromConfig(config);
+    final selected = group == null
+        ? null
+        : await autoSelectProxy(
+            group,
+            groups,
+            (name) async => (await coreController.getDelay(
+              group.testUrl ?? ref.read(appSettingProvider).testUrl,
+              name,
+            )).value,
+            transportKinds: transportKinds,
+            preferTcpFirst: system.isOhos,
+          );
+    if (selected == null) {
+      if (showNoRouteError) {
+        state = state.copyWith(error: currentAppLocalizations.simpleNoRoute);
+      }
+      return false;
+    }
+    for (final entry in selected.selections.entries.toList().reversed) {
+      await ref
+          .read(proxiesActionProvider.notifier)
+          .changeProxy(groupName: entry.key, proxyName: entry.value);
+      ref
+          .read(profilesActionProvider.notifier)
+          .updateCurrentSelectedMap(entry.key, entry.value);
+    }
+    ref.read(proxiesActionProvider.notifier).updateCurrentGroupName(group!.name);
+    return true;
   }
 
   Future<void> _syncRemoteProfile({required bool fallbackOnNetworkError}) async {
@@ -245,6 +297,14 @@ class HarmonySimple extends _$HarmonySimple {
       }
       final bytes = download.bytes;
       if (bytes == null) throw HarmonyAccountError.config;
+      final yamlText = utf8.decode(bytes);
+      final interval =
+          download.profileUpdateInterval ??
+          profileUpdateIntervalFromYaml(yamlText) ??
+          const Duration(hours: 24);
+      await _api.saveConfigRefreshInterval(interval);
+      _configRefreshInterval = interval;
+      _scheduleConfigRefresh();
       await ref.read(coreActionProvider.notifier).tryStartCore();
       final old = _findRemoteProfile();
       final profile = await (old ?? Profile.normal(label: appDisplayName))
@@ -269,6 +329,31 @@ class HarmonySimple extends _$HarmonySimple {
       }
       rethrow;
     }
+  }
+
+  void _scheduleConfigRefresh() {
+    _configRefreshTimer?.cancel();
+    if (_api.session == null) return;
+    _configRefreshTimer = Timer.periodic(_configRefreshInterval, (_) {
+      if (_api.session == null || state.busy) return;
+      unawaited(_syncRemoteProfile(fallbackOnNetworkError: true));
+    });
+  }
+
+  void _scheduleHealthCheck() {
+    _healthCheckTimer?.cancel();
+    if (_api.session == null) return;
+    _healthCheckTimer = Timer.periodic(_healthCheckInterval, (_) {
+      if (!ref.read(isStartProvider) || state.busy) return;
+      unawaited(reevaluateRoute());
+    });
+  }
+
+  void _stopBackgroundTasks() {
+    _configRefreshTimer?.cancel();
+    _configRefreshTimer = null;
+    _healthCheckTimer?.cancel();
+    _healthCheckTimer = null;
   }
 
   Profile? _findRemoteProfile() {

@@ -9,6 +9,8 @@ class MemoryStore extends HarmonySessionStore {
   String? token;
   String? meta;
   String? lastModified;
+  String? reconnect;
+  String? refreshSeconds;
 
   @override
   Future<String?> read() async => token;
@@ -50,10 +52,38 @@ class MemoryStore extends HarmonySessionStore {
   }
 
   @override
+  Future<bool> readReconnectOnLaunch() async => reconnect == '1';
+
+  @override
+  Future<void> writeReconnectOnLaunch(bool value) async {
+    reconnect = value ? '1' : '0';
+  }
+
+  @override
+  Future<void> deleteReconnectOnLaunch() async {
+    reconnect = null;
+  }
+
+  @override
+  Future<int?> readConfigRefreshSeconds() async => int.tryParse(refreshSeconds ?? '');
+
+  @override
+  Future<void> writeConfigRefreshSeconds(int seconds) async {
+    refreshSeconds = '$seconds';
+  }
+
+  @override
+  Future<void> deleteConfigRefreshSeconds() async {
+    refreshSeconds = null;
+  }
+
+  @override
   Future<void> clearAll() async {
     token = null;
     meta = null;
     lastModified = null;
+    reconnect = null;
+    refreshSeconds = null;
   }
 }
 

@@ -1,3 +1,4 @@
+import 'package:fl_clash/common/proxy_transport.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 
@@ -30,10 +31,25 @@ Group? connectionGroup(List<Group> groups, List<String> rules) {
 Future<({String name, Map<String, String> selections})?> autoSelectProxy(
   Group root,
   List<Group> groups,
-  Future<int?> Function(String name) measure,
-) async {
+  Future<int?> Function(String name) measure, {
+  Map<String, ProxyTransportKind> transportKinds = const {},
+  bool preferTcpFirst = false,
+}) async {
   final candidates = <({String name, Map<String, String> selections})>[];
   final automatic = <String>{};
+
+  String? proxyTypeFor(String name) {
+    for (final group in groups) {
+      for (final proxy in group.all) {
+        if (proxy.name == name) return proxy.type;
+      }
+    }
+    return null;
+  }
+
+  ProxyTransportKind kindFor(String name) {
+    return transportKinds[name] ?? proxyTransportKind(proxyTypeFor(name), name);
+  }
 
   void collect(Group group, Map<String, String> route, Set<String> visited) {
     if (visited.contains(group.name)) return;
@@ -66,12 +82,20 @@ Future<({String name, Map<String, String> selections})?> autoSelectProxy(
   collect(root, {}, {});
   final delays = <String, int?>{};
   final elapsed = Stopwatch()..start();
+  var preferTcp = preferTcpFirst;
+
   Future<int?> delay(String name) async {
     if (delays.containsKey(name)) return delays[name];
+    final timeout = probeTimeoutFor(kindFor(name), preferTcp: preferTcp);
     try {
-      delays[name] = await measure(name).timeout(const Duration(seconds: 8));
+      delays[name] = await measure(name).timeout(timeout);
     } catch (_) {
       delays[name] = null;
+    }
+    if (!preferTcp && inferPreferTcpFromDelays(delays, {
+      for (final key in delays.keys) key: kindFor(key),
+    })) {
+      preferTcp = true;
     }
     return delays[name];
   }
@@ -88,9 +112,14 @@ Future<({String name, Map<String, String> selections})?> autoSelectProxy(
       if (value != null && value > 0) return candidate;
     }
   }
-  final manual = candidates
+  var manual = candidates
       .where((item) => !automatic.contains(item.name))
       .toList();
+  manual = sortByTransportPreference(
+    manual,
+    (item) => kindFor(item.name),
+    preferTcp: preferTcp,
+  );
   // Bound concurrent probes on a phone, including subscriptions with many nodes.
   for (var offset = 0; offset < manual.length; offset += 6) {
     final batch = manual.skip(offset).take(6).toList();
