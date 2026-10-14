@@ -111,6 +111,28 @@ class FailingStore extends MemoryStore {
   Future<void> clearAll() async => throw StateError('storage failed');
 }
 
+class WriteFailureStore extends MemoryStore {
+  @override
+  Future<void> write(String value) async => throw StateError('write failed');
+}
+
+class DeleteFailureStore extends MemoryStore {
+  @override
+  Future<void> clearAll() async => throw StateError('delete failed');
+}
+
+class BlockingCacheStore extends MemoryStore {
+  final writing = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<void> writeConfigCache(String value) async {
+    writing.complete();
+    await release.future;
+    cache = value;
+  }
+}
+
 ResponseBody jsonBody(
   Object? data, [
   int status = 200,
@@ -229,9 +251,12 @@ void main() {
       );
       expect(store.token, isNull);
       store.token = 'expired';
-      await expectLater(api.restore(), throwsA(HarmonyAccountError.expired));
+      // A new process may have a persisted token. The signed-out instance must
+      // never restore after its own failed login/logout.
+      final restartedApi = HarmonyAccountApi(http: http, storage: store);
+      await expectLater(restartedApi.restore(), throwsA(HarmonyAccountError.expired));
       expect(store.token, isNull);
-      expect(api.isAuthorized, isFalse);
+      expect(restartedApi.isAuthorized, isFalse);
     },
   );
 
@@ -528,6 +553,7 @@ void main() {
         signInStarted.complete();
         return signIn.future;
       }
+      if (request.path == '/api/auth/sign-out') return jsonBody({'success': true});
       validations++;
       return jsonBody({
         'session': {'expiresAt': DateTime.now().add(const Duration(days: 1)).toIso8601String()},
@@ -560,6 +586,107 @@ void main() {
 
     await expectLater(api.login('alice', 'password'), throwsA(HarmonyAccountError.unavailable));
     expect(api.isAuthorized, isFalse);
+  });
+
+  test('failed keystore deletion cannot restore the logged-out session in this process', () async {
+    final value = HarmonySession('saved-token', 'alice', DateTime.now().add(const Duration(days: 1)));
+    final store = DeleteFailureStore()
+      ..token = value.token
+      ..meta = jsonEncode(value.toJson());
+    var validations = 0;
+    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+    http.httpClientAdapter = Adapter((request) {
+      if (request.path == '/api/auth/get-session') validations++;
+      return jsonBody({'success': true});
+    });
+    final api = HarmonyAccountApi(http: http, storage: store)..session = value;
+
+    await expectLater(api.logout(), throwsStateError);
+    expect(store.token, 'saved-token', reason: 'Simulate a keystore that really failed to delete');
+    expect(await api.restore(), isNull);
+    expect(await api.restore(), isNull);
+    expect(validations, 0);
+    expect(api.session, isNull);
+  });
+
+  test('a token issued to a login that cannot persist is revoked best-effort', () async {
+    final store = WriteFailureStore();
+    final revoked = <String?>[];
+    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+    http.httpClientAdapter = Adapter((request) {
+      if (request.path == '/api/auth/sign-in/username') {
+        return jsonBody({}, 200, {'set-auth-token': ['unpersisted-token']});
+      }
+      if (request.path == '/api/auth/sign-out') {
+        revoked.add(request.headers['Authorization'] as String?);
+        return jsonBody({'success': true});
+      }
+      return jsonBody({
+        'session': {'expiresAt': DateTime.now().add(const Duration(days: 1)).toIso8601String()},
+        'user': {'username': 'alice'},
+      });
+    });
+    final api = HarmonyAccountApi(http: http, storage: store);
+
+    await expectLater(api.login('alice', 'password'), throwsA(HarmonyAccountError.unavailable));
+
+    expect(revoked, ['Bearer unpersisted-token']);
+    expect(store.token, isNull);
+    expect(store.meta, isNull);
+    expect(api.isAuthorized, isFalse);
+  });
+
+  test('logout is ordered after a cache write already in progress', () async {
+    final store = BlockingCacheStore();
+    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+    http.httpClientAdapter = Adapter((_) => jsonBody({'success': true}));
+    final api = HarmonyAccountApi(http: http, storage: store)..session = HarmonySession(
+      'token', 'alice', DateTime.now().add(const Duration(days: 1)),
+    );
+    final committing = api.commitConfigCache(
+      HarmonyConfigCacheMetadata(username: 'alice', profileId: 7, contentHash: 'a' * 64),
+      expectedToken: 'token',
+    ).then<Object?>((_) => null, onError: (Object error) => error);
+    await store.writing.future;
+    final loggingOut = api.logout();
+    expect(api.isAuthorized, isFalse);
+    store.release.complete();
+
+    expect(await committing, HarmonyAccountError.expired);
+    await loggingOut;
+
+    expect(store.cache, isNull);
+    expect(store.token, isNull);
+    expect(api.session, isNull);
+    expect(await api.restore(), isNull);
+  });
+
+  test('logout discards a config download that finishes afterward', () async {
+    final response = Completer<ResponseBody>();
+    final requested = Completer<void>();
+    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+    http.httpClientAdapter = AsyncAdapter((request) async {
+      if (request.path == '/v1/config') {
+        requested.complete();
+        return response.future;
+      }
+      return jsonBody({'success': true});
+    });
+    final store = MemoryStore();
+    final api = HarmonyAccountApi(http: http, storage: store)..session = HarmonySession(
+      'token', 'alice', DateTime.now().add(const Duration(days: 1)),
+    );
+    final downloading = api.downloadConfig().then<Object?>(
+      (value) => value,
+      onError: (Object error) => error,
+    );
+    await requested.future;
+    await api.logout();
+    response.complete(ResponseBody.fromString('proxies: []', 200));
+
+    expect(await downloading, HarmonyAccountError.expired);
+    expect(store.cache, isNull);
+    expect(api.session, isNull);
   });
 
   test('native clear attempts every credential deletion after one failure', () async {

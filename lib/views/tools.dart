@@ -151,12 +151,14 @@ class _LocaleItem extends ConsumerWidget {
     final locale = ref.watch(
       appSettingProvider.select((state) => state.locale),
     );
-    final subTitle = locale ?? context.appLocalizations.defaultText;
-    final currentLocale = utils.getLocaleForString(locale);
+    final savedLocale = utils.getLocaleForString(locale);
+    final currentLocale = savedLocale == null
+        ? null
+        : resolveAppLocale([savedLocale]);
     return ListItem<Locale?>.options(
       leading: const Icon(Icons.language_outlined),
       title: Text(context.appLocalizations.language),
-      subtitle: Text(Intl.message(subTitle)),
+      subtitle: Text(_getLocaleString(context, currentLocale)),
       delegate: OptionsDelegate(
         title: context.appLocalizations.language,
         options: [null, ...AppLocalizations.delegate.supportedLocales],

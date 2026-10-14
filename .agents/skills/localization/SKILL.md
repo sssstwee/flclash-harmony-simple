@@ -24,8 +24,7 @@ Do not use this for README translation sync or manual edits to generated localiz
 4. Add or update every source ARB:
    - `arb/intl_en.arb`
    - `arb/intl_zh_CN.arb`
-   - `arb/intl_ja.arb`
-   - `arb/intl_ru.arb`
+   This app supports only English and Chinese. Do not add other locale ARBs.
 5. Replace inline strings with existing project accessors:
    - Widgets with `BuildContext`: `context.appLocalizations.key` from `common.dart`.
    - Controllers/providers/non-widget code: `currentAppLocalizations.key` from `app_localizations.dart`.
@@ -40,6 +39,6 @@ Do not use this for README translation sync or manual edits to generated localiz
 
 ## Pitfalls
 
-- If ja/ru still show English, fix ja/ru source ARB values and regenerate. Do not edit generated Dart.
+- Keep the generated supported locales in sync with the English and Chinese source ARBs. Remove obsolete locale resources when removing a language; do not edit generated Dart by hand.
 - Ignore `lib/l10n/intl/**` and `lib/**/generated/**` during text scans.
 - If generator or analyzer hits local cache permission friction, rerun serially before treating it as a code issue.

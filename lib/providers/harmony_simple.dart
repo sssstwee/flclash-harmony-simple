@@ -97,6 +97,7 @@ class HarmonySimple extends _$HarmonySimple {
   HarmonyProfileStore get _files => ref.read(harmonyProfileStoreProvider);
   int _operation = 0;
   bool _restoring = false;
+  final _profileInstalls = <({Profile profile, Completer<void> done})>[];
 
   void _ensureCurrent(int operation, String token) {
     if (!ref.mounted || operation != _operation || _api.session?.token != token) {
@@ -199,7 +200,11 @@ class HarmonySimple extends _$HarmonySimple {
   Future<void> logout({bool expired = false}) async {
     final operation = ++_operation;
     state = state.copyWith(busy: true, clearError: true);
-    final profiles = _remoteProfiles();
+    final installations = List.of(_profileInstalls);
+    final profiles = <int, Profile>{
+      for (final profile in _remoteProfiles()) profile.id: profile,
+      for (final install in installations) install.profile.id: install.profile,
+    };
     state = state.copyWith(
       clearRemoteProfile: true,
       clearSession: true,
@@ -217,7 +222,10 @@ class HarmonySimple extends _$HarmonySimple {
         // The API clears in-memory authorization even if the keystore fails.
         _api.session = null;
       }
-      for (final profile in profiles) {
+      // File/DB writes cannot be cancelled. Join writes already in flight
+      // before deleting their results so logout cannot leave a late orphan.
+      await Future.wait(installations.map((install) => install.done.future));
+      for (final profile in profiles.values) {
         await _deleteRemoteProfile(profile);
       }
     } finally {
@@ -389,14 +397,20 @@ class HarmonySimple extends _$HarmonySimple {
       }
       await ref.read(coreActionProvider.notifier).tryStartCore();
       _ensureCurrent(operation, session.token);
-      final old = _remoteProfiles().firstOrNull;
-      final profile = await _files.save(
-        old ?? Profile.normal(label: appDisplayName), bytes,
-      );
-      _ensureCurrent(operation, session.token);
-      await ref.read(profilesActionProvider.notifier)
-          .putProfile(profile.copyWith(autoUpdate: false));
-      _ensureCurrent(operation, session.token);
+      final target = _remoteProfiles().firstOrNull ?? Profile.normal(label: appDisplayName);
+      final install = (profile: target, done: Completer<void>());
+      _profileInstalls.add(install);
+      late final Profile profile;
+      try {
+        profile = await _files.save(target, bytes);
+        _ensureCurrent(operation, session.token);
+        await ref.read(profilesActionProvider.notifier)
+            .putProfile(profile.copyWith(autoUpdate: false));
+        _ensureCurrent(operation, session.token);
+      } finally {
+        install.done.complete();
+        _profileInstalls.remove(install);
+      }
       await _api.commitConfigCache(
         HarmonyConfigCacheMetadata(
           username: session.username,

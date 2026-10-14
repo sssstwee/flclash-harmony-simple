@@ -116,9 +116,13 @@ class GlobalState {
       profiles = profiles.map(harmonyProfileDefaults).toList();
     }
     container.read(profilesProvider.notifier).setAndReorder(profiles);
+    final savedLocale = utils.getLocaleForString(config.appSettingProps.locale);
     await AppLocalizations.load(
-      utils.getLocaleForString(config.appSettingProps.locale) ??
-          WidgetsBinding.instance.platformDispatcher.locale,
+      resolveAppLocale(
+        savedLocale == null
+            ? WidgetsBinding.instance.platformDispatcher.locales
+            : [savedLocale],
+      ),
     );
     await window?.init(version, config.windowProps);
     if (system.isAndroid) {

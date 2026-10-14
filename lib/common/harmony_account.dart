@@ -208,6 +208,7 @@ class HarmonyAccountApi {
   final HarmonySessionStore _storage;
   HarmonySession? session;
   int _generation = 0;
+  bool _restoreBlocked = false;
   Future<void> _storageTail = Future<void>.value();
 
   HarmonyAccountApi({Dio? http, HarmonySessionStore? storage})
@@ -273,6 +274,7 @@ class HarmonyAccountApi {
   });
 
   Future<HarmonySession?> restore() async {
+    if (_restoreBlocked) return null;
     final generation = _generation;
     String? token;
     try {
@@ -299,7 +301,14 @@ class HarmonyAccountApi {
           // In-memory authorization is already gone even if storage is broken.
         }
       } else if (error == HarmonyAccountError.unavailable && token != null) {
-        final raw = await _store(_storage.readMeta);
+        String? raw;
+        try {
+          raw = await _store(_storage.readMeta);
+        } catch (_) {
+          _checkGeneration(generation);
+          session = null;
+          throw HarmonyAccountError.unavailable;
+        }
         _checkGeneration(generation);
         final cached = HarmonySession.fromJson(raw, token);
         if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
@@ -317,7 +326,9 @@ class HarmonyAccountApi {
 
   Future<HarmonySession> login(String username, String password) async {
     final generation = ++_generation;
+    _restoreBlocked = true;
     session = null;
+    String? issuedToken;
     try {
       await _store(() async {
         _checkGeneration(generation);
@@ -330,8 +341,8 @@ class HarmonyAccountApi {
         data: {'username': username.trim(), 'password': password},
         login: true,
       );
+      final token = issuedToken = response.headers.value('set-auth-token');
       _checkGeneration(generation);
-      final token = response.headers.value('set-auth-token');
       if (token == null || token.isEmpty) throw HarmonyAccountError.unavailable;
       final value = await _validate(token);
       _checkGeneration(generation);
@@ -342,11 +353,22 @@ class HarmonyAccountApi {
         if (await _storage.read() != token) throw HarmonyAccountError.unavailable;
       });
       _checkGeneration(generation);
+      _restoreBlocked = false;
       return session = value;
     } catch (error) {
       if (_generation == generation) {
         try {
           await clear();
+        } catch (_) {}
+      }
+      if (issuedToken != null && issuedToken.isNotEmpty) {
+        try {
+          await _request(
+            '/api/auth/sign-out',
+            method: 'POST',
+            data: {},
+            token: issuedToken,
+          );
         } catch (_) {}
       }
       if (error is HarmonyAccountError) rethrow;
@@ -447,6 +469,9 @@ class HarmonyAccountApi {
 
   Future<void> clear() {
     ++_generation;
+    // A broken keystore must not silently sign this process back in. Only a
+    // subsequent successful explicit login lifts this barrier.
+    _restoreBlocked = true;
     session = null;
     return _store(_storage.clearAll);
   }
