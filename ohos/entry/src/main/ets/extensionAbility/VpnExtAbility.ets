@@ -85,10 +85,6 @@ interface CoreRPCAction {
   data: string
 }
 
-interface NetworkStateRequest {
-  'network-state'?: boolean
-}
-
 interface PendingServiceStart {
   options: VpnOptions
   runTime: number
@@ -281,7 +277,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     try {
       const action = JSON.parse(data) as CoreRPCAction
       if (action.method === "asyncTestDelay") {
-        const request = JSON.parse(action.data) as NetworkStateRequest
+        const request = JSON.parse(action.data) as Record<string, boolean>
         if (request['network-state'] === true) {
           this.observeNetwork()
           const snapshot = this.networkManager?.refreshSnapshot() ?? Promise.resolve()
@@ -315,7 +311,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
       const startingConnection = vpnExtension.createVpnConnection(this.context)
       this.vpnConnection = startingConnection
       const vpnConfig = this.toVpnConfig(vpnOptions)
-      startingConnection.create(vpnConfig).then((fd: number) => {
+      startingConnection.create(vpnConfig).then((fd: number): Promise<void> => {
         if (epoch !== this.serviceEpoch || this.destroyed) {
           return startingConnection.destroy()
         }
@@ -340,6 +336,7 @@ export default class VpnExtAbility extends VpnExtensionAbility {
         this.powerManager?.subscribe(suspend)
         this.observeNetwork()
         this.runTime = runTime !== 0 ? runTime : Date.now()
+        return Promise.resolve()
       }).catch((err: Error) => {
         console.log(`Call startTUN failed <= ${err.message ?? err}`)
       }).finally(() => {

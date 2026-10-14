@@ -112,3 +112,18 @@ test('network-state RPC waits for the native snapshot before forwarding to core'
   f.snapshot.resolve(); await tick();
   assert.deepEqual(f.invocations, [action]);
 });
+
+
+test('stale create joins its own asynchronous destroy before a queued start', async () => {
+  const f = fixture(); f.start(); const stale = f.connections.at(-1);
+  f.ability.handleStopService({}); await tick();
+  stale.holdDestroy = true; f.start();
+  stale.created.resolve(1); await tick();
+  assert.equal(stale.pendingDestroys.length, 1);
+  assert.equal(f.ability.starting, true);
+  assert.equal(f.connections.at(-1), stale);
+  assert.equal(f.starts, 0);
+  stale.pendingDestroys[0].resolve(); await tick();
+  assert.notEqual(f.connections.at(-1), stale);
+  assert.equal(f.starts, 0);
+});
