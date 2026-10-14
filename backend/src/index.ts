@@ -6,21 +6,136 @@ const authRoutes = new Map([
   ['/api/auth/sign-out', 'POST'],
 ]);
 
+const CONFIG_RATE_WINDOW_SEC = 60;
+const CONFIG_RATE_MAX = 30;
+
+type ConfigRow = {
+  content: string;
+  updated_at: string;
+  scope: string;
+  scope_key: string;
+};
+
+let cachedAuth: { env: Env; auth: ReturnType<typeof createAuth> } | undefined;
+
+function getAuth(env: Env) {
+  if (!cachedAuth || cachedAuth.env !== env) {
+    cachedAuth = { env, auth: createAuth(env) };
+  }
+  return cachedAuth.auth;
+}
+
 function failure(code: string, status: number) {
   return Response.json({ code }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
+function configHeaders(updatedAt: string) {
+  return {
+    'Content-Type': 'application/yaml; charset=utf-8',
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'Last-Modified': new Date(updatedAt).toUTCString(),
+  };
+}
+
+async function resolveProxyConfig(
+  db: D1Database,
+  userId: string,
+  configGroup: string | null,
+): Promise<ConfigRow | null> {
+  const userRow = await db
+    .prepare(
+      'SELECT content, updated_at, scope, scope_key FROM proxy_config WHERE scope = ? AND scope_key = ?',
+    )
+    .bind('user', userId)
+    .first<ConfigRow>();
+  if (userRow) return userRow;
+
+  if (configGroup) {
+    const groupRow = await db
+      .prepare(
+        'SELECT content, updated_at, scope, scope_key FROM proxy_config WHERE scope = ? AND scope_key = ?',
+      )
+      .bind('group', configGroup)
+      .first<ConfigRow>();
+    if (groupRow) return groupRow;
+  }
+
+  return db
+    .prepare(
+      'SELECT content, updated_at, scope, scope_key FROM proxy_config WHERE scope = ? AND scope_key = ?',
+    )
+    .bind('default', '')
+    .first<ConfigRow>();
+}
+
+async function allowConfigFetch(db: D1Database, userId: string): Promise<boolean> {
+  const now = Math.floor(Date.now() / 1000);
+  const row = await db
+    .prepare('SELECT window_start, request_count FROM config_api_rate_limit WHERE user_id = ?')
+    .bind(userId)
+    .first<{ window_start: number; request_count: number }>();
+
+  if (!row) {
+    await db
+      .prepare(
+        'INSERT INTO config_api_rate_limit (user_id, window_start, request_count) VALUES (?, ?, 1)',
+      )
+      .bind(userId, now)
+      .run();
+    return true;
+  }
+
+  if (now - row.window_start >= CONFIG_RATE_WINDOW_SEC) {
+    await db
+      .prepare(
+        'UPDATE config_api_rate_limit SET window_start = ?, request_count = 1 WHERE user_id = ?',
+      )
+      .bind(now, userId)
+      .run();
+    return true;
+  }
+
+  if (row.request_count >= CONFIG_RATE_MAX) return false;
+
+  await db
+    .prepare('UPDATE config_api_rate_limit SET request_count = request_count + 1 WHERE user_id = ?')
+    .bind(userId)
+    .run();
+  return true;
+}
+
+function auditConfigFetch(
+  ctx: ExecutionContext,
+  db: D1Database,
+  userId: string,
+  scope: string,
+  scopeKey: string,
+  clientIp: string | null,
+) {
+  ctx.waitUntil(
+    db
+      .prepare(
+        'INSERT INTO config_fetch_audit (user_id, scope, scope_key, fetched_at, client_ip) VALUES (?, ?, ?, ?, ?)',
+      )
+      .bind(userId, scope, scopeKey, new Date().toISOString(), clientIp)
+      .run()
+      .catch(() => undefined),
+  );
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     try {
       const path = new URL(request.url).pathname;
+
       if (path === '/health' && request.method === 'GET') {
         return Response.json({ status: 'ok', app: 'Clash Harmony' });
       }
-      const auth = createAuth(env);
+
       if (authRoutes.get(path) === request.method) {
+        const auth = getAuth(env);
         let authRequest: Request = request;
-        // Bound native-client auth input before handing it to the library.
         if (request.method === 'POST') {
           const body = await readLimited(request, 4096);
           if (!body) return failure('INVALID_REQUEST', 413);
@@ -30,31 +145,61 @@ export default {
         response.headers.set('Cache-Control', 'no-store');
         return response;
       }
+
       if (path !== '/v1/config' || request.method !== 'GET') {
         return failure('NOT_FOUND', 404);
       }
+
+      const auth = getAuth(env);
       const session = await auth.api.getSession({ headers: request.headers });
-      if (!session) return failure('UNAUTHORIZED', 401);
-      const config = await env.DB.prepare('SELECT content, updated_at FROM proxy_config WHERE id = 1').first<{ content: string; updated_at: string }>();
+      if (!session?.user?.id) return failure('UNAUTHORIZED', 401);
+
+      const allowed = await allowConfigFetch(env.DB, session.user.id);
+      if (!allowed) return failure('RATE_LIMITED', 429);
+
+      const configGroup = await env.DB.prepare('SELECT config_group FROM user WHERE id = ?')
+        .bind(session.user.id)
+        .first<{ config_group: string | null }>()
+        .then(row => row?.config_group ?? null);
+
+      const config = await resolveProxyConfig(env.DB, session.user.id, configGroup);
       if (!config) return failure('CONFIG_UNAVAILABLE', 503);
-      return new Response(config.content, {
-        headers: {
-          'Content-Type': 'application/yaml; charset=utf-8',
-          'Cache-Control': 'private, no-store',
-          'X-Content-Type-Options': 'nosniff',
-          'Last-Modified': new Date(config.updated_at).toUTCString(),
-        },
-      });
+
+      const ifModifiedSince = request.headers.get('If-Modified-Since');
+      if (ifModifiedSince) {
+        const serverSec = Math.floor(new Date(config.updated_at).getTime() / 1000);
+        const clientSec = Math.floor(new Date(ifModifiedSince).getTime() / 1000);
+        if (
+          !Number.isNaN(clientSec) &&
+          !Number.isNaN(serverSec) &&
+          serverSec <= clientSec
+        ) {
+          return new Response(null, {
+            status: 304,
+            headers: {
+              'Cache-Control': 'private, no-store',
+              'Last-Modified': new Date(config.updated_at).toUTCString(),
+            },
+          });
+        }
+      }
+
+      const clientIp = request.headers.get('cf-connecting-ip');
+      auditConfigFetch(ctx, env.DB, session.user.id, config.scope, config.scope_key, clientIp);
+
+      return new Response(config.content, { headers: configHeaders(config.updated_at) });
     } catch (error) {
-      // Never log bodies, tokens, passwords or upstream URLs.
-      console.error(JSON.stringify({ event: 'request_failed', type: error instanceof Error ? error.name : 'unknown' }));
+      console.error(
+        JSON.stringify({ event: 'request_failed', type: error instanceof Error ? error.name : 'unknown' }),
+      );
       return failure('SERVICE_UNAVAILABLE', 503);
     }
   },
 } satisfies ExportedHandler<Env>;
 
 async function readLimited(request: Request, max: number): Promise<ArrayBuffer | null> {
-  if (Number(request.headers.get('Content-Length')) > max) return null;
+  const contentLength = Number(request.headers.get('Content-Length'));
+  if (!Number.isNaN(contentLength) && contentLength > max) return null;
   if (!request.body) return new ArrayBuffer(0);
   const reader = request.body.getReader();
   const parts: Uint8Array[] = [];
@@ -63,11 +208,17 @@ async function readLimited(request: Request, max: number): Promise<ArrayBuffer |
     const { value, done } = await reader.read();
     if (done) break;
     length += value.byteLength;
-    if (length > max) { await reader.cancel(); return null; }
+    if (length > max) {
+      await reader.cancel();
+      return null;
+    }
     parts.push(value);
   }
   const result = new Uint8Array(length);
   let offset = 0;
-  for (const part of parts) { result.set(part, offset); offset += part.byteLength; }
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.byteLength;
+  }
   return result.buffer;
 }

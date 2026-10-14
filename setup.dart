@@ -143,9 +143,13 @@ Future<int> _package(
   final coreSha256 = platform == 'windows' ? await _buildGoCore(rootDir) : null;
 
   final file = File(p.join(rootDir, 'env.json'));
+  final defines = await file.exists()
+      ? jsonDecode(await file.readAsString()) as Map<String, dynamic>
+      : <String, dynamic>{};
+  defines.remove('CORE_SHA256');
 
   await file.writeAsString(
-    jsonEncode({'APP_ENV': env, 'CORE_SHA256': ?coreSha256}),
+    jsonEncode({...defines, 'APP_ENV': env, 'CORE_SHA256': ?coreSha256}),
   );
 
   final flutterBuildArgs = createFlutterBuildArgs(

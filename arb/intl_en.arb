@@ -583,5 +583,15 @@
   "harmonyConfigError": "Unable to download valid connection settings. Try connecting again later.",
   "harmonyConnecting": "Connecting…",
   "harmonyDisconnecting": "Disconnecting…",
-  "harmonyAutomaticHint": "Domestic and local networks connect directly. Overseas networks use the proxy automatically."
+  "harmonyAutomaticHint": "Domestic and local networks connect directly. Overseas networks use the proxy automatically.",
+  "harmonyOfflineConfig": "Using cached settings (offline)",
+  "harmonyRetry": "Try again",
+  "harmonyCurrentNode": "Current node",
+  "harmonySwitchNode": "Switch node",
+  "harmonySessionTraffic": "Session traffic",
+  "harmonyUpload": "Upload",
+  "harmonyDownload": "Download",
+  "harmonyLatency": "Latency",
+  "harmonyAccount": "Account",
+  "simpleErrorState": "Connection error"
 }

@@ -4798,6 +4798,76 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  String get harmonyOfflineConfig {
+    return Intl.message(
+      'Using cached settings (offline)',
+      name: 'harmonyOfflineConfig',
+      desc: '',
+      args: [],
+    );
+  }
+
+  String get harmonyRetry {
+    return Intl.message('Try again', name: 'harmonyRetry', desc: '', args: []);
+  }
+
+  String get harmonyCurrentNode {
+    return Intl.message(
+      'Current node',
+      name: 'harmonyCurrentNode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  String get harmonySwitchNode {
+    return Intl.message(
+      'Switch node',
+      name: 'harmonySwitchNode',
+      desc: '',
+      args: [],
+    );
+  }
+
+  String get harmonySessionTraffic {
+    return Intl.message(
+      'Session traffic',
+      name: 'harmonySessionTraffic',
+      desc: '',
+      args: [],
+    );
+  }
+
+  String get harmonyUpload {
+    return Intl.message('Upload', name: 'harmonyUpload', desc: '', args: []);
+  }
+
+  String get harmonyDownload {
+    return Intl.message(
+      'Download',
+      name: 'harmonyDownload',
+      desc: '',
+      args: [],
+    );
+  }
+
+  String get harmonyLatency {
+    return Intl.message('Latency', name: 'harmonyLatency', desc: '', args: []);
+  }
+
+  String get harmonyAccount {
+    return Intl.message('Account', name: 'harmonyAccount', desc: '', args: []);
+  }
+
+  String get simpleErrorState {
+    return Intl.message(
+      'Connection error',
+      name: 'simpleErrorState',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

@@ -4,8 +4,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-12",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": true,
-  "vars": { "AUTH_ORIGIN": "https://auth.example.com" },
+  "workers_dev": false,
+  "vars": {
+    "AUTH_ORIGIN": "https://auth.example.com"
+  },
   "secrets": { "required": ["BETTER_AUTH_SECRET"] },
   "d1_databases": [
     {

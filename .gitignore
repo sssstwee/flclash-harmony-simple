@@ -67,6 +67,9 @@ docs/
 /macos/**/Package.resolved
 /macos/build/
 /env.json
+/env.local.json
+*.secrets.json
+**/private-config*.json
 /core_sha256.json
 /core/*.exe
 /plugins/rust_api/.claude/
@@ -81,3 +84,13 @@ backend/node_modules/
 backend/.wrangler/
 backend/.dev.vars*
 backend/.env*
+backend/wrangler.local.jsonc
+
+# Local editor / agent artifacts (not part of the HarmonyOS product)
+.mcp.json
+opencode.jsonc
+.codegraph/
+.gemini/
+.zed/
+release_telegram.py
+.github/homebrew_cask_template.rb

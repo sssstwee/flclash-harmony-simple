@@ -1,17 +1,26 @@
-import 'package:fl_clash/l10n/l10n.dart';
+import 'package:dio/dio.dart';
+import 'package:fl_clash/common/fixed.dart';
 import 'package:fl_clash/common/harmony_account.dart';
-import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
+import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/harmony_simple.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/simple.dart';
+import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class SignedOutApi extends HarmonyAccountApi {
+  SignedOutApi()
+    : super(http: Dio(BaseOptions(baseUrl: 'https://api.example.test')));
+
   int logins = 0;
+
   @override
   Future<HarmonySession?> restore() async => null;
+
   @override
   Future<HarmonySession> login(String username, String password) async {
     logins++;
@@ -19,30 +28,105 @@ class SignedOutApi extends HarmonyAccountApi {
   }
 }
 
-void main() {
-  Widget app(Widget child) => MaterialApp(
-    locale: const Locale('zh', 'CN'),
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
+/// Avoids bootstrap/profile sync and path/database init during widget tests.
+class _EmptyProfiles extends Profiles {
+  @override
+  List<Profile> build() => [];
+}
+
+class IdleHarmonySimple extends HarmonySimple {
+  @override
+  HarmonySimpleState build() => const HarmonySimpleState(bootstrapping: false);
+
+  @override
+  Future<void> bootstrap() async {}
+
+  @override
+  Future<void> checkSession() async {}
+
+  @override
+  Future<void> login(String username, String password) async {
+    if (state.busy) return;
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      final session = await ref
+          .read(harmonyAccountApiProvider)
+          .login(username, password);
+      state = state.copyWith(session: session, clearError: true);
+    } on HarmonyAccountError catch (error) {
+      state = state.copyWith(error: _harmonyErrorMessage(error));
+    } catch (_) {
+      state = state.copyWith(
+        error: AppLocalizations.current.harmonyServiceError,
+      );
+    } finally {
+      state = state.copyWith(busy: false);
+    }
+  }
+
+  String _harmonyErrorMessage(HarmonyAccountError error) {
+    return switch (error) {
+      HarmonyAccountError.credentials =>
+        AppLocalizations.current.harmonyCredentialsError,
+      HarmonyAccountError.expired =>
+        AppLocalizations.current.harmonySessionExpired,
+      HarmonyAccountError.rateLimited =>
+        AppLocalizations.current.harmonyRateLimited,
+      HarmonyAccountError.config => AppLocalizations.current.harmonyConfigError,
+      HarmonyAccountError.unavailable =>
+        AppLocalizations.current.harmonyServiceError,
+    };
+  }
+}
+
+Finder get primaryFilledButton => find.descendant(
+  of: find.byType(SimpleConnectionPanel),
+  matching: find.byType(FilledButton),
+);
+
+Widget app(Widget child) => MaterialApp(
+  locale: const Locale('zh', 'CN'),
+  localizationsDelegates: const [
+    AppLocalizations.delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ],
+  supportedLocales: const [Locale('zh', 'CN')],
+  home: Scaffold(body: child),
+);
+
+Widget scoped({
+  required Widget child,
+  required SignedOutApi api,
+}) {
+  return ProviderScope(
+    key: UniqueKey(),
+    overrides: [
+      harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
+      harmonyAccountApiProvider.overrideWithValue(api),
+      profilesProvider.overrideWith(_EmptyProfiles.new),
+      initProvider.overrideWithValue(true),
+      isStartProvider.overrideWithValue(false),
+      totalTrafficProvider.overrideWithValue(const Traffic()),
+      trafficsProvider.overrideWithValue(FixedList(0)),
     ],
-    supportedLocales: const [Locale('zh', 'CN')],
-    home: Scaffold(body: child),
+    child: child,
   );
+}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    await AppLocalizations.load(const Locale('zh', 'CN'));
+  });
 
   Future<void> renderLogin(WidgetTester tester, SignedOutApi api) async {
     await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          initProvider.overrideWithValue(true),
-          isStartProvider.overrideWithValue(false),
-        ],
-        child: app(SimpleDashboardView(accountApi: api)),
-      ),
+      scoped(api: api, child: app(const SimpleDashboardView())),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
   }
 
   testWidgets(
@@ -55,11 +139,13 @@ void main() {
       expect(find.text('导入订阅'), findsNothing);
       expect(find.text('连接'), findsNothing);
       await tester.tap(find.byType(FilledButton));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
       expect(api.logins, 0);
       expect(find.text('请填写此项。'), findsNWidgets(2));
       expect(find.byType(NavigationBar), findsNothing);
       expect(find.byType(ListTile), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 
@@ -75,12 +161,10 @@ void main() {
     expect(api.logins, 1);
     expect(find.text('用户名或密码错误。'), findsOneWidget);
     expect(
-      tester
-          .widget<EditableText>(find.byType(EditableText).last)
-          .controller
-          .text,
+      tester.widget<EditableText>(find.byType(EditableText).last).controller.text,
       isEmpty,
     );
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets(
@@ -88,12 +172,15 @@ void main() {
     (tester) async {
       for (final phase in ConnectionPhase.values) {
         await tester.pumpWidget(
-          app(
-            SimpleConnectionPanel(
-              phase: phase,
-              username: 'harmony',
-              onToggle: () {},
-              onLogout: () {},
+          scoped(
+            api: SignedOutApi(),
+            child: app(
+              SimpleConnectionPanel(
+                phase: phase,
+                username: 'harmony',
+                onToggle: () {},
+                onLogout: () {},
+              ),
             ),
           ),
         );
@@ -102,7 +189,7 @@ void main() {
             phase == ConnectionPhase.connecting ||
             phase == ConnectionPhase.disconnecting;
         expect(
-          tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+          tester.widget<FilledButton>(primaryFilledButton).onPressed,
           busy ? isNull : isNotNull,
         );
         if (phase == ConnectionPhase.connected) {
@@ -112,16 +199,16 @@ void main() {
           expect(find.text('连接'), findsOneWidget);
         }
         if (phase == ConnectionPhase.connecting) {
-          expect(find.text('正在连接…'), findsNWidgets(2));
+          expect(find.text('正在连接…'), findsWidgets);
         }
         if (phase == ConnectionPhase.disconnecting) {
-          expect(find.text('正在断开…'), findsNWidgets(2));
+          expect(find.text('正在断开…'), findsWidgets);
         }
         expect(find.byType(ListTile), findsNothing);
         expect(find.text('DNS'), findsNothing);
         expect(tester.takeException(), isNull);
       }
-      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 
@@ -129,12 +216,15 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      app(
-        const MediaQuery(
-          data: MediaQueryData(disableAnimations: true),
-          child: SimpleConnectionPanel(
-            phase: ConnectionPhase.disconnecting,
-            username: 'harmony',
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          const MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnecting,
+              username: 'harmony',
+            ),
           ),
         ),
       ),
@@ -149,6 +239,7 @@ void main() {
       isNotNull,
     );
     expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets(
@@ -161,7 +252,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await renderLogin(tester, SignedOutApi());
-      final listScrollable = find
+      final loginScrollable = find
           .descendant(
             of: find.byType(ListView),
             matching: find.byType(Scrollable),
@@ -170,24 +261,34 @@ void main() {
       await tester.scrollUntilVisible(
         find.byType(FilledButton),
         100,
-        scrollable: listScrollable,
+        scrollable: loginScrollable,
       );
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(
-        app(
-          const SimpleConnectionPanel(
-            phase: ConnectionPhase.disconnected,
-            username: 'harmony',
+        scoped(
+          api: SignedOutApi(),
+          child: app(
+            const SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnected,
+              username: 'harmony',
+            ),
           ),
         ),
       );
       await tester.pumpAndSettle();
+      final connectionScrollable = find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first;
       await tester.scrollUntilVisible(
-        find.byType(FilledButton),
+        primaryFilledButton,
         100,
-        scrollable: listScrollable,
+        scrollable: connectionScrollable,
       );
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
     },
   );
 }

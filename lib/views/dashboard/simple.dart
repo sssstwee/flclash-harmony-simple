@@ -1,14 +1,11 @@
 import 'dart:async';
 
-import 'package:fl_clash/common/auto_proxy.dart';
-import 'package:fl_clash/common/harmony_account.dart';
-import 'widgets/simple_connection.dart';
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/default_routing.dart';
-import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,24 +21,21 @@ class SimpleDashboardView extends ConsumerStatefulWidget {
 
 class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     with WidgetsBindingObserver {
-  late final HarmonyAccountApi _api = widget.accountApi ?? harmonyAccount;
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
   final _password = TextEditingController();
-  bool _busy = true;
-  bool _disconnecting = false;
-  String? _error;
-  Profile? _remoteProfile;
   Timer? _sessionTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _restore());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(harmonySimpleProvider.notifier).bootstrap();
+    });
     _sessionTimer = Timer.periodic(
       const Duration(minutes: 15),
-      (_) => _checkSession(),
+      (_) => ref.read(harmonySimpleProvider.notifier).checkSession(),
     );
   }
 
@@ -56,210 +50,101 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(_checkSession());
-  }
-
-  Future<void> _restore() async {
-    try {
-      final session = await _api.restore();
-      if (session != null && mounted) await _loadRemoteProfile();
-    } catch (error) {
-      if (mounted) _error = _message(error);
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(ref.read(harmonySimpleProvider.notifier).checkSession());
     }
-  }
-
-  Future<void> _checkSession() async {
-    if (_busy || _api.session == null) return;
-    try {
-      if (await _api.restore() == null) await _logout(expired: true);
-    } on HarmonyAccountError catch (error) {
-      if (error == HarmonyAccountError.expired) await _logout(expired: true);
-    } catch (_) {
-      // A temporary network failure does not interrupt an active VPN.
-    }
-  }
-
-  String _message(Object error) {
-    final texts = context.appLocalizations;
-    return switch (error) {
-      HarmonyAccountError.credentials => texts.harmonyCredentialsError,
-      HarmonyAccountError.expired => texts.harmonySessionExpired,
-      HarmonyAccountError.rateLimited => texts.harmonyRateLimited,
-      HarmonyAccountError.config => texts.harmonyConfigError,
-      _ => texts.harmonyServiceError,
-    };
   }
 
   Future<void> _login() async {
-    if (_busy || !_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await _api.login(_username.text, _password.text);
-      _password.clear();
-      if (mounted) await _loadRemoteProfile();
-    } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
-    } finally {
-      _password.clear();
-      if (mounted) setState(() => _busy = false);
-    }
+    final password = _password.text;
+    _password.clear();
+    await ref
+        .read(harmonySimpleProvider.notifier)
+        .login(_username.text, password);
   }
 
-  Future<void> _loadRemoteProfile() async {
-    final bytes = await _api.downloadConfig();
+  Future<void> _showNodeSwitcher() async {
+    final groups = ref.read(groupsProvider);
+    final profile = ref.read(currentProfileProvider);
+    final groupName = profile?.currentGroupName;
+    final group = groups.getGroup(groupName ?? '');
+    if (group == null || group.type != GroupType.Selector) return;
     if (!mounted) return;
-    await ref.read(coreActionProvider.notifier).tryStartCore();
-    final old = ref
-        .read(profilesProvider)
-        .where((p) => p.url.isEmpty && p.label == appDisplayName)
-        .firstOrNull;
-    final profile = await (old ?? Profile.normal(label: appDisplayName))
-        .saveFile(bytes);
-    if (!mounted) return;
+    final texts = context.appLocalizations;
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  texts.harmonySwitchNode,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              for (final proxy in group.all)
+                if (proxy.type.toUpperCase() != 'DIRECT' &&
+                    !proxy.type.toUpperCase().startsWith('REJECT'))
+                  ListTile(
+                    title: Text(proxy.name),
+                    subtitle: Text(proxy.type),
+                    onTap: () => Navigator.pop(context, proxy.name),
+                  ),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected == null || groupName == null) return;
+    await ref
+        .read(proxiesActionProvider.notifier)
+        .changeProxy(groupName: groupName, proxyName: selected);
     ref
         .read(profilesActionProvider.notifier)
-        .putProfile(profile.copyWith(autoUpdate: false));
-    ref.read(currentProfileIdProvider.notifier).value = profile.id;
-    _remoteProfile = profile;
-    await ref.read(setupActionProvider.notifier).applyProfile(force: true);
+        .updateCurrentSelectedMap(groupName, selected);
   }
 
-  Future<void> _logout({bool expired = false}) async {
-    if (!mounted) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await ref.read(setupActionProvider.notifier).updateStatus(false);
-      await _api.logout();
-      final profile = _remoteProfile;
-      _remoteProfile = null;
-      if (profile != null) {
-        await ref
-            .read(profilesActionProvider.notifier)
-            .deleteProfile(profile.id);
-        await (await profile.file).safeDelete();
-      }
-    } catch (_) {
-      // Always remove local authorization, even if cache cleanup fails.
-      await _api.clear();
-      _remoteProfile = null;
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = expired
-              ? context.appLocalizations.harmonySessionExpired
-              : null;
-        });
-      }
-    }
+  String? _activeNodeName() {
+    final profile = ref.watch(currentProfileProvider);
+    final groupName = profile?.currentGroupName;
+    if (groupName == null) return null;
+    return profile?.selectedMap[groupName];
   }
 
-  Future<void> _toggle() async {
-    if (_busy) return;
-    final texts = context.appLocalizations;
-    final setup = ref.read(setupActionProvider.notifier);
-    final running = ref.read(isStartProvider);
-    if (_api.session == null) return;
-    setState(() {
-      _busy = true;
-      _disconnecting = running;
-      _error = null;
-    });
-    try {
-      if (running) {
-        await setup.updateStatus(false);
-        return;
-      }
-      // Fetch an authorized, current configuration for every new connection.
-      await _loadRemoteProfile();
-      final profile = _remoteProfile!;
-      if (profile.id != ref.read(currentProfileIdProvider)) return;
-      ref
-          .read(patchClashConfigProvider.notifier)
-          .update((state) => state.copyWith(mode: Mode.rule));
-      ref
-          .read(vpnSettingProvider.notifier)
-          .update((state) => state.copyWith(enable: true));
-      await setup.applyProfile(force: true);
-      final groups = ref.read(groupsProvider);
-      final config = await coreController.getConfig(profile.id);
-      final group = connectionGroup(
-        groups,
-        system.isOhos
-            ? defaultRoutingRules(config)
-            : List<String>.from(config['rules'] ?? const <String>[]),
-      );
-      final selected = group == null
-          ? null
-          : await autoSelectProxy(
-              group,
-              groups,
-              (name) async => (await coreController.getDelay(
-                group.testUrl ?? ref.read(appSettingProvider).testUrl,
-                name,
-              )).value,
-            );
-      if (!mounted) return;
-      if (selected == null) {
-        setState(() => _error = texts.simpleNoRoute);
-        return;
-      }
-      // Persist child selectors before their parents, then apply once.
-      for (final entry in selected.selections.entries.toList().reversed) {
-        await ref
-            .read(proxiesActionProvider.notifier)
-            .changeProxy(groupName: entry.key, proxyName: entry.value);
-        ref
-            .read(profilesActionProvider.notifier)
-            .updateCurrentSelectedMap(entry.key, entry.value);
-      }
-      ref
-          .read(proxiesActionProvider.notifier)
-          .updateCurrentGroupName(group!.name);
-      await setup.updateStatus(true, isInit: true);
-      if (mounted && !ref.read(isStartProvider)) {
-        setState(() => _error = texts.simpleConnectFailed);
-      }
-    } catch (error) {
-      if (mounted) {
-        await setup.updateStatus(false);
-        if (error == HarmonyAccountError.expired) {
-          await _logout(expired: true);
-        } else if (mounted) {
-          setState(
-            () => _error = error is HarmonyAccountError
-                ? _message(error)
-                : texts.simpleConnectFailed,
-          );
-        }
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
+  int? _activeDelay(String? proxyName) {
+    if (proxyName == null) return null;
+    return ref.watch(delayProvider(proxyName: proxyName));
+  }
+
+  ConnectionPhase _phase(HarmonySimpleState ui, bool running) {
+    if (ui.error != null && !ui.busy && !running) {
+      return ConnectionPhase.error;
     }
+    if (ui.busy) {
+      return ui.disconnecting
+          ? ConnectionPhase.disconnecting
+          : ConnectionPhase.connecting;
+    }
+    return running ? ConnectionPhase.connected : ConnectionPhase.disconnected;
   }
 
   @override
   Widget build(BuildContext context) {
     final texts = context.appLocalizations;
-    final running = ref.watch(isStartProvider);
-    final session = _api.session;
+    final ui = ref.watch(harmonySimpleProvider);
+    final session = ui.session;
     final ready = ref.watch(initProvider);
-    final phase = _busy
-        ? _disconnecting
-              ? ConnectionPhase.disconnecting
-              : ConnectionPhase.connecting
-        : running
-        ? ConnectionPhase.connected
-        : ConnectionPhase.disconnected;
+    final running = ref.watch(isStartProvider);
+    final nodeName = _activeNodeName();
+    final nodeDelay = _activeDelay(nodeName);
+    final phase = _phase(ui, running);
+
     return CommonScaffold(
       title: appDisplayName,
       body: Center(
@@ -269,9 +154,16 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
               ? SimpleConnectionPanel(
                   phase: phase,
                   username: session.username,
-                  error: _error,
-                  onToggle: ready ? _toggle : null,
-                  onLogout: () => _logout(),
+                  error: ui.error,
+                  usingCachedConfig: ui.usingCachedConfig,
+                  nodeName: nodeName,
+                  nodeDelayMs: nodeDelay,
+                  onToggle: ready && !ui.bootstrapping
+                      ? () => ref.read(harmonySimpleProvider.notifier).toggleConnect()
+                      : null,
+                  onLogout: () => ref.read(harmonySimpleProvider.notifier).logout(),
+                  onRetry: () => ref.read(harmonySimpleProvider.notifier).retryConnect(),
+                  onSwitchNode: running ? _showNodeSwitcher : null,
                 )
               : AutofillGroup(
                   child: Form(
@@ -299,7 +191,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                         const SizedBox(height: 32),
                         TextFormField(
                           controller: _username,
-                          enabled: !_busy,
+                          enabled: !ui.busy && !ui.bootstrapping,
                           autofillHints: const [AutofillHints.username],
                           textInputAction: TextInputAction.next,
                           autocorrect: false,
@@ -313,7 +205,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                         const SizedBox(height: 16),
                         TextFormField(
                           controller: _password,
-                          enabled: !_busy,
+                          enabled: !ui.busy && !ui.bootstrapping,
                           obscureText: true,
                           autofillHints: const [AutofillHints.password],
                           textInputAction: TextInputAction.done,
@@ -332,8 +224,10 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(56),
                           ),
-                          onPressed: _busy || !ready ? null : _login,
-                          child: _busy
+                          onPressed: ui.busy || ui.bootstrapping || !ready
+                              ? null
+                              : _login,
+                          child: ui.busy || ui.bootstrapping
                               ? const SizedBox.square(
                                   dimension: 22,
                                   child: CircularProgressIndicator(
@@ -342,10 +236,10 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                                 )
                               : Text(texts.harmonyLogin),
                         ),
-                        if (_error != null) ...[
+                        if (ui.error != null) ...[
                           const SizedBox(height: 16),
                           Text(
-                            _error!,
+                            ui.error!,
                             textAlign: TextAlign.center,
                             style: TextStyle(color: context.colorScheme.error),
                           ),

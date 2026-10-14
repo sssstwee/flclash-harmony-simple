@@ -1,159 +1,75 @@
 # Clash Harmony
 
-A minimal HarmonyOS fork: sign in with a username and password, then connect with automatic route selection. Configuration is delivered through an authenticated Cloudflare Workers / D1 service. Based on [tljk/FlClash-ohos](https://github.com/tljk/FlClash-ohos/tree/v0.8.94-ohos), under GPL-3.0. This is an independent fork.
+Minimal HarmonyOS edition: sign in, fetch admin-managed Mihomo config from Cloudflare, auto-select a node, connect. Full product guide: **[README_SIMPLE.md](README_SIMPLE.md)** (简体中文).
 
-[简洁版说明与安装要求](README_SIMPLE.md) · [GitHub Actions builds](../../actions)
+Upstream FlClash docs are collapsed here for reference only: [简体中文](README_zh_CN.md) · [releases / desktop features](../../actions) apply to the full multi-platform client, not this fork’s daily path.
 
-The upstream documentation follows.
+## Architecture
 
-<div>
+```mermaid
+flowchart LR
+  App[HarmonyOS App\nFlutter + ArkTS]
+  Pages[Cloudflare Pages\ngateway]
+  Worker[Workers API\nBetter Auth + /v1/config]
+  D1[(D1\nusers + scoped config)]
 
-[**简体中文**](README_zh_CN.md)
-
-</div>
-
-## FlClash
-
-[![Downloads](https://img.shields.io/github/downloads/tljk/FlClash-ohos/total?style=flat-square&logo=github)](https://github.com/tljk/FlClash-ohos/releases/)[![Last Version](https://img.shields.io/github/release/tljk/FlClash-ohos/all.svg?style=flat-square)](https://github.com/tljk/FlClash-ohos/releases/)[![License](https://img.shields.io/github/license/tljk/FlClash-ohos?style=flat-square)](LICENSE)
-
-[![Channel](https://img.shields.io/badge/Telegram-Channel-blue?style=flat-square&logo=telegram)](https://t.me/FlClash_ohos)
-
-A multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.
-
-on Desktop:
-<p style="text-align: center;">
-    <img alt="desktop" src="snapshots/desktop.gif">
-</p>
-
-on Mobile:
-<p style="text-align: center;">
-    <img alt="mobile" src="snapshots/mobile.gif">
-</p>
-
-## Features
-
-✈️ Multi-platform: Android, Windows, macOS, Linux and OpenHarmony
-
-💻 Adaptive multiple screen sizes, Multiple color themes available
-
-💡 Based on Material You Design, [Surfboard](https://github.com/getsurfboard/surfboard)-like UI
-
-☁️ Supports data sync via WebDAV
-
-✨ Support subscription link, Dark mode
-
-## Use
-
-### Linux
-
-⚠️ Make sure to install the following dependencies before using them
-
-   ```bash
-    sudo apt-get install libayatana-appindicator3-dev
-    sudo apt-get install libkeybinder-3.0-dev
-   ```
-
-### Android
-
-Support the following actions
-
-   ```bash
-    com.follow.clash.action.START
-    
-    com.follow.clash.action.STOP
-    
-    com.follow.clash.action.TOGGLE
-   ```
-
-## Download
-
-<a href="https://chen08209.github.io/FlClash-fdroid-repo/repo?fingerprint=789D6D32668712EF7672F9E58DEEB15FBD6DCEEC5AE7A4371EA72F2AAE8A12FD"><img alt="Get it on F-Droid" src="snapshots/get-it-on-fdroid.svg" width="200px"/></a> <a href="https://github.com/tljk/FlClash-ohos/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
-
-### Homebrew
-
-```bash
-brew tap chen08209/tap
-brew install --cask flclash
+  App -->|HTTPS| Pages
+  Pages -->|Service Binding| Worker
+  Worker --> D1
 ```
 
-## Build
+- **App** (`lib/`, `ohos/`): login, cached config, connect/disconnect, auto route selection.
+- **Pages gateway** (`backend/gateway/`): public HTTPS entry (your `*.pages.dev` or custom domain), security headers, path allowlist.
+- **Worker** (`backend/src/`): auth, per-user config resolution, rate limits, audit log.
+- **D1**: Better Auth tables + `proxy_config` (default / per-user / per-group).
 
-1. Update submodules
-   ```bash
-   git submodule update --init --recursive
-   ```
+## Required configuration (names only)
 
-2. Install `Flutter` and `Golang` environment
+No real API URLs, D1 IDs, subscriptions, or credentials belong in git. Use local/gitignored files and platform secrets.
 
-3. Build Application
+### GitHub Actions (repository **Variables** / **Secrets**)
 
-    - android
+| Name | Kind | Purpose |
+|------|------|---------|
+| `CLASH_HARMONY_API_URL` | Variable (optional) | Public HTTPS origin baked into release HAP via `env.json` at build time. If unset, CI uses `https://auth.example.com`. |
 
-        1. Install `Android SDK`, `Android NDK`
+### Cloudflare Worker (`backend/`)
 
-        2. Set `ANDROID_NDK` environment variable
+| Name | Kind | Purpose |
+|------|------|---------|
+| `BETTER_AUTH_SECRET` | Secret (`wrangler secret put`) | Better Auth signing key (≥ 32 random chars). |
+| `AUTH_ORIGIN` | Var (in gitignored `wrangler.local.jsonc` or dashboard) | Public HTTPS origin of the auth API (must match what clients use). |
+| D1 `database_id` | Resource binding | In gitignored `wrangler.local.jsonc` only; committed `wrangler.jsonc` uses an all-zero placeholder. |
 
-        3. Run build script
+### Cloudflare Pages gateway (`backend/gateway/`)
 
-           ```bash
-           dart setup.dart android
-           ```
+| Name | Kind | Purpose |
+|------|------|---------|
+| Pages project name | Dashboard | Your gateway project (Service Binding to the Worker above). |
+| `API` service binding | `wrangler.jsonc` | Binds to the Worker service name you deploy. |
 
-    - windows
+### HarmonyOS app build (local / CI)
 
-        1. Requires a Windows client
+| Name | Kind | Purpose |
+|------|------|---------|
+| `CLASH_HARMONY_API_URL` | `dart-define` / `env.json` | Copy [`env.json.example`](env.json.example) → gitignored `env.json` for `dart setup.dart` / Flutter builds. |
 
-        2. Install `GCC`, `Inno Setup`
+### Operator-only files (never commit)
 
-        3. Run build script
+| File | Purpose |
+|------|---------|
+| `backend/wrangler.local.jsonc` | Real `database_id`, `AUTH_ORIGIN`, optional `workers_dev`. Template: [`backend/wrangler.local.jsonc.example`](backend/wrangler.local.jsonc.example). |
+| `backend/secrets.json` or any `*.secrets.json` | `SUBSCRIPTION_URL` for `npm run config`. Template: [`backend/secrets.example.json`](backend/secrets.example.json). |
+| `env.json` | Flutter `CLASH_HARMONY_API_URL` for packaged builds. |
 
-           ```bash
-           dart setup.dart windows
-           ```
+Deploy steps: [backend/README.md](backend/README.md).
 
-    - linux
+## Build & CI
 
-        1. Requires a Linux client
+GitHub Actions workflow **Clash Harmony** (`.github/workflows/harmony-simple.yml`): secret pattern scan, backend tests, Flutter analyze/test, unsigned HAP on app changes. Uses pinned gitcode SHAs in [`.github/harmony-pinned-shas.env`](.github/harmony-pinned-shas.env).
 
-        2. Dependencies are auto-installed by setup script, or manually:
-           ```bash
-           sudo apt-get install -y libayatana-appindicator3-dev libkeybinder-3.0-dev
-           ```
+## Repo layout note
 
-        3. Run build script
+Platform trees (`android/`, `windows/`, `macos/`, `linux/`) remain from upstream FlClash for shared code and CI parity; the Harmony **simple** product path uses `ohos/` + slim dashboard only.
 
-           ```bash
-           dart setup.dart linux
-           ```
-
-    - macOS
-
-        1. Requires a macOS client
-
-        2. Run build script
-
-           ```bash
-           dart setup.dart macos
-           ```
-
-    - OpenHarmony
-
-        1. Install `DevEco Studio` with the OpenHarmony SDK
-
-        2. Set the `OHOS_NDK_HOME` environment variable
-
-        3. Run build script
-
-           ```bash
-           dart setup.dart ohos
-           ```
-
-## Star
-
-The easiest way to support developers is to click on the star (⭐) at the top of the page.
-
-<p style="text-align: center;">
-    <a href="https://api.star-history.com/svg?repos=tljk/FlClash-ohos&Date">
-        <img alt="start" width=50% src="https://api.star-history.com/svg?repos=tljk/FlClash-ohos&Date"/>
-    </a>
-</p>
+Based on [tljk/FlClash-ohos](https://github.com/tljk/FlClash-ohos), GPL-3.0.

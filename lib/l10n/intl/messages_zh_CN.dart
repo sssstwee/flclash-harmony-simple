@@ -305,6 +305,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "go": MessageLookupByLibrary.simpleMessage("前往"),
     "goDownload": MessageLookupByLibrary.simpleMessage("前往下载"),
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage("前往配置脚本"),
+    "harmonyAccount": MessageLookupByLibrary.simpleMessage("账号"),
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
       "国内和内网直连，国外网络自动使用代理。",
     ),
@@ -312,6 +313,16 @@ class MessageLookup extends MessageLookupByLibrary {
       "暂时无法获取可用线路，请稍后点击连接重试。",
     ),
     "harmonyConnecting": MessageLookupByLibrary.simpleMessage("正在连接…"),
+    "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("当前节点"),
+    "harmonyDownload": MessageLookupByLibrary.simpleMessage("下载"),
+    "harmonyLatency": MessageLookupByLibrary.simpleMessage("延迟"),
+    "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
+      "正在使用缓存配置（离线）",
+    ),
+    "harmonyRetry": MessageLookupByLibrary.simpleMessage("重试"),
+    "harmonySessionTraffic": MessageLookupByLibrary.simpleMessage("本次流量"),
+    "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("切换节点"),
+    "harmonyUpload": MessageLookupByLibrary.simpleMessage("上传"),
     "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
       "用户名或密码错误。",
     ),
@@ -689,6 +700,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "simpleConnectFailed": MessageLookupByLibrary.simpleMessage(
       "启动失败，请检查 VPN 授权后重试。",
     ),
+    "simpleErrorState": MessageLookupByLibrary.simpleMessage("连接异常"),
     "simpleDisconnect": MessageLookupByLibrary.simpleMessage("断开"),
     "simpleHome": MessageLookupByLibrary.simpleMessage("连接"),
     "simpleImport": MessageLookupByLibrary.simpleMessage("导入订阅"),

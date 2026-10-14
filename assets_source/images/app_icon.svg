@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Clash Harmony">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="shield" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#E0E7FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path fill="url(#shield)" d="M256 96c-72 28-120 32-152 36v118c0 92 62 158 152 190 90-32 152-98 152-190V132c-32-4-80-8-152-36z"/>
+  <path fill="#2563EB" d="M256 140c-48 18-82 22-104 24v90c0 62 42 106 104 128 62-22 104-66 104-128v-90c-22-2-56-6-104-24z" opacity="0.18"/>
+  <path fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" d="M196 260h120M256 200v120"/>
+</svg>

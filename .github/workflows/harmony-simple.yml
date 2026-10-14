@@ -3,6 +3,8 @@ name: Clash Harmony
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -13,7 +15,34 @@ permissions:
   contents: read
 
 jobs:
+  secrets-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for committed secrets
+        run: bash .github/scripts/check-no-secrets.sh
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            app:
+              - '**'
+              - '!backend/**'
+
   backend:
+    needs: [changes, secrets-scan]
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -30,13 +59,20 @@ jobs:
       - run: npm run check
 
   build:
-    needs: backend
+    needs: [changes, backend, secrets-scan]
+    if: |
+      always() &&
+      (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
+      (github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Load pinned gitcode SHAs
+        run: grep -v '^#' .github/harmony-pinned-shas.env >> "$GITHUB_ENV"
 
       - name: Set up HarmonyOS SDK
         uses: ErBWs/setup-ohos@v2.0.0
@@ -46,11 +82,18 @@ jobs:
 
       - name: Set up HarmonyOS Flutter
         run: |
-          git clone -b 3.44.9+ohos-0.0.1-canary1 --depth 1 https://gitcode.com/CPF-Flutter/flutter_flutter.git "$RUNNER_TOOL_CACHE/flutter-ohos"
-          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" tag 3.44.10
-          git -C "$RUNNER_TOOL_CACHE/flutter-ohos" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
-          echo "$RUNNER_TOOL_CACHE/flutter-ohos/bin" >> "$GITHUB_PATH"
-          echo "$RUNNER_TOOL_CACHE/flutter-ohos/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
+          set -euo pipefail
+          FLUTTER_DIR="$RUNNER_TOOL_CACHE/flutter-ohos"
+          rm -rf "$FLUTTER_DIR"
+          mkdir -p "$FLUTTER_DIR"
+          git -C "$FLUTTER_DIR" init
+          git -C "$FLUTTER_DIR" remote add origin https://gitcode.com/CPF-Flutter/flutter_flutter.git
+          git -C "$FLUTTER_DIR" fetch --depth 1 origin "$FLUTTER_OHOS_SHA"
+          git -C "$FLUTTER_DIR" checkout FETCH_HEAD
+          git -C "$FLUTTER_DIR" tag 3.44.10
+          git -C "$FLUTTER_DIR" apply "$GITHUB_WORKSPACE/.github/flutter_ohos.patch"
+          echo "$FLUTTER_DIR/bin" >> "$GITHUB_PATH"
+          echo "$FLUTTER_DIR/bin/cache/dart-sdk/bin" >> "$GITHUB_PATH"
           echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
 
       - name: Cache Dart dependencies
@@ -81,14 +124,37 @@ jobs:
 
       - name: Set up HarmonyOS Go
         run: |
-          git clone -b release-branch.go1.24 --depth 1 https://gitcode.com/openharmony-sig/ohos_golang_go.git "$RUNNER_TOOL_CACHE/ohos-go"
-          cd "$RUNNER_TOOL_CACHE/ohos-go/src"
+          set -euo pipefail
+          OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
+          rm -rf "$OHOS_GO_DIR"
+          mkdir -p "$OHOS_GO_DIR"
+          git -C "$OHOS_GO_DIR" init
+          git -C "$OHOS_GO_DIR" remote add origin https://gitcode.com/openharmony-sig/ohos_golang_go.git
+          git -C "$OHOS_GO_DIR" fetch --depth 1 origin "$OHOS_GO_SHA"
+          git -C "$OHOS_GO_DIR" checkout FETCH_HEAD
+          git -C "$OHOS_GO_DIR" log -1 --format='OHOS Go commit: %H %s'
+          cd "$OHOS_GO_DIR/src"
           ./make.bash
-          echo "GOROOT=$RUNNER_TOOL_CACHE/ohos-go" >> "$GITHUB_ENV"
-          echo "$RUNNER_TOOL_CACHE/ohos-go/bin" >> "$GITHUB_PATH"
+          echo "GOROOT=$OHOS_GO_DIR" >> "$GITHUB_ENV"
+          echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
-        run: dart setup.dart ohos --env stable -v
+        env:
+          CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
+        run: |
+          set -euo pipefail
+          API_URL="${CLASH_HARMONY_API_URL:-https://auth.example.com}"
+          cp env.json.example env.json
+          API_URL="$API_URL" python3 - <<'PY'
+          import json, os
+          with open("env.json") as f:
+              data = json.load(f)
+          data["CLASH_HARMONY_API_URL"] = os.environ["API_URL"]
+          with open("env.json", "w") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          PY
+          dart setup.dart ohos --env stable -v
 
       - name: Checksums
         run: |

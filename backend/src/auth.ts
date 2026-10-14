@@ -10,6 +10,8 @@ export function createAuth(env: Env) {
     database: { dialect: new D1Dialect({ database: env.DB }), type: 'sqlite' },
     emailAndPassword: { enabled: true, disableSignUp: true },
     session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
+    // Database-backed limits stay consistent across isolates; /v1/config uses a
+    // separate D1 counter so config polling does not compete with auth keys.
     rateLimit: {
       enabled: true,
       storage: 'database',

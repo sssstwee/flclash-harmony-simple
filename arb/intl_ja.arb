@@ -583,5 +583,15 @@
   "harmonyConfigError": "接続設定を取得できません。後でもう一度接続してください。",
   "harmonyConnecting": "接続中…",
   "harmonyDisconnecting": "切断中…",
-  "harmonyAutomaticHint": "中国国内とローカルネットワークは直接接続し、海外は自動でプロキシを使用します。"
+  "harmonyAutomaticHint": "中国国内とローカルネットワークは直接接続し、海外は自動でプロキシを使用します。",
+  "harmonyOfflineConfig": "Using cached settings (offline)",
+  "harmonyRetry": "Try again",
+  "harmonyCurrentNode": "Current node",
+  "harmonySwitchNode": "Switch node",
+  "harmonySessionTraffic": "Session traffic",
+  "harmonyUpload": "Upload",
+  "harmonyDownload": "Download",
+  "harmonyLatency": "Latency",
+  "harmonyAccount": "Account",
+  "simpleErrorState": "Connection error"
 }
