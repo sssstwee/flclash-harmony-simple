@@ -104,3 +104,21 @@ test('tampered or malformed envelopes are refused with 503', async () => {
     expect((await request('/v1/config/version', { headers: bearer(token) })).status).toBe(503);
   }
 });
+
+test('uppercase sha256 is served lowercase with a stable ETag', async () => {
+  const doc = envelope('2026-10-14.3');
+  await kv().put('default', JSON.stringify({ ...doc, sha256: doc.sha256.toUpperCase() }));
+  const token = await login();
+  const first = await request('/v1/config', { headers: bearer(token) });
+  expect(first.status).toBe(200);
+  const body = await first.json() as typeof doc;
+  expect(body.sha256).toBe(doc.sha256);
+  expect(body.sha256).toMatch(/^[0-9a-f]{64}$/);
+  const version = await (await request('/v1/config/version', { headers: bearer(token) })).json() as { sha256: string };
+  expect(version.sha256).toBe(doc.sha256);
+  const etag = first.headers.get('ETag')!;
+  await kv().put('default', JSON.stringify(doc));
+  const lower = await request('/v1/config', { headers: { ...bearer(token), 'If-None-Match': etag } });
+  expect(lower.status).toBe(304);
+  expect(lower.headers.get('ETag')).toBe(etag);
+});

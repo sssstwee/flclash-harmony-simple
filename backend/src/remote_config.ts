@@ -56,11 +56,13 @@ export async function validateEnvelope(raw: string, key: string): Promise<Remote
     typeof doc.version !== 'string' || !doc.version ||
     typeof doc.minClientVersion !== 'string' || !CLIENT_VERSION.test(doc.minClientVersion) ||
     typeof doc.payload !== 'string' ||
-    typeof doc.sha256 !== 'string'
+    typeof doc.sha256 !== 'string' || !/^[0-9a-fA-F]{64}$/.test(doc.sha256)
   ) {
     throw new RemoteConfigInvalid(key);
   }
-  if ((await sha256Hex(doc.payload)) !== doc.sha256.toLowerCase()) throw new RemoteConfigInvalid(key);
+  // Clients compare the lowercase hex digest exactly, so always serve it normalized.
+  doc.sha256 = doc.sha256.toLowerCase();
+  if ((await sha256Hex(doc.payload)) !== doc.sha256) throw new RemoteConfigInvalid(key);
   try {
     JSON.parse(doc.payload);
   } catch {
