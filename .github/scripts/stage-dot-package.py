@@ -10,7 +10,8 @@ import shutil
 import tempfile
 import zipfile
 
-REPOSITORY = 'sssstwee/flclash-harmony-simple'
+REPOSITORY_ID = '1415379213'
+REPOSITORIES = {'sssstwee/flclash-harmony-simple', 'sssstwee/xiaomao-ai-proxy'}
 BRANCH = 'dot/harmony-auto-adapt-20261014-0519'
 
 
@@ -32,7 +33,9 @@ def required(env, key, pattern):
 def stage(root, env):
     root = Path(root)
     sha = required(env, 'EXPECTED_SHA', r'[a-f0-9]{40}')
-    if env.get('SOURCE_SHA') != sha or env.get('GITHUB_REPOSITORY') != REPOSITORY:
+    repository = env.get('GITHUB_REPOSITORY')
+    if (env.get('SOURCE_SHA') != sha or repository not in REPOSITORIES or
+            env.get('GITHUB_REPOSITORY_ID') != REPOSITORY_ID):
         raise ValueError('Repository or run SHA does not match isolated packaging')
     if env.get('SOURCE_REF') != f'refs/heads/{BRANCH}':
         raise ValueError('Only the exact dot branch can stage packages')
@@ -74,7 +77,7 @@ def stage(root, env):
     try:
         files = []
         for extension, source, checksum in validated:
-            output = staging / f'dot-harmony-auto-adapt-{sha[:12]}-unsigned.{extension}'
+            output = staging / f'xiaomao-ai-proxy-{sha[:12]}-unsigned.{extension}'
             shutil.copyfile(source, output)
             if digest(output) != checksum:
                 raise ValueError(f'{extension} changed while staging')
@@ -85,7 +88,9 @@ def stage(root, env):
                 'bytes': output.stat().st_size,
             })
         metadata = {
-            'repository': REPOSITORY,
+            'repository': repository,
+            'repository_id': REPOSITORY_ID,
+            'app_name': '小猫AI代理',
             'branch': BRANCH,
             'commit': sha,
             'signing': 'unsigned; --no-codesign; no signing credential used',
@@ -101,6 +106,7 @@ def stage(root, env):
         }
         (staging / 'BUILD-INFO.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
         (staging / 'README.txt').write_text(
+            '小猫AI代理 / Xiaomao AI Proxy\n'
             'Unsigned HarmonyOS build. Not directly installable.\n'
             'No device, VPN, backend, signing or deployment changes were performed.\n'
             'Device compatibility and real-network recovery remain unverified.\n',

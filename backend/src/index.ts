@@ -125,7 +125,7 @@ export default {
       const path = new URL(request.url).pathname;
 
       if (path === '/health' && request.method === 'GET') {
-        return Response.json({ status: 'ok', app: 'Clash Harmony' });
+        return Response.json({ status: 'ok', app: '小猫AI代理' });
       }
 
       if (authRoutes.get(path) === request.method) {

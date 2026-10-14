@@ -1,4 +1,4 @@
-# Clash Harmony
+# 小猫AI代理
 
 基于 [tljk/FlClash-ohos 的 v0.8.94-ohos 分支](https://github.com/tljk/FlClash-ohos/tree/v0.8.94-ohos)，上游基线 `017c08b8f842fef37ffb3220605b2477380a6dc4`。保留 GPL-3.0 许可和上游版权；本分支并非 FlClash 官方发行版。
 
@@ -31,9 +31,9 @@
 
 使用上游 CI 指定的鸿蒙 Flutter SDK：`CPF-Flutter/flutter_flutter` 的 `3.44.9+ohos-0.0.1-canary1`，以及仓库的 `.github/flutter_ohos.patch`。普通 Flutter SDK 不支持此项目的 `Platform.isOhos` 与 `TargetPlatform.ohos`。
 
-推送到 `main` 或手动运行 Actions 的 **Clash Harmony** 工作流，会检查服务端类型和认证测试，并依次安装应用依赖、静态检查、运行全部 Flutter 测试、编译鸿蒙 Go 内核并构建 HAP / APP。构建产物与 SHA-256 校验文件保存在对应运行的 Artifacts 中，保留 14 天。
+推送到 `main` 或手动运行 Actions 的 **小猫AI代理** 工作流，会检查服务端类型和认证测试，并依次安装应用依赖、静态检查、运行全部 Flutter 测试、编译鸿蒙 Go 内核并构建 HAP / APP。构建产物与 SHA-256 校验文件保存在对应运行的 Artifacts 中，保留 14 天。
 
-本自动适应修复的独立分支 `dot/harmony-auto-adapt-20261014-0519` 首轮 PR 检查只做验证，不打包。只有同一提交首轮完整验证成功后，明确重跑该 PR 的 build 作业或提供成功验证记录手动运行，才允许独立构建；其他修复分支不参与。包名包含 `dot-harmony-auto-adapt` 和提交短 SHA，随附完整提交、验证/打包执行次数及校验和，便于与并行实现区分。
+本自动适应修复的独立分支 `dot/harmony-auto-adapt-20261014-0519` 首轮 PR 检查只做验证，不打包。只有同一提交首轮完整验证成功后，明确重跑该 PR 的 build 作业或提供成功验证记录手动运行，才允许独立构建；其他修复分支不参与。包名包含 `xiaomao-ai-proxy` 和提交短 SHA，随附完整提交、验证/打包执行次数及校验和，便于与并行实现区分。
 
 工作流沿用上游 CI 的 SDK 和工具链，输出未签名 HAP。安装前需要使用与 `com.follow.clash.simple` 对应、包含目标手机 UDID 的 HarmonyOS 调试证书和 profile 签名；证书、私钥和订阅链接不得提交进公开仓库。真机的 VPN 授权仍需设备所有者完成。
 
@@ -57,3 +57,9 @@ Profile 的 ACL 授权需包含 `ohos.permission.KEEP_BACKGROUND_RUNNING_SYSTEM`
 - 连接仍需要有效账号、可用代理节点、手机网络和设备所有者允许首次系统 VPN 授权。应用不能绕过系统授权或替代管理员开通账号。
 
 上述检查和自动恢复必须继续完成真机验收，尤其是 VPN 授权、Wi-Fi／蜂窝切换、后台锁屏、DNS／IPv6／UDP 和断开后的网络恢复。自动化测试通过不代表这些手机场景已经验证。
+
+## 名称与升级兼容
+
+应用在中英文界面统一显示 **小猫AI代理**；便于跨平台下载的产物文件名使用 `xiaomao-ai-proxy`。GitHub 仓库地址需在仓库设置中单独修改；完成前，文档与应用链接继续使用已验证的现有地址。
+
+包 ID、签名身份、数据目录、自启动与服务标识、URL scheme 和内部 `fl_clash` / `FlClash` 标识保留，避免更名导致原有配置失效。上游名称仅用于归属说明与兼容标识。已安装的旧版本需要安装新构建后才会显示新名称。此次更名不部署服务端，也不恢复已取消的打包任务。

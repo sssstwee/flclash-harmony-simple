@@ -1,4 +1,4 @@
-# Clash Harmony 服务端
+# 小猫AI代理 服务端
 
 使用 Cloudflare Workers 与 D1，以及 Better Auth 的用户名登录、scrypt 密码哈希、签名 Bearer 会话和数据库限流。公开注册关闭；管理员创建账号。手机登录及连接时下载 D1 中的配置（默认 / 按用户 / 按组），无需导入订阅。
 

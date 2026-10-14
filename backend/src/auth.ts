@@ -4,7 +4,7 @@ import { D1Dialect } from 'kysely-d1';
 
 export function createAuth(env: Env) {
   return betterAuth({
-    appName: 'Clash Harmony',
+    appName: '小猫AI代理',
     baseURL: env.AUTH_ORIGIN,
     secret: env.BETTER_AUTH_SECRET,
     database: { dialect: new D1Dialect({ database: env.DB }), type: 'sqlite' },

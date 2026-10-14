@@ -262,7 +262,7 @@ class _WindowHeaderState extends State<WindowHeader> {
             ),
           ),
           if (system.isMacOS)
-            const Text(appName)
+            const Text(appDisplayName)
           else ...[
             Positioned(right: 0, child: _buildActions()),
           ],

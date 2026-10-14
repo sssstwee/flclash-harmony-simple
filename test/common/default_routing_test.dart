@@ -62,7 +62,7 @@ MakeRealProfileState profileState(
   proxyGroups: [],
   rules: [],
   addedRules: [Rule.parse('DOMAIN,old-custom.example,DIRECT')],
-  defaultUA: 'Clash Harmony/test',
+  defaultUA: 'XiaomaoAIProxy/test',
 );
 
 void main() {

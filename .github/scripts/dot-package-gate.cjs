@@ -1,6 +1,10 @@
 'use strict';
 
-const REPOSITORY = 'sssstwee/flclash-harmony-simple';
+const REPOSITORY_ID = '1415379213';
+const REPOSITORIES = new Set([
+  'sssstwee/flclash-harmony-simple',
+  'sssstwee/xiaomao-ai-proxy',
+]);
 const BRANCH = 'dot/harmony-auto-adapt-20261014-0519';
 const BASE_BRANCH = 'codex/harmony-audit-fixes-github';
 const BASE_SHA = 'e23d459ce3290eb2f130933bcddcb4c7654133d0';
@@ -49,7 +53,9 @@ module.exports = async function dotPackageGate({ github, context, core, env = pr
   const refName = context.ref.replace(/^refs\/(?:heads|tags)\//, '');
   const blocked = [BASE_BRANCH, BRANCH];
   const legacy = !blocked.includes(headRef) && !blocked.includes(refName);
-  const ownRepo = `${context.repo.owner}/${context.repo.repo}` === REPOSITORY;
+  const repository = `${context.repo.owner}/${context.repo.repo}`;
+  const ownRepo = REPOSITORIES.has(repository) &&
+    String(env.GITHUB_REPOSITORY_ID || '') === REPOSITORY_ID;
   const ownManual = context.eventName === 'workflow_dispatch' && ownRepo &&
     context.ref === `refs/heads/${BRANCH}`;
   const dotPr = context.eventName === 'pull_request' && headRef === BRANCH;
@@ -57,7 +63,7 @@ module.exports = async function dotPackageGate({ github, context, core, env = pr
   // Default closed. Only publish an enabled output after all applicable checks.
   core.setOutput('enabled', 'false');
   core.setOutput('isolated', 'false');
-  core.setOutput('artifact', `Clash-Harmony-HarmonyOS-${context.sha}`);
+  core.setOutput('artifact', `xiaomao-ai-proxy-HarmonyOS-${context.sha}`);
   core.setOutput('upload_path', 'dist/');
   if (requested && !ownManual) {
     throw new Error('Explicit packaging inputs are restricted to the exact dot manual branch.');
@@ -71,8 +77,8 @@ module.exports = async function dotPackageGate({ github, context, core, env = pr
     }
     if (!ownRepo || context.ref !== 'refs/pull/4/merge' ||
         !matchesPullRequest(payloadPr, payloadPr.head?.sha) ||
-        payloadPr.head?.repo?.full_name !== REPOSITORY ||
-        payloadPr.base?.repo?.full_name !== REPOSITORY) {
+        payloadPr.head?.repo?.full_name !== repository ||
+        payloadPr.base?.repo?.full_name !== repository) {
       throw new Error('A rerun may package only the exact own-repository PR4 snapshot.');
     }
     rerun = true;
@@ -107,8 +113,8 @@ module.exports = async function dotPackageGate({ github, context, core, env = pr
   });
   if (currentPr.state !== 'open' || currentPr.merged === true ||
       !matchesPullRequest(currentPr, sha) ||
-      currentPr.head?.repo?.full_name !== REPOSITORY ||
-      currentPr.base?.repo?.full_name !== REPOSITORY) {
+      currentPr.head?.repo?.full_name !== repository ||
+      currentPr.base?.repo?.full_name !== repository) {
     throw new Error('PR4 must remain open on the exact reviewed branch, base and head.');
   }
 
@@ -125,8 +131,8 @@ module.exports = async function dotPackageGate({ github, context, core, env = pr
   if (!['workflow_dispatch', 'pull_request'].includes(prior.event) ||
       String(prior.id) !== runId || prior.head_branch !== BRANCH || prior.head_sha !== sha ||
       prior.status !== 'completed' || prior.conclusion !== 'success' ||
-      prior.path !== WORKFLOW || prior.repository?.full_name !== REPOSITORY ||
-      prior.head_repository?.full_name !== REPOSITORY ||
+      prior.path !== WORKFLOW || prior.repository?.full_name !== repository ||
+      prior.head_repository?.full_name !== repository ||
       (rerun && (prior.event !== 'pull_request' || validationAttempt !== 1 || packageAttempt <= 1))) {
     throw new Error('Validation must be a successful exact-head own-branch run attempt.');
   }
@@ -195,6 +201,6 @@ module.exports = async function dotPackageGate({ github, context, core, env = pr
   core.setOutput('validation_attempt', String(validationAttempt));
   core.setOutput('enabled', 'true');
   core.setOutput('isolated', 'true');
-  core.setOutput('artifact', `dot-harmony-auto-adapt-${sha.slice(0, 12)}`);
+  core.setOutput('artifact', `xiaomao-ai-proxy-${sha.slice(0, 12)}`);
   core.setOutput('upload_path', 'dot-package/');
 };

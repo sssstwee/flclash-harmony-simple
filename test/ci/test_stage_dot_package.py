@@ -21,7 +21,8 @@ class StageDotPackageTest(unittest.TestCase):
         self.env = {
             'EXPECTED_SHA': 'a' * 40,
             'SOURCE_SHA': 'a' * 40,
-            'GITHUB_REPOSITORY': MODULE.REPOSITORY,
+            'GITHUB_REPOSITORY': 'sssstwee/flclash-harmony-simple',
+            'GITHUB_REPOSITORY_ID': MODULE.REPOSITORY_ID,
             'SOURCE_REF': f'refs/heads/{MODULE.BRANCH}',
             'VALIDATION_RUN_ID': '111',
             'GITHUB_RUN_ID': '222',
@@ -40,7 +41,7 @@ class StageDotPackageTest(unittest.TestCase):
             raw.parent.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(raw, 'w') as archive:
                 archive.writestr('module.json', '{"test":"mock unsigned fixture"}')
-            shutil.copyfile(raw, self.root / 'dist' / f'FlClash-0.8.94-ohos.{extension}')
+            shutil.copyfile(raw, self.root / 'dist' / f'xiaomao-ai-proxy-0.8.94-ohos.{extension}')
 
     def run_stage(self):
         return MODULE.stage(self.root, self.env)
@@ -55,8 +56,8 @@ class StageDotPackageTest(unittest.TestCase):
         output = self.run_stage()
         names = {path.name for path in output.iterdir()}
         self.assertEqual(names, {
-            'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.hap',
-            'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.app',
+            'xiaomao-ai-proxy-aaaaaaaaaaaa-unsigned.hap',
+            'xiaomao-ai-proxy-aaaaaaaaaaaa-unsigned.app',
             'BUILD-INFO.json', 'README.txt', 'SHA256SUMS',
         })
         info = json.loads((output / 'BUILD-INFO.json').read_text())
@@ -80,6 +81,18 @@ class StageDotPackageTest(unittest.TestCase):
                 saved = self.env.pop(key)
                 self.assert_rejected()
                 self.env[key] = saved
+
+    def test_accepts_renamed_repository_with_same_identity(self):
+        self.env['GITHUB_REPOSITORY'] = 'sssstwee/xiaomao-ai-proxy'
+        output = self.run_stage()
+        info = json.loads((output / 'BUILD-INFO.json').read_text())
+        self.assertEqual(info['repository'], self.env['GITHUB_REPOSITORY'])
+        self.assertEqual(info['repository_id'], MODULE.REPOSITORY_ID)
+        self.assertEqual(info['app_name'], '小猫AI代理')
+
+    def test_rejects_recreated_repository(self):
+        self.env['GITHUB_REPOSITORY_ID'] = '999999999'
+        self.assert_rejected()
 
     def test_rejects_wrong_branch(self):
         self.env['SOURCE_REF'] = 'refs/heads/cursor/parallel'
@@ -144,25 +157,25 @@ class StageDotPackageTest(unittest.TestCase):
         shutil.rmtree(self.root / 'dist')
         output = self.run_stage()
         for extension, raw in self.raw.items():
-            staged = output / f'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.{extension}'
+            staged = output / f'xiaomao-ai-proxy-aaaaaaaaaaaa-unsigned.{extension}'
             self.assertEqual(MODULE.digest(staged), MODULE.digest(raw))
 
     def test_ignores_unrelated_distributor_outputs(self):
         (self.root / 'dist/stale.hap').write_bytes(b'unrelated package')
-        (self.root / 'dist/FlClash-0.8.94-ohos.app').write_bytes(b'stale app copy')
+        (self.root / 'dist/xiaomao-ai-proxy-0.8.94-ohos.app').write_bytes(b'stale app copy')
         output = self.run_stage()
         self.assertNotIn('stale.hap', {path.name for path in output.iterdir()})
-        staged = output / 'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.app'
+        staged = output / 'xiaomao-ai-proxy-aaaaaaaaaaaa-unsigned.app'
         self.assertEqual(MODULE.digest(staged), MODULE.digest(self.raw['app']))
 
     def test_stages_final_regenerated_hap_instead_of_stale_distributor_copy(self):
-        early_hap = self.root / 'dist/FlClash-0.8.94-ohos.hap'
+        early_hap = self.root / 'dist/xiaomao-ai-proxy-0.8.94-ohos.hap'
         earlier_digest = MODULE.digest(early_hap)
         # The later APP target regenerates raw HAP; dist still holds target one's copy.
         with zipfile.ZipFile(self.raw['hap'], 'w') as archive:
             archive.writestr('module.json', '{"test":"final HAP after APP assembly"}')
         output = self.run_stage()
-        staged = output / 'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.hap'
+        staged = output / 'xiaomao-ai-proxy-aaaaaaaaaaaa-unsigned.hap'
         self.assertEqual(MODULE.digest(staged), MODULE.digest(self.raw['hap']))
         self.assertNotEqual(MODULE.digest(staged), earlier_digest)
         self.assertEqual(MODULE.digest(early_hap), earlier_digest)
@@ -187,7 +200,7 @@ class StageDotPackageTest(unittest.TestCase):
     def test_rejects_symlink_input(self):
         source = self.raw['hap']
         source.unlink()
-        source.symlink_to(self.root / 'dist/FlClash-0.8.94-ohos.hap')
+        source.symlink_to(self.root / 'dist/xiaomao-ai-proxy-0.8.94-ohos.hap')
         self.assert_rejected()
 
     def test_rejects_corrupt_raw_crc_despite_valid_distributor_copy(self):

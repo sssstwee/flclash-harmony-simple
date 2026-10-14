@@ -21,7 +21,7 @@ function fixture() {
   const state = {
     context: { eventName: 'workflow_dispatch', ref: `refs/heads/${BRANCH}`, sha: SHA,
       runId: 222, repo: { owner: 'sssstwee', repo: 'flclash-harmony-simple' }, payload: {} },
-    env: { REQUEST_PACKAGE: 'true', EXPECTED_SHA: SHA, VALIDATION_RUN_ID: '111', GITHUB_RUN_ATTEMPT: '1' },
+    env: { GITHUB_REPOSITORY_ID: '1415379213', REQUEST_PACKAGE: 'true', EXPECTED_SHA: SHA, VALIDATION_RUN_ID: '111', GITHUB_RUN_ATTEMPT: '1' },
     ref: SHA,
     currentPr: { number: 4, state: 'open', merged: false,
       head: { ref: BRANCH, sha: SHA, repo: { full_name: REPOSITORY } },
@@ -112,7 +112,7 @@ for (const [name, change, enabled, isolated] of [
       assert.equal(state.outputs.validation_run_id, '111');
       assert.equal(state.outputs.validation_attempt, '1');
       assert.equal(state.outputs.package_attempt, '1');
-      assert.equal(state.outputs.artifact, `dot-harmony-auto-adapt-${SHA.slice(0, 12)}`);
+      assert.equal(state.outputs.artifact, `xiaomao-ai-proxy-${SHA.slice(0, 12)}`);
       assert.equal(state.outputs.upload_path, 'dot-package/');
       assert.equal(state.outputs.sha, SHA);
     } else if (state.context.eventName !== 'workflow_dispatch') {
@@ -260,5 +260,29 @@ for (const [name, change] of [
     const state = rerunFixture(); change(state);
     await assert.rejects(() => gate(state));
     assert.equal(state.outputs.enabled, 'false');
+  });
+}
+
+for (const repository of ['flclash-harmony-simple', 'xiaomao-ai-proxy']) {
+  test(`renamed repository keeps exact identity and package isolation: ${repository}`, async () => {
+    const s = fixture();
+    const fullName = `sssstwee/${repository}`;
+    s.context.repo.repo = repository;
+    s.currentPr.head.repo.full_name = fullName;
+    s.currentPr.base.repo.full_name = fullName;
+    s.prior.repository.full_name = fullName;
+    s.prior.head_repository.full_name = fullName;
+    await gate(s);
+    assert.equal(s.outputs.enabled, 'true');
+    assert.equal(s.outputs.isolated, 'true');
+  });
+}
+
+for (const id of ['', '999999999']) {
+  test(`reject missing or recreated repository identity: ${id}`, async () => {
+    const s = fixture();
+    s.env.GITHUB_REPOSITORY_ID = id;
+    await assert.rejects(gate(s));
+    assert.equal(s.outputs.enabled, 'false');
   });
 }
