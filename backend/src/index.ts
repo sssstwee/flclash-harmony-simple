@@ -4,6 +4,7 @@ import {
   configRowMeta,
   etagMatches,
 } from './config_meta';
+import { RemoteConfigInvalid, loadRemoteConfig, type RemoteConfigDocument } from './remote_config';
 
 const authRoutes = new Map([
   ['/api/auth/sign-in/username', 'POST'],
@@ -133,7 +134,8 @@ function auditConfigFetch(
 }
 
 type AuthorizedConfig =
-  | { ok: true; session: { user: { id: string } }; config: ConfigRow }
+  | { ok: true; session: { user: { id: string } }; config: ConfigRow; remote: null }
+  | { ok: true; session: { user: { id: string } }; config: null; remote: RemoteConfigDocument }
   | { ok: false; response: Response };
 
 async function loadAuthorizedConfig(request: Request, env: Env): Promise<AuthorizedConfig> {
@@ -148,10 +150,20 @@ async function loadAuthorizedConfig(request: Request, env: Env): Promise<Authori
     .first<{ config_group: string | null }>()
     .then(row => row?.config_group ?? null);
 
+  const username = (session.user as { username?: string | null }).username ?? null;
+  try {
+    const remote = await loadRemoteConfig(env.CONFIGS, username, configGroup);
+    if (remote) return { ok: true, session, config: null, remote };
+  } catch (error) {
+    if (!(error instanceof RemoteConfigInvalid)) throw error;
+    console.error(JSON.stringify({ event: 'remote_config_invalid', key: error.key }));
+    return { ok: false, response: failure('CONFIG_UNAVAILABLE', 503) };
+  }
+
   const config = await resolveProxyConfig(env.DB, session.user.id, configGroup);
   if (!config) return { ok: false, response: failure('CONFIG_UNAVAILABLE', 503) };
 
-  return { ok: true, session, config };
+  return { ok: true, session, config, remote: null };
 }
 
 export default {
@@ -179,6 +191,19 @@ export default {
       if (path === '/v1/config/version' && request.method === 'GET') {
         const loaded = await loadAuthorizedConfig(request, env);
         if (!loaded.ok) return loaded.response;
+        if (loaded.remote) {
+          const { envelope, updatedAt } = loaded.remote;
+          return Response.json(
+            {
+              version: envelope.version,
+              ...(updatedAt !== null ? { updated_at: updatedAt } : {}),
+              min_check_seconds: DEFAULT_MIN_CHECK_SECONDS,
+              minClientVersion: envelope.minClientVersion,
+              sha256: envelope.sha256,
+            },
+            { headers: { 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' } },
+          );
+        }
         const { config } = loaded;
         const meta = await configRowMeta(config);
         const updatedUnix = Math.floor(new Date(config.updated_at).getTime() / 1000);
@@ -203,10 +228,28 @@ export default {
 
       const loaded = await loadAuthorizedConfig(request, env);
       if (!loaded.ok) return loaded.response;
-      const { session, config } = loaded;
+      const { session } = loaded;
 
       const allowed = await allowConfigFetch(env.DB, session.user.id);
       if (!allowed) return failure('RATE_LIMITED', 429);
+
+      if (loaded.remote) {
+        const { remote } = loaded;
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'private, no-store',
+          'X-Content-Type-Options': 'nosniff',
+          ETag: remote.etag,
+          'X-Config-Version': remote.envelope.version,
+          ...(remote.updatedAt !== null ? { 'Last-Modified': new Date(remote.updatedAt * 1000).toUTCString() } : {}),
+        };
+        auditConfigFetch(ctx, env.DB, session.user.id, 'kv', remote.key, request.headers.get('cf-connecting-ip'));
+        if (etagMatches(request.headers.get('If-None-Match'), remote.etag)) {
+          return new Response(null, { status: 304, headers });
+        }
+        return new Response(remote.body, { headers });
+      }
+      const { config } = loaded;
 
       const meta = await configRowMeta(config);
       const headers = await configHeaders(config);

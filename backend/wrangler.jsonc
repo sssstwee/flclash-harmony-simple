@@ -17,5 +17,6 @@
       "migrations_dir": "migrations"
     }
   ],
+  "kv_namespaces": [{ "binding": "CONFIGS", "id": "00000000000000000000000000000000" }],
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }

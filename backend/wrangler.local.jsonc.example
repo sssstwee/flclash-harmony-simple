@@ -23,6 +23,12 @@
       "migrations_dir": "migrations"
     }
   ],
+  "kv_namespaces": [
+    {
+      "binding": "CONFIGS",
+      "id": "YOUR-KV-NAMESPACE-ID"
+    }
+  ],
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.1
