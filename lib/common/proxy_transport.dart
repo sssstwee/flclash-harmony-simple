@@ -41,7 +41,7 @@ Duration probeTimeoutFor(ProxyTransportKind kind, {bool preferTcp = false}) {
     ProxyTransportKind.udpHeavy when preferTcp => const Duration(seconds: 3),
     ProxyTransportKind.udpHeavy => const Duration(seconds: 5),
     ProxyTransportKind.tcpFriendly => const Duration(seconds: 8),
-    ProxyTransportKind.unknown => const Duration(seconds: 6),
+    ProxyTransportKind.unknown => const Duration(seconds: 8),
   };
 }
 
