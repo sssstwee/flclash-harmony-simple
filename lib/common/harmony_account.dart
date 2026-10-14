@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
+import 'package:fl_clash/common/harmony_config_check.dart';
+import 'package:fl_clash/common/harmony_connect.dart';
 import 'package:flutter/services.dart';
 
 /// Production builds must set [CLASH_HARMONY_API_URL] (see `env.json.example`).
@@ -10,6 +14,10 @@ const harmonyApiUrl = String.fromEnvironment(
   'CLASH_HARMONY_API_URL',
   defaultValue: 'https://auth.example.com',
 );
+
+const harmonyConfigPath = '/v1/config';
+
+const harmonyConfigVersionPath = '/v1/config/version';
 
 const harmonyConfigMaxBytes = 1024 * 1024;
 
@@ -23,6 +31,11 @@ class HarmonySessionStore {
   static const _metaKey = 'harmony_session_meta';
   static const _lastModifiedKey = 'harmony_config_lm';
   static const _configCacheKey = 'harmony_config_cache';
+  static const _etagKey = 'harmony_config_etag';
+  static const _configVersionKey = 'harmony_config_version';
+  static const _reconnectKey = 'harmony_vpn_reconnect';
+  static const _configRefreshKey = 'harmony_config_refresh_sec';
+  static const _minCheckKey = 'harmony_config_min_check_sec';
 
   Future<String?> read() =>
       _channel.invokeMethod<String>('read', _arguments(_tokenKey));
@@ -51,6 +64,73 @@ class HarmonySessionStore {
   Future<void> deleteConfigLastModified() =>
       _channel.invokeMethod<void>('delete', _arguments(_lastModifiedKey));
 
+  Future<String?> readConfigEtag() =>
+      _channel.invokeMethod<String>('read', _arguments(_etagKey));
+
+  Future<void> writeConfigEtag(String value) =>
+      _channel.invokeMethod<void>('write', _arguments(_etagKey, value));
+
+  Future<void> deleteConfigEtag() =>
+      _channel.invokeMethod<void>('delete', _arguments(_etagKey));
+
+  Future<String?> readConfigVersion() =>
+      _channel.invokeMethod<String>('read', _arguments(_configVersionKey));
+
+  Future<void> writeConfigVersion(String value) => _channel.invokeMethod<void>(
+    'write',
+    _arguments(_configVersionKey, value),
+  );
+
+  Future<void> deleteConfigVersion() =>
+      _channel.invokeMethod<void>('delete', _arguments(_configVersionKey));
+
+  Future<bool> readReconnectOnLaunch() async {
+    final raw = await _channel.invokeMethod<String>(
+      'read',
+      _arguments(_reconnectKey),
+    );
+    return raw == '1';
+  }
+
+  Future<void> writeReconnectOnLaunch(bool value) =>
+      _channel.invokeMethod<void>(
+        'write',
+        _arguments(_reconnectKey, value ? '1' : '0'),
+      );
+
+  Future<void> deleteReconnectOnLaunch() =>
+      _channel.invokeMethod<void>('delete', _arguments(_reconnectKey));
+
+  Future<int?> readConfigRefreshSeconds() async {
+    final raw = await _channel.invokeMethod<String>(
+      'read',
+      _arguments(_configRefreshKey),
+    );
+    return int.tryParse(raw ?? '');
+  }
+
+  Future<void> writeConfigRefreshSeconds(int seconds) => _channel
+      .invokeMethod<void>('write', _arguments(_configRefreshKey, '$seconds'));
+
+  Future<void> deleteConfigRefreshSeconds() =>
+      _channel.invokeMethod<void>('delete', _arguments(_configRefreshKey));
+
+  Future<int?> readMinCheckSeconds() async {
+    final raw = await _channel.invokeMethod<String>(
+      'read',
+      _arguments(_minCheckKey),
+    );
+    return int.tryParse(raw ?? '');
+  }
+
+  Future<void> writeMinCheckSeconds(int seconds) => _channel.invokeMethod<void>(
+    'write',
+    _arguments(_minCheckKey, '$seconds'),
+  );
+
+  Future<void> deleteMinCheckSeconds() =>
+      _channel.invokeMethod<void>('delete', _arguments(_minCheckKey));
+
   Future<String?> readConfigCache() =>
       _channel.invokeMethod<String>('read', _arguments(_configCacheKey));
 
@@ -68,6 +148,11 @@ class HarmonySessionStore {
       deleteMeta,
       deleteConfigLastModified,
       deleteConfigCache,
+      deleteConfigEtag,
+      deleteConfigVersion,
+      deleteReconnectOnLaunch,
+      deleteConfigRefreshSeconds,
+      deleteMinCheckSeconds,
     ]) {
       try {
         await remove();
@@ -199,13 +284,17 @@ class HarmonyConfigDownload {
   final Uint8List? bytes;
   final String? etag;
   final String? lastModified;
+  final String? configVersion;
   final bool notModified;
+  final Duration? profileUpdateInterval;
 
   const HarmonyConfigDownload({
     this.bytes,
     this.etag,
     this.lastModified,
+    this.configVersion,
     this.notModified = false,
+    this.profileUpdateInterval,
   });
 }
 
@@ -216,6 +305,12 @@ class HarmonyAccountApi {
   int _generation = 0;
   bool _restoreBlocked = false;
   Future<void> _storageTail = Future<void>.value();
+
+  /// When set (VPN running), config fetches retry via local mixed port after a direct failure.
+  int? localMixedProxyPort;
+
+  /// `false` after a 404 on [harmonyConfigVersionPath]; no further version probes this run.
+  bool? versionEndpointSupported;
 
   HarmonyAccountApi({Dio? http, HarmonySessionStore? storage})
     : _http =
@@ -252,6 +347,45 @@ class HarmonyAccountApi {
   Future<String?> readConfigLastModified() =>
       _store(_storage.readConfigLastModified);
 
+  Future<String?> readConfigEtag() => _store(_storage.readConfigEtag);
+
+  Future<String?> readConfigVersion() => _store(_storage.readConfigVersion);
+
+  Future<bool> readReconnectOnLaunch() =>
+      _store(_storage.readReconnectOnLaunch);
+
+  Future<void> setReconnectOnLaunch(bool value) =>
+      _store(() => _storage.writeReconnectOnLaunch(value));
+
+  Future<Duration> readConfigRefreshInterval({
+    Duration fallback = const Duration(hours: 24),
+  }) async {
+    final seconds = await _store(_storage.readConfigRefreshSeconds);
+    if (seconds == null || seconds <= 0) return fallback;
+    return Duration(seconds: seconds);
+  }
+
+  Future<Duration> readMinCheckInterval() async {
+    final seconds = await _store(_storage.readMinCheckSeconds);
+    return harmonyMinCheckIntervalFromSeconds(seconds);
+  }
+
+  Future<void> saveConfigRefreshInterval(Duration interval) {
+    final seconds = interval.inSeconds;
+    if (seconds <= 0) {
+      return _store(_storage.deleteConfigRefreshSeconds);
+    }
+    return _store(() => _storage.writeConfigRefreshSeconds(seconds));
+  }
+
+  Future<void> saveMinCheckInterval(Duration interval) {
+    final seconds = interval.inSeconds;
+    if (seconds <= 0) {
+      return _store(_storage.deleteMinCheckSeconds);
+    }
+    return _store(() => _storage.writeMinCheckSeconds(seconds));
+  }
+
   Future<HarmonyConfigCacheMetadata?> readConfigCache() async {
     final current = session;
     if (current == null || !isAuthorized) {
@@ -263,6 +397,31 @@ class HarmonyAccountApi {
     }
     final metadata = HarmonyConfigCacheMetadata.fromJson(raw);
     return metadata?.username == current.username ? metadata : null;
+  }
+
+  Future<void> persistInstalledConfigValidators({
+    required String expectedToken,
+    String? lastModified,
+    String? etag,
+    String? configVersion,
+  }) async {
+    final generation = _generation;
+    await _store(() async {
+      _checkGeneration(generation);
+      if (!isAuthorized || session?.token != expectedToken) {
+        throw HarmonyAccountError.expired;
+      }
+      if (lastModified != null && lastModified.isNotEmpty) {
+        await _storage.writeConfigLastModified(lastModified);
+      }
+      if (etag != null && etag.isNotEmpty) {
+        await _storage.writeConfigEtag(etag);
+      }
+      if (configVersion != null && configVersion.isNotEmpty) {
+        await _storage.writeConfigVersion(configVersion);
+      }
+      _checkGeneration(generation);
+    });
   }
 
   Future<void> commitConfigCache(
@@ -418,6 +577,39 @@ class HarmonyAccountApi {
     return HarmonySession(token, username, expiresAt);
   }
 
+  /// Lightweight version probe (GET only). Returns null when the server has no `/version` route.
+  Future<HarmonyConfigVersionInfo?> fetchConfigVersionInfo() async {
+    if (versionEndpointSupported == false) return null;
+    if (!isAuthorized) throw HarmonyAccountError.expired;
+    try {
+      final response = await _request(
+        harmonyConfigVersionPath,
+        token: session!.token,
+      );
+      if (response.statusCode == 404) {
+        versionEndpointSupported = false;
+        return null;
+      }
+      versionEndpointSupported = true;
+      return HarmonyConfigVersionInfo.fromJson(response.data);
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        versionEndpointSupported = false;
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  /// Conditional GET (never HEAD). Returns true when config is unchanged (304).
+  Future<bool> probeConfigNotModified() async {
+    final download = await downloadConfig(
+      ifModifiedSince: await readConfigLastModified(),
+      ifNoneMatch: await readConfigEtag(),
+    );
+    return download.notModified;
+  }
+
   Future<HarmonyConfigDownload> downloadConfig({
     String? ifNoneMatch,
     String? ifModifiedSince,
@@ -428,12 +620,14 @@ class HarmonyAccountApi {
     final token = session!.token;
     final generation = _generation;
     final response = await _request(
-      '/v1/config',
+      harmonyConfigPath,
       token: token,
       responseType: ResponseType.stream,
       headers: {
-        'If-None-Match': ?ifNoneMatch,
-        'If-Modified-Since': ?ifModifiedSince,
+        if (ifNoneMatch != null && ifNoneMatch.isNotEmpty)
+          'If-None-Match': ifNoneMatch,
+        if (ifModifiedSince != null && ifModifiedSince.isNotEmpty)
+          'If-Modified-Since': ifModifiedSince,
       },
     );
     _checkGeneration(generation);
@@ -441,11 +635,15 @@ class HarmonyAccountApi {
       throw HarmonyAccountError.expired;
     }
     if (response.statusCode == 304) {
+      final etag = response.headers.value('etag');
+      final version = response.headers.value('x-config-version');
       return HarmonyConfigDownload(
         notModified: true,
-        etag: response.headers.value('etag') ?? ifNoneMatch,
+        etag: etag ?? ifNoneMatch,
         lastModified:
             response.headers.value('last-modified') ?? ifModifiedSince,
+        configVersion: version,
+        profileUpdateInterval: null,
       );
     }
     final stream = response.data;
@@ -476,10 +674,16 @@ class HarmonyAccountApi {
     if (bytes.isEmpty) {
       throw HarmonyAccountError.config;
     }
+    final lastModified = response.headers.value('last-modified');
+    final etag = response.headers.value('etag');
+    final configVersion = response.headers.value('x-config-version');
+    final headerInterval = response.headers.value('profile-update-interval');
     return HarmonyConfigDownload(
-      bytes: bytes,
-      etag: response.headers.value('etag'),
-      lastModified: response.headers.value('last-modified'),
+      bytes: Uint8List.fromList(bytes),
+      etag: etag,
+      lastModified: lastModified,
+      configVersion: configVersion,
+      profileUpdateInterval: profileUpdateIntervalFromHeader(headerInterval),
     );
   }
 
@@ -516,6 +720,7 @@ class HarmonyAccountApi {
     // subsequent successful explicit login lifts this barrier.
     _restoreBlocked = true;
     session = null;
+    versionEndpointSupported = null;
     return _store(_storage.clearAll);
   }
 
@@ -528,27 +733,26 @@ class HarmonyAccountApi {
     ResponseType responseType = ResponseType.json,
     Map<String, String>? headers,
   }) async {
+    assert(
+      method != 'HEAD',
+      'HEAD is not allowed for Harmony config endpoints',
+    );
     final uri = Uri.tryParse(_http.options.baseUrl);
     if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
       throw HarmonyAccountError.unavailable;
     }
+    final configPath =
+        path == harmonyConfigPath || path == harmonyConfigVersionPath;
     try {
-      return await _http.request<dynamic>(
+      return await _requestWithRouteFallback(
         path,
+        method: method,
         data: data,
-        options: Options(
-          method: method,
-          responseType: responseType,
-          followRedirects: false,
-          validateStatus: (status) =>
-              status != null &&
-              (status >= 200 && status < 300 ||
-                  path == '/v1/config' && status == 304),
-          headers: {
-            if (token != null) 'Authorization': 'Bearer $token',
-            ...?headers,
-          },
-        ),
+        token: token,
+        login: login,
+        responseType: responseType,
+        headers: headers,
+        configPath: configPath,
       );
     } on DioException catch (error) {
       final status = error.response?.statusCode;
@@ -557,16 +761,136 @@ class HarmonyAccountApi {
             ? HarmonyAccountError.credentials
             : HarmonyAccountError.expired;
       }
-      if (status == 429) {
-        throw HarmonyAccountError.rateLimited;
-      }
-      if (status == null || status >= 500) {
+      if (status == 429) throw HarmonyAccountError.rateLimited;
+      if (configPath && (status == null || status >= 500)) {
         throw HarmonyAccountError.unavailable;
       }
-      if (path == '/v1/config') {
-        throw HarmonyAccountError.config;
-      }
+      if (configPath) throw HarmonyAccountError.config;
       throw HarmonyAccountError.unavailable;
+    }
+  }
+
+  Future<Response<dynamic>> _requestWithRouteFallback(
+    String path, {
+    required String method,
+    Object? data,
+    String? token,
+    required bool login,
+    required ResponseType responseType,
+    Map<String, String>? headers,
+    required bool configPath,
+  }) async {
+    try {
+      return await _dioRequest(
+        path: path,
+        method: method,
+        data: data,
+        token: token,
+        responseType: responseType,
+        headers: headers,
+        viaLocalProxy: false,
+      );
+    } on DioException catch (error) {
+      if (!configPath ||
+          localMixedProxyPort == null ||
+          !_shouldRetryViaProxy(error)) {
+        rethrow;
+      }
+    }
+    return _dioRequest(
+      path: path,
+      method: method,
+      data: data,
+      token: token,
+      responseType: responseType,
+      headers: headers,
+      viaLocalProxy: true,
+    );
+  }
+
+  Future<Response<dynamic>> _dioRequest({
+    required String path,
+    required String method,
+    Object? data,
+    String? token,
+    required ResponseType responseType,
+    Map<String, String>? headers,
+    required bool viaLocalProxy,
+  }) async {
+    final options = Options(
+      method: method,
+      responseType: responseType,
+      validateStatus: (status) =>
+          status != null && (status >= 200 && status < 300 || status == 304),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        ...?headers,
+      },
+    );
+    if (_http.httpClientAdapter is! IOHttpClientAdapter) {
+      return _http.request<dynamic>(path, data: data, options: options);
+    }
+    return _performRequest(
+      path,
+      method: method,
+      data: data,
+      token: token,
+      responseType: responseType,
+      headers: headers,
+      viaLocalProxy: viaLocalProxy,
+    );
+  }
+
+  bool _shouldRetryViaProxy(DioException error) {
+    if (error.response != null) return false;
+    return error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.sendTimeout;
+  }
+
+  Future<Response<dynamic>> _performRequest(
+    String path, {
+    required String method,
+    Object? data,
+    String? token,
+    required ResponseType responseType,
+    Map<String, String>? headers,
+    required bool viaLocalProxy,
+  }) async {
+    final port = localMixedProxyPort;
+    final previousAdapter = _http.httpClientAdapter;
+    _http.httpClientAdapter = IOHttpClientAdapter(
+      createHttpClient: () {
+        final client = HttpClient();
+        client.badCertificateCallback = (_, _, _) => true;
+        if (viaLocalProxy && port != null) {
+          client.findProxy = (_) => 'PROXY localhost:$port';
+        } else {
+          client.findProxy = (_) => 'DIRECT';
+        }
+        return client;
+      },
+    );
+    try {
+      return await _http.request<dynamic>(
+        path,
+        data: data,
+        options: Options(
+          method: method,
+          responseType: responseType,
+          validateStatus: (status) =>
+              status != null &&
+              (status >= 200 && status < 300 ||
+                  path == harmonyConfigPath && status == 304),
+          headers: {
+            if (token != null) 'Authorization': 'Bearer $token',
+            ...?headers,
+          },
+        ),
+      );
+    } finally {
+      _http.httpClientAdapter = previousAdapter;
     }
   }
 }

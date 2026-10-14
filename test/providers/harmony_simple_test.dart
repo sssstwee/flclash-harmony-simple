@@ -7,6 +7,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
+import 'package:fl_clash/common/harmony_config_check.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -132,6 +133,50 @@ class _Api extends HarmonyAccountApi {
   Future<void> clearConfigCache() async {
     metadata = null;
   }
+
+  @override
+  Future<String?> readConfigLastModified() async => metadata?.lastModified;
+
+  @override
+  Future<String?> readConfigEtag() async => metadata?.etag;
+
+  @override
+  Future<String?> readConfigVersion() async => null;
+
+  @override
+  Future<HarmonyConfigVersionInfo?> fetchConfigVersionInfo() async => null;
+
+  @override
+  Future<bool> probeConfigNotModified() async => true;
+
+  @override
+  Future<void> persistInstalledConfigValidators({
+    required String expectedToken,
+    String? lastModified,
+    String? etag,
+    String? configVersion,
+  }) async {}
+
+  @override
+  Future<Duration> readConfigRefreshInterval({
+    Duration fallback = const Duration(hours: 24),
+  }) async => fallback;
+
+  @override
+  Future<Duration> readMinCheckInterval() async =>
+      harmonyDefaultVersionCheckInterval;
+
+  @override
+  Future<void> saveConfigRefreshInterval(Duration interval) async {}
+
+  @override
+  Future<void> saveMinCheckInterval(Duration interval) async {}
+
+  @override
+  Future<bool> readReconnectOnLaunch() async => false;
+
+  @override
+  Future<void> setReconnectOnLaunch(bool value) async {}
 
   @override
   Future<void> logout() async {

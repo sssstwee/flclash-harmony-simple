@@ -1,3 +1,6 @@
+/// Built-in overseas categories inserted before the catch-all rule.
+const builtinGeositeCategories = [('GEOSITE,category-ai-!cn', 'ai')];
+
 /// Reuses the bundled Mihomo GeoSite/GeoIP databases for automatic split routing.
 List<String> defaultRoutingRules(Map<String, dynamic> config) {
   final groups = {
@@ -52,6 +55,13 @@ List<String> defaultRoutingRules(Map<String, dynamic> config) {
   }
   if (target == null) throw StateError('No usable proxy group in subscription');
 
+  final categoryRules = <String>[
+    for (final entry in builtinGeositeCategories)
+      if (resolveBuiltinCategoryGroup(config, entry.$2, hasProxy)
+          case final group?)
+        '${entry.$1},$group',
+  ];
+
   return [
     'GEOSITE,private,DIRECT',
     'GEOSITE,cn,DIRECT',
@@ -67,8 +77,80 @@ List<String> defaultRoutingRules(Map<String, dynamic> config) {
     'IP-CIDR6,fe80::/10,DIRECT',
     'IP-CIDR6,ff00::/8,DIRECT,no-resolve',
     'GEOIP,CN,DIRECT',
+    ...categoryRules,
     'MATCH,$target',
   ];
+}
+
+/// Resolves a built-in category (e.g. AI) to a subscription group name.
+String? resolveBuiltinCategoryGroup(
+  Map<String, dynamic> config,
+  String category,
+  bool Function(String name) hasProxy,
+) {
+  if (category != 'ai') return null;
+  return findAiServiceGroup(config, hasProxy);
+}
+
+/// Picks an AI/WARP-capable group from the subscription when present.
+String? findAiServiceGroup(
+  Map<String, dynamic> config,
+  bool Function(String name) hasProxy,
+) {
+  final groups = (config['proxy-groups'] as List? ?? []).cast<Map>();
+  final nodes = (config['proxies'] as List? ?? []).cast<Map>();
+
+  bool nameHintsAi(String name) {
+    if (name.contains('🤖') || name.contains('智能')) return true;
+    final lower = name.toLowerCase();
+    const keywords = [
+      'ai服务',
+      'ai-service',
+      'openai',
+      'chatgpt',
+      'claude',
+      'gemini',
+      'gpt',
+    ];
+    if (keywords.any(lower.contains)) return true;
+    // Avoid false positives such as "Main" matching substring "ai".
+    return RegExp(r'(?:^|[^a-zA-Z])ai(?:[^a-zA-Z]|$)').hasMatch(name);
+  }
+
+  bool nameHintsWarp(String name) {
+    final lower = name.toLowerCase();
+    return lower.contains('warp') || lower.contains('cloudflare');
+  }
+
+  for (final group in groups) {
+    final name = group['name'] as String?;
+    if (name != null && nameHintsAi(name) && hasProxy(name)) {
+      return name;
+    }
+  }
+
+  for (final group in groups) {
+    final name = group['name'] as String?;
+    if (name == null || !hasProxy(name)) continue;
+    if ((group['proxies'] as List? ?? []).cast<String>().any(nameHintsWarp)) {
+      return name;
+    }
+  }
+
+  for (final proxy in nodes) {
+    final name = '${proxy['name']}';
+    if (nameHintsWarp(name)) {
+      for (final group in groups) {
+        final groupName = group['name'] as String?;
+        if (groupName == null || !hasProxy(groupName)) continue;
+        if ((group['proxies'] as List? ?? []).cast<String>().contains(name)) {
+          return groupName;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 void excludeDirectFromAutomaticGroups(Map<String, dynamic> config) {
@@ -100,6 +182,20 @@ void excludeDirectFromAutomaticGroups(Map<String, dynamic> config) {
   ];
 }
 
+const _connectivityFakeIpFilters = [
+  'connectivitycheck.platform.hicloud.com',
+  'connectivitycheck.gstatic.com',
+  'captive.apple.com',
+  'msftconnecttest.com',
+  'www.msftconnecttest.com',
+  'detectportal.firefox.com',
+  'time.apple.com',
+  'time.windows.com',
+  'pool.ntp.org',
+  'stun.l.google.com',
+  '+.stun.l.google.com',
+];
+
 void applyDefaultDns(Map<String, dynamic> config) {
   final dns = Map<String, dynamic>.from(config['dns'] as Map? ?? {});
   const directDns = [
@@ -113,12 +209,14 @@ void applyDefaultDns(Map<String, dynamic> config) {
   };
   dns['direct-nameserver'] = ['system://', ...directDns];
   dns['direct-nameserver-follow-policy'] = true;
+  dns['respect-rules'] = true;
   // Rule/whitelist filters have different syntax; leave their existing behavior.
   if ((dns['fake-ip-filter-mode'] ?? 'blacklist') == 'blacklist') {
     dns['fake-ip-filter'] = {
       ...(dns['fake-ip-filter'] as List? ?? []).cast<String>(),
       'geosite:private',
       'geosite:cn',
+      ..._connectivityFakeIpFilters,
     }.toList();
   }
   config['dns'] = dns;

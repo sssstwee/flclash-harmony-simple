@@ -1,4 +1,9 @@
 import { createAuth } from './auth';
+import {
+  DEFAULT_MIN_CHECK_SECONDS,
+  configRowMeta,
+  etagMatches,
+} from './config_meta';
 
 const authRoutes = new Map([
   ['/api/auth/sign-in/username', 'POST'],
@@ -29,75 +34,83 @@ function failure(code: string, status: number) {
   return Response.json({ code }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-function configHeaders(updatedAt: string, etag: string) {
+async function configHeaders(config: ConfigRow) {
+  const meta = await configRowMeta(config);
   return {
     'Content-Type': 'application/yaml; charset=utf-8',
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff',
-    ETag: etag,
-    'Last-Modified': new Date(updatedAt).toUTCString(),
+    'Last-Modified': new Date(config.updated_at).toUTCString(),
+    ETag: meta.etag,
+    'X-Config-Version': meta.version,
   };
 }
 
-async function resolveProxyConfig(db: D1Database, userId: string): Promise<ConfigRow | null> {
-  // Resolve the user's current group and all fallback priorities in one snapshot.
+async function resolveProxyConfig(
+  db: D1Database,
+  userId: string,
+  configGroup: string | null,
+): Promise<ConfigRow | null> {
+  const userRow = await db
+    .prepare(
+      'SELECT content, updated_at, scope, scope_key FROM proxy_config WHERE scope = ? AND scope_key = ?',
+    )
+    .bind('user', userId)
+    .first<ConfigRow>();
+  if (userRow) return userRow;
+
+  if (configGroup) {
+    const groupRow = await db
+      .prepare(
+        'SELECT content, updated_at, scope, scope_key FROM proxy_config WHERE scope = ? AND scope_key = ?',
+      )
+      .bind('group', configGroup)
+      .first<ConfigRow>();
+    if (groupRow) return groupRow;
+  }
+
   return db
-    .prepare(`
-      SELECT config.content, config.updated_at, config.scope, config.scope_key
-      FROM user AS account
-      JOIN proxy_config AS config ON
-        (config.scope = 'user' AND config.scope_key = account.id)
-        OR (config.scope = 'group' AND account.config_group <> '' AND config.scope_key = account.config_group)
-        OR (config.scope = 'default' AND config.scope_key = '')
-      WHERE account.id = ?
-      ORDER BY CASE config.scope WHEN 'user' THEN 0 WHEN 'group' THEN 1 ELSE 2 END
-      LIMIT 1
-    `)
-    .bind(userId)
+    .prepare(
+      'SELECT content, updated_at, scope, scope_key FROM proxy_config WHERE scope = ? AND scope_key = ?',
+    )
+    .bind('default', '')
     .first<ConfigRow>();
 }
 
 async function allowConfigFetch(db: D1Database, userId: string): Promise<boolean> {
   const now = Math.floor(Date.now() / 1000);
-  // Admission and increment must be one atomic statement. Separate reads race
-  // both when the row is first inserted and when a limit/window is reached.
-  const admitted = await db
-    .prepare(`
-      INSERT INTO config_api_rate_limit (user_id, window_start, request_count)
-      VALUES (?1, ?2, 1)
-      ON CONFLICT(user_id) DO UPDATE SET
-        window_start = CASE
-          WHEN excluded.window_start - config_api_rate_limit.window_start >= ?3
-          THEN excluded.window_start ELSE config_api_rate_limit.window_start END,
-        request_count = CASE
-          WHEN excluded.window_start - config_api_rate_limit.window_start >= ?3
-          THEN 1 ELSE config_api_rate_limit.request_count + 1 END
-      WHERE excluded.window_start - config_api_rate_limit.window_start >= ?3
-        OR config_api_rate_limit.request_count < ?4
-      RETURNING request_count
-    `)
-    .bind(userId, now, CONFIG_RATE_WINDOW_SEC, CONFIG_RATE_MAX)
-    .first<{ request_count: number }>();
-  return admitted !== null;
-}
+  const row = await db
+    .prepare('SELECT window_start, request_count FROM config_api_rate_limit WHERE user_id = ?')
+    .bind(userId)
+    .first<{ window_start: number; request_count: number }>();
 
-async function configEtag(config: ConfigRow): Promise<string> {
-  // HTTP dates only have second precision and cannot identify scope changes.
-  // Include scope identity and the exact bytes so older fallbacks, reassigned
-  // groups, and multiple edits in one second never reuse a stale validator.
-  const bytes = new TextEncoder().encode(
-    JSON.stringify([config.scope, config.scope_key, config.content]),
-  );
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-  return `"${hash}"`;
-}
+  if (!row) {
+    await db
+      .prepare(
+        'INSERT INTO config_api_rate_limit (user_id, window_start, request_count) VALUES (?, ?, 1)',
+      )
+      .bind(userId, now)
+      .run();
+    return true;
+  }
 
-function matchesEtag(ifNoneMatch: string | null, etag: string): boolean {
-  return ifNoneMatch?.split(',').some(value => {
-    const tag = value.trim();
-    return tag === '*' || tag.replace(/^W\//, '') === etag;
-  }) ?? false;
+  if (now - row.window_start >= CONFIG_RATE_WINDOW_SEC) {
+    await db
+      .prepare(
+        'UPDATE config_api_rate_limit SET window_start = ?, request_count = 1 WHERE user_id = ?',
+      )
+      .bind(now, userId)
+      .run();
+    return true;
+  }
+
+  if (row.request_count >= CONFIG_RATE_MAX) return false;
+
+  await db
+    .prepare('UPDATE config_api_rate_limit SET request_count = request_count + 1 WHERE user_id = ?')
+    .bind(userId)
+    .run();
+  return true;
 }
 
 function auditConfigFetch(
@@ -117,6 +130,28 @@ function auditConfigFetch(
       .run()
       .catch(() => undefined),
   );
+}
+
+type AuthorizedConfig =
+  | { ok: true; session: { user: { id: string } }; config: ConfigRow }
+  | { ok: false; response: Response };
+
+async function loadAuthorizedConfig(request: Request, env: Env): Promise<AuthorizedConfig> {
+  const auth = getAuth(env);
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user?.id) {
+    return { ok: false, response: failure('UNAUTHORIZED', 401) };
+  }
+
+  const configGroup = await env.DB.prepare('SELECT config_group FROM user WHERE id = ?')
+    .bind(session.user.id)
+    .first<{ config_group: string | null }>()
+    .then(row => row?.config_group ?? null);
+
+  const config = await resolveProxyConfig(env.DB, session.user.id, configGroup);
+  if (!config) return { ok: false, response: failure('CONFIG_UNAVAILABLE', 503) };
+
+  return { ok: true, session, config };
 }
 
 export default {
@@ -141,28 +176,46 @@ export default {
         return response;
       }
 
+      if (path === '/v1/config/version' && request.method === 'GET') {
+        const loaded = await loadAuthorizedConfig(request, env);
+        if (!loaded.ok) return loaded.response;
+        const { config } = loaded;
+        const meta = await configRowMeta(config);
+        const updatedUnix = Math.floor(new Date(config.updated_at).getTime() / 1000);
+        return Response.json(
+          {
+            version: meta.version,
+            updated_at: updatedUnix,
+            min_check_seconds: DEFAULT_MIN_CHECK_SECONDS,
+          },
+          {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          },
+        );
+      }
+
       if (path !== '/v1/config' || request.method !== 'GET') {
         return failure('NOT_FOUND', 404);
       }
 
-      const auth = getAuth(env);
-      const session = await auth.api.getSession({ headers: request.headers });
-      if (!session?.user?.id) return failure('UNAUTHORIZED', 401);
+      const loaded = await loadAuthorizedConfig(request, env);
+      if (!loaded.ok) return loaded.response;
+      const { session, config } = loaded;
 
       const allowed = await allowConfigFetch(env.DB, session.user.id);
       if (!allowed) return failure('RATE_LIMITED', 429);
 
-      const config = await resolveProxyConfig(env.DB, session.user.id);
-      if (!config) return failure('CONFIG_UNAVAILABLE', 503);
-
-      const etag = await configEtag(config);
-      const headers = configHeaders(config.updated_at, etag);
+      const meta = await configRowMeta(config);
+      const headers = await configHeaders(config);
       const clientIp = request.headers.get('cf-connecting-ip');
       auditConfigFetch(ctx, env.DB, session.user.id, config.scope, config.scope_key, clientIp);
 
       // Date-only clients get a full response: even a later Last-Modified date
       // cannot prove that the previously selected scope/content is unchanged.
-      if (matchesEtag(request.headers.get('If-None-Match'), etag)) {
+      if (etagMatches(request.headers.get('If-None-Match'), meta.etag)) {
         return new Response(null, { status: 304, headers });
       }
 

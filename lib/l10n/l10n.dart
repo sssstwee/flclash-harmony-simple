@@ -4868,6 +4868,476 @@ class AppLocalizations {
       args: [],
     );
   }
+
+  /// `Automatically picked the lowest-latency route`
+  String get harmonyRouteReasonAuto {
+    return Intl.message(
+      'Automatically picked the lowest-latency route',
+      name: 'harmonyRouteReasonAuto',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `UDP looks blocked; preferring TCP nodes`
+  String get harmonyRouteReasonTcp {
+    return Intl.message(
+      'UDP looks blocked; preferring TCP nodes',
+      name: 'harmonyRouteReasonTcp',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Selected the best node from latency tests`
+  String get harmonyRouteReasonManual {
+    return Intl.message(
+      'Selected the best node from latency tests',
+      name: 'harmonyRouteReasonManual',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `AI sites use the “{groupName}” group`
+  String harmonyAiRoutingHint(String groupName) {
+    return Intl.message(
+      'AI sites use the “$groupName” group',
+      name: 'harmonyAiRoutingHint',
+      desc: '',
+      args: [groupName],
+    );
+  }
+
+  /// `Network: Wi‑Fi`
+  String get harmonyNetworkWifi {
+    return Intl.message(
+      'Network: Wi‑Fi',
+      name: 'harmonyNetworkWifi',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network: cellular`
+  String get harmonyNetworkCellular {
+    return Intl.message(
+      'Network: cellular',
+      name: 'harmonyNetworkCellular',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network: other`
+  String get harmonyNetworkOther {
+    return Intl.message(
+      'Network: other',
+      name: 'harmonyNetworkOther',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network: unknown`
+  String get harmonyNetworkUnknown {
+    return Intl.message(
+      'Network: unknown',
+      name: 'harmonyNetworkUnknown',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Route healthy (checked {time})`
+  String harmonyHealthCheckOk(String time) {
+    return Intl.message(
+      'Route healthy (checked $time)',
+      name: 'harmonyHealthCheckOk',
+      desc: '',
+      args: [time],
+    );
+  }
+
+  /// `Route check failed ({time}); trying another node`
+  String harmonyHealthCheckFailed(String time) {
+    return Intl.message(
+      'Route check failed ($time); trying another node',
+      name: 'harmonyHealthCheckFailed',
+      desc: '',
+      args: [time],
+    );
+  }
+
+  /// `Will reconnect automatically next time you open the app`
+  String get harmonyAutoReconnectOn {
+    return Intl.message(
+      'Will reconnect automatically next time you open the app',
+      name: 'harmonyAutoReconnectOn',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Will stay disconnected after a manual disconnect`
+  String get harmonyAutoReconnectOff {
+    return Intl.message(
+      'Will stay disconnected after a manual disconnect',
+      name: 'harmonyAutoReconnectOff',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Updating config in the background…`
+  String get harmonyConfigUpdating {
+    return Intl.message(
+      'Updating config in the background…',
+      name: 'harmonyConfigUpdating',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config synced at {time}`
+  String harmonyConfigSyncedAt(String time) {
+    return Intl.message(
+      'Config synced at $time',
+      name: 'harmonyConfigSyncedAt',
+      desc: '',
+      args: [time],
+    );
+  }
+
+  /// `Config is up to date (v {version}, checked {time})`
+  String harmonyConfigFreshUpToDate(String version, String time) {
+    return Intl.message(
+      'Config is up to date (v $version, checked $time)',
+      name: 'harmonyConfigFreshUpToDate',
+      desc: '',
+      args: [version, time],
+    );
+  }
+
+  /// `New config found, updating…`
+  String get harmonyConfigFreshUpdating {
+    return Intl.message(
+      'New config found, updating…',
+      name: 'harmonyConfigFreshUpdating',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config updated automatically`
+  String get harmonyConfigFreshAutoUpdated {
+    return Intl.message(
+      'Config updated automatically',
+      name: 'harmonyConfigFreshAutoUpdated',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cannot check for updates; using cached config ({reason})`
+  String harmonyConfigFreshCheckFailed(String reason) {
+    return Intl.message(
+      'Cannot check for updates; using cached config ($reason)',
+      name: 'harmonyConfigFreshCheckFailed',
+      desc: '',
+      args: [reason],
+    );
+  }
+
+  /// `Refresh config`
+  String get harmonyConfigRefreshTooltip {
+    return Intl.message(
+      'Refresh config',
+      name: 'harmonyConfigRefreshTooltip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config refreshed`
+  String get harmonyConfigRefreshSuccess {
+    return Intl.message(
+      'Config refreshed',
+      name: 'harmonyConfigRefreshSuccess',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config refresh failed`
+  String get harmonyConfigRefreshFailed {
+    return Intl.message(
+      'Config refresh failed',
+      name: 'harmonyConfigRefreshFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Please wait a moment`
+  String get harmonyConfigRefreshDebounced {
+    return Intl.message(
+      'Please wait a moment',
+      name: 'harmonyConfigRefreshDebounced',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network unavailable`
+  String get harmonyConfigCheckReasonOffline {
+    return Intl.message(
+      'Network unavailable',
+      name: 'harmonyConfigCheckReasonOffline',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Too many requests`
+  String get harmonyConfigCheckReasonRateLimit {
+    return Intl.message(
+      'Too many requests',
+      name: 'harmonyConfigCheckReasonRateLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Service temporarily unavailable`
+  String get harmonyConfigCheckReasonServer {
+    return Intl.message(
+      'Service temporarily unavailable',
+      name: 'harmonyConfigCheckReasonServer',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connection details`
+  String get harmonyStatusSection {
+    return Intl.message(
+      'Connection details',
+      name: 'harmonyStatusSection',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cannot refresh subscription`
+  String get harmonyIssueTitleOfflineCached {
+    return Intl.message(
+      'Cannot refresh subscription',
+      name: 'harmonyIssueTitleOfflineCached',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.`
+  String get harmonyIssueDetailOfflineCached {
+    return Intl.message(
+      'The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.',
+      name: 'harmonyIssueDetailOfflineCached',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Next: tap Connect`
+  String get harmonyIssueActionOfflineCached {
+    return Intl.message(
+      'Next: tap Connect',
+      name: 'harmonyIssueActionOfflineCached',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cannot fetch latest config`
+  String get harmonyIssueTitleSubscription {
+    return Intl.message(
+      'Cannot fetch latest config',
+      name: 'harmonyIssueTitleSubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.`
+  String get harmonyIssueDetailSubscription {
+    return Intl.message(
+      'The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.',
+      name: 'harmonyIssueDetailSubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Next: tap Connect or retry later`
+  String get harmonyIssueActionSubscription {
+    return Intl.message(
+      'Next: tap Connect or retry later',
+      name: 'harmonyIssueActionSubscription',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sign-in expired`
+  String get harmonyIssueTitleAuthExpired {
+    return Intl.message(
+      'Sign-in expired',
+      name: 'harmonyIssueTitleAuthExpired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Your session expired. Sign out and log in again to refresh the subscription.`
+  String get harmonyIssueDetailAuthExpired {
+    return Intl.message(
+      'Your session expired. Sign out and log in again to refresh the subscription.',
+      name: 'harmonyIssueDetailAuthExpired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Next: sign out, then log in again`
+  String get harmonyIssueActionAuthExpired {
+    return Intl.message(
+      'Next: sign out, then log in again',
+      name: 'harmonyIssueActionAuthExpired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `VPN did not start`
+  String get harmonyIssueTitleVpnFailed {
+    return Intl.message(
+      'VPN did not start',
+      name: 'harmonyIssueTitleVpnFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The system VPN failed to start. Allow the VPN permission, then tap Connect again.`
+  String get harmonyIssueDetailVpnFailed {
+    return Intl.message(
+      'The system VPN failed to start. Allow the VPN permission, then tap Connect again.',
+      name: 'harmonyIssueDetailVpnFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Next: tap Connect and allow VPN`
+  String get harmonyIssueActionVpnFailed {
+    return Intl.message(
+      'Next: tap Connect and allow VPN',
+      name: 'harmonyIssueActionVpnFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No working route`
+  String get harmonyIssueTitleNoRoute {
+    return Intl.message(
+      'No working route',
+      name: 'harmonyIssueTitleNoRoute',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `None of the saved nodes responded. Try Connect again later or wait for a config refresh.`
+  String get harmonyIssueDetailNoRoute {
+    return Intl.message(
+      'None of the saved nodes responded. Try Connect again later or wait for a config refresh.',
+      name: 'harmonyIssueDetailNoRoute',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Next: try Connect again later`
+  String get harmonyIssueActionNoRoute {
+    return Intl.message(
+      'Next: try Connect again later',
+      name: 'harmonyIssueActionNoRoute',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Service unavailable`
+  String get harmonyIssueTitleService {
+    return Intl.message(
+      'Service unavailable',
+      name: 'harmonyIssueTitleService',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cannot reach the account server. Check your network; you can still try Connect with a cached profile.`
+  String get harmonyIssueDetailService {
+    return Intl.message(
+      'Cannot reach the account server. Check your network; you can still try Connect with a cached profile.',
+      name: 'harmonyIssueDetailService',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Next: check network, then Connect`
+  String get harmonyIssueActionService {
+    return Intl.message(
+      'Next: check network, then Connect',
+      name: 'harmonyIssueActionService',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Too many attempts`
+  String get harmonyIssueTitleRateLimit {
+    return Intl.message(
+      'Too many attempts',
+      name: 'harmonyIssueTitleRateLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Please wait about a minute before signing in or connecting again.`
+  String get harmonyIssueDetailRateLimit {
+    return Intl.message(
+      'Please wait about a minute before signing in or connecting again.',
+      name: 'harmonyIssueDetailRateLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Next: wait, then retry`
+  String get harmonyIssueActionRateLimit {
+    return Intl.message(
+      'Next: wait, then retry',
+      name: 'harmonyIssueActionRateLimit',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<AppLocalizations> {

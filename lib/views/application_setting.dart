@@ -162,7 +162,9 @@ class HiddenItem extends ConsumerWidget {
         system.isAndroid ? appLocalizations.exclude : appLocalizations.keep,
       ),
       subtitle: Text(
-        system.isAndroid ? appLocalizations.excludeDesc : appLocalizations.keepDesc,
+        system.isAndroid
+            ? appLocalizations.excludeDesc
+            : appLocalizations.keepDesc,
       ),
       delegate: SwitchDelegate(
         value: hidden,

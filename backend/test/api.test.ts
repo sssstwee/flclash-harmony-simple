@@ -286,6 +286,32 @@ test('a matching ETag never bypasses the per-user rate limit', async () => {
   expect(limited.status).toBe(429);
 });
 
+test('config exposes ETag and version endpoint', async () => {
+  const token = await login();
+  await seedDefaultConfig();
+  const config = await request('/v1/config', { headers: bearer(token) });
+  expect(config.status).toBe(200);
+  const etag = config.headers.get('ETag');
+  const version = config.headers.get('X-Config-Version');
+  expect(etag).toMatch(/^"[0-9a-f]{64}"$/);
+  expect(version).toHaveLength(16);
+  const unchanged = await request('/v1/config', {
+    headers: { ...bearer(token), 'If-None-Match': etag! },
+  });
+  expect(unchanged.status).toBe(304);
+  const versionResponse = await request('/v1/config/version', { headers: bearer(token) });
+  expect(versionResponse.status).toBe(200);
+  expect(versionResponse.headers.get('Cache-Control')).toBe('no-cache');
+  const body = await versionResponse.json() as {
+    version: string;
+    updated_at: number;
+    min_check_seconds: number;
+  };
+  expect(body.version).toBe(version);
+  expect(body.min_check_seconds).toBeGreaterThan(0);
+  expect(typeof body.updated_at).toBe('number');
+});
+
 test('prefers per-user configuration with default fallback and logs fetches', async () => {
   const token = await login();
   await seedDefaultConfig('proxies: []');

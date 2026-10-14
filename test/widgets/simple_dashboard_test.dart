@@ -5,6 +5,9 @@ import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/simple.dart';
+import 'package:fl_clash/common/harmony_config_freshness.dart';
+import 'package:fl_clash/common/harmony_home_status.dart';
+import 'package:fl_clash/common/harmony_user_issue.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -44,10 +47,8 @@ class IdleHarmonySimple extends HarmonySimple {
   Future<void> checkSession() async {}
 }
 
-Finder get primaryFilledButton => find.descendant(
-  of: find.byType(SimpleConnectionPanel),
-  matching: find.byType(FilledButton),
-);
+Finder get primaryFilledButton =>
+    find.byKey(const Key('harmony_primary_connect'));
 
 Widget app(Widget child) => MaterialApp(
   locale: const Locale('zh', 'CN'),
@@ -149,7 +150,20 @@ void main() {
             ),
           ),
         );
+        await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
+        final scrollable = find.descendant(
+          of: find.byType(SimpleConnectionPanel),
+          matching: find.byType(Scrollable),
+        );
+        if (scrollable.evaluate().isNotEmpty) {
+          await tester.scrollUntilVisible(
+            primaryFilledButton,
+            120,
+            scrollable: scrollable.first,
+          );
+        }
+        expect(primaryFilledButton, findsOneWidget);
         final busy =
             phase == ConnectionPhase.connecting ||
             phase == ConnectionPhase.disconnecting;
@@ -173,6 +187,120 @@ void main() {
         expect(find.text('DNS'), findsNothing);
         expect(tester.takeException(), isNull);
       }
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('offline cached issue explains next step in plain Chinese', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.error,
+            username: 'harmony',
+            issue: HarmonyUserIssue.offlineCached,
+            usingCachedConfig: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('暂时无法更新订阅'), findsOneWidget);
+    expect(find.textContaining('账号服务器暂时连不上'), findsOneWidget);
+    expect(find.textContaining('点「连接」'), findsWidgets);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'config freshness row shows up-to-date text and refresh control',
+    (tester) async {
+      await tester.pumpWidget(
+        scoped(
+          api: SignedOutApi(),
+          child: app(
+            SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnected,
+              username: 'harmony',
+              configFreshness: HarmonyConfigFreshness(
+                kind: HarmonyConfigFreshnessKind.upToDate,
+                versionShort: 'abcd1234',
+                lastCheckedAt: DateTime(2026, 3, 20, 14, 30),
+              ),
+              onConfigRefresh: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('配置已是最新'), findsOneWidget);
+      expect(find.textContaining('abcd1234'), findsOneWidget);
+      expect(find.byKey(const Key('harmony_config_refresh')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets('config freshness row shows updating state while syncing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          MediaQuery(
+            data: const MediaQueryData(disableAnimations: true),
+            child: SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnected,
+              username: 'harmony',
+              configFreshness: const HarmonyConfigFreshness(
+                kind: HarmonyConfigFreshnessKind.discoveringUpdate,
+                refreshInProgress: true,
+              ),
+              homeStatus: const HarmonyHomeStatus(configSyncInProgress: true),
+              onConfigRefresh: () {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('发现新配置，正在更新…'), findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const Key('harmony_config_refresh')))
+          .onPressed,
+      isNull,
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'home insight card explains auto route and reconnect in Chinese',
+    (tester) async {
+      await tester.pumpWidget(
+        scoped(
+          api: SignedOutApi(),
+          child: app(
+            const SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnected,
+              username: 'harmony',
+              homeStatus: HarmonyHomeStatus(
+                routeKind: HarmonyRouteKind.tcpPreferred,
+                aiGroupName: '🤖AI服务',
+                networkKind: HarmonyNetworkKind.wifi,
+                autoReconnectArmed: true,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('连接说明'), findsOneWidget);
+      expect(find.textContaining('TCP'), findsOneWidget);
+      expect(find.textContaining('AI 网站'), findsOneWidget);
+      expect(find.text('下次打开应用将自动连接'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );

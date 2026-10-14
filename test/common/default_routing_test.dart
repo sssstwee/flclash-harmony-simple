@@ -30,6 +30,58 @@ Map<String, dynamic> subscription({String catchAll = 'MATCH,Main'}) => {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('routes AI geosite through a subscription AI group when present', () {
+    final config = subscription();
+    (config['proxy-groups'] as List<Map<String, dynamic>>).add({
+      'name': '🤖AI服务',
+      'type': 'fallback',
+      'proxies': ['Node', 'DIRECT'],
+    });
+    final rules = defaultRoutingRules(config);
+    expect(rules, contains('GEOSITE,category-ai-!cn,🤖AI服务'));
+    expect(rules.last, 'MATCH,Main');
+  });
+
+  test('findAiServiceGroup does not treat Main as an AI group', () {
+    final config = <String, dynamic>{
+      'proxy-groups': [
+        {
+          'name': 'Main',
+          'type': 'select',
+          'proxies': ['Node'],
+        },
+      ],
+      'proxies': [
+        {'name': 'Node', 'type': 'vless'},
+      ],
+    };
+    expect(findAiServiceGroup(config, (name) => name == 'Main'), isNull);
+  });
+
+  test('findAiServiceGroup prefers AI-labeled groups and warp members', () {
+    final config = <String, dynamic>{
+      'proxies': [
+        {'name': 'HY2 WARP', 'type': 'hysteria2'},
+        {'name': 'TCP Node', 'type': 'vless'},
+      ],
+      'proxy-groups': [
+        {
+          'name': 'Main',
+          'type': 'select',
+          'proxies': ['TCP Node', 'DIRECT'],
+        },
+        {
+          'name': '🤖AI服务',
+          'type': 'fallback',
+          'proxies': ['HY2 WARP', 'TCP Node'],
+        },
+      ],
+      'rules': ['MATCH,Main'],
+    };
+    bool hasProxy(String name) => name == 'Main' || name == '🤖AI服务';
+    expect(findAiServiceGroup(config, hasProxy), '🤖AI服务');
+  });
+
   test(
     'uses automatic domestic/LAN direct rules and an overseas catch-all',
     () {
@@ -150,7 +202,15 @@ void main() {
         dns['nameserver-policy']['geosite:cn'],
         contains('https://doh.pub/dns-query'),
       );
-      expect(dns['fake-ip-filter'], ['*.lan', 'geosite:private', 'geosite:cn']);
+      expect(
+        dns['fake-ip-filter'],
+        containsAll(['*.lan', 'geosite:private', 'geosite:cn']),
+      );
+      expect(dns['respect-rules'], isTrue);
+      expect(
+        dns['fake-ip-filter'],
+        contains('connectivitycheck.platform.hicloud.com'),
+      );
     },
   );
 

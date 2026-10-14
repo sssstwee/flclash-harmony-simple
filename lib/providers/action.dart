@@ -169,6 +169,7 @@ class SetupAction extends _$SetupAction {
     _updateTimer?.cancel();
     _updateTimer = null;
     await coreController.stopListener();
+    await service?.clearVpnNotification();
     await app?.stopBackgroundRunning();
   }
 

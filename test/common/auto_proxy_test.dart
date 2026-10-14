@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:fake_async/fake_async.dart';
 import 'package:fl_clash/common/auto_proxy.dart';
+import 'package:fl_clash/common/proxy_transport.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -129,6 +130,31 @@ void main() {
         root,
       ], (name) async => name == 'fast' ? -1 : 0);
       expect(result, isNull);
+    },
+  );
+
+  test(
+    'probes TCP-friendly nodes before UDP-heavy ones when preferTcpFirst',
+    () async {
+      const root = Group(
+        name: 'Main',
+        type: GroupType.Selector,
+        all: [
+          Proxy(name: 'hy2', type: 'Hysteria2'),
+          Proxy(name: 'vless', type: 'Vless'),
+        ],
+      );
+      final result = await autoSelectProxy(
+        root,
+        [root],
+        (name) async => name == 'vless' ? 5 : null,
+        transportKinds: const {
+          'hy2': ProxyTransportKind.udpHeavy,
+          'vless': ProxyTransportKind.tcpFriendly,
+        },
+        preferTcpFirst: true,
+      );
+      expect(result?.name, 'vless');
     },
   );
 

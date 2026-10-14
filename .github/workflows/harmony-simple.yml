@@ -187,11 +187,22 @@ jobs:
           cd dist
           find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
+      - name: Resolve package artifact name
+        id: pkg
+        run: |
+          SHORT="${GITHUB_SHA::7}"
+          BRANCH="${{ github.head_ref || github.ref_name }}"
+          if [[ "$BRANCH" == "cursor/zero-config-harmony-proxy-31c4" ]]; then
+            echo "name=Clash-Harmony-cursor-pr3-${SHORT}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=Clash-Harmony-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload packages
         if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         uses: actions/upload-artifact@v4
         with:
-          name: Clash-Harmony-HarmonyOS-${{ github.sha }}
+          name: ${{ steps.pkg.outputs.name }}
           path: dist/
           if-no-files-found: error
           retention-days: 14

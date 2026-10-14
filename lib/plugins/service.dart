@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:isolate';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/harmony_vpn_notification.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,8 @@ abstract mixin class ServiceListener {
   void onServiceEvent(CoreEvent event) {}
 
   void onServiceCrash(String message) {}
+
+  void onNotificationAction(String action) {}
 }
 
 class Service {
@@ -41,6 +44,12 @@ class Service {
           final message = call.arguments as String? ?? '';
           for (final listener in _listeners) {
             listener.onServiceCrash(message);
+          }
+          break;
+        case 'notificationAction':
+          final action = call.arguments as String? ?? '';
+          for (final listener in _listeners) {
+            listener.onNotificationAction(action);
           }
           break;
         default:
@@ -83,6 +92,21 @@ class Service {
 
   Future<bool> shutdown() async {
     return await methodChannel.invokeMethod<bool>('shutdown') ?? true;
+  }
+
+  Future<void> updateVpnNotification(
+    HarmonyVpnNotificationPayload payload,
+  ) async {
+    if (!system.isOhos) return;
+    await methodChannel.invokeMethod<void>(
+      'updateVpnNotification',
+      json.encode(payload.toJson()),
+    );
+  }
+
+  Future<void> clearVpnNotification() async {
+    if (!system.isOhos) return;
+    await methodChannel.invokeMethod<void>('clearVpnNotification');
   }
 
   Future<DateTime?> getRunTime() async {

@@ -73,6 +73,27 @@ export default class EntryAbility extends FlutterAbility {
     super.onCreate(want, launchParam)
     this.notificationManager = new NotificationManager(this.context)
     this.notificationManager?.subscribe()
+    this.consumeNotificationWant(want)
+  }
+
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    super.onNewWant(want, launchParam)
+    this.consumeNotificationWant(want)
+  }
+
+  handleVpnNotification(raw: string): void {
+    this.notificationManager?.applyParams(raw)
+  }
+
+  handleClearVpnNotification(): void {
+    this.notificationManager?.clearNotification()
+  }
+
+  private consumeNotificationWant(want: Want): void {
+    const action = want.parameters?.['harmonyNotificationAction'] as string
+    if (action) {
+      publishEvent('HARMONY_NOTIF_ACTION', action)
+    }
   }
 
   onDestroy(): void {

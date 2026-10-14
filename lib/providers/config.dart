@@ -165,8 +165,6 @@ List<Override> buildConfigOverrides(Config config) {
       (_, _) => config.patchClashConfig,
     ),
     excludeSSIDsProvider.overrideWithBuild((_, _) => config.excludeSSIDs),
-    definedPackagesProvider.overrideWithBuild(
-      (_, _) => config.definedPackages,
-    ),
+    definedPackagesProvider.overrideWithBuild((_, _) => config.definedPackages),
   ];
 }

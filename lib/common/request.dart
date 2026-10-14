@@ -82,7 +82,11 @@ class Request {
       final version = globalState.packageInfo.version;
       final buildNumber = globalState.packageInfo.buildNumber;
       final hasUpdate =
-          utils.compareVersions(remoteVersion.replaceAll('v', ''), '$version+$buildNumber') > 0;
+          utils.compareVersions(
+            remoteVersion.replaceAll('v', ''),
+            '$version+$buildNumber',
+          ) >
+          0;
       if (!hasUpdate) return null;
       return data;
     } catch (e) {

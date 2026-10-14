@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,6 +25,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   final _username = TextEditingController();
   final _password = TextEditingController();
   Timer? _sessionTimer;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
+  List<ConnectivityResult>? _lastConnectivity;
 
   @override
   void initState() {
@@ -36,11 +40,21 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
       const Duration(minutes: 15),
       (_) => ref.read(harmonySimpleProvider.notifier).checkSession(),
     );
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      if (_lastConnectivity != null && listEquals(_lastConnectivity, results)) {
+        return;
+      }
+      _lastConnectivity = results;
+      ref
+          .read(harmonySimpleProvider.notifier)
+          .reportNetworkConnectivity(results);
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _connectivitySub?.cancel();
     _sessionTimer?.cancel();
     _username.dispose();
     _password.dispose();
@@ -50,7 +64,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(ref.read(harmonySimpleProvider.notifier).checkSession());
+      unawaited(ref.read(harmonySimpleProvider.notifier).onAppResumed());
     }
   }
 
@@ -127,7 +141,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   }
 
   ConnectionPhase _phase(HarmonySimpleState ui, bool running) {
-    if (ui.error != null && !ui.busy && !running) {
+    if ((ui.error != null || ui.issue != null) && !ui.busy && !running) {
       return ConnectionPhase.error;
     }
     if (ui.busy) {
@@ -162,6 +176,9 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   usingCachedConfig: ui.usingCachedConfig,
                   nodeName: nodeName,
                   nodeDelayMs: nodeDelay,
+                  homeStatus: ui.homeStatus,
+                  issue: ui.issue,
+                  showReconnectHint: !running,
                   onToggle: ready && !ui.bootstrapping
                       ? () => ref
                             .read(harmonySimpleProvider.notifier)
@@ -172,6 +189,10 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   onRetry: () =>
                       ref.read(harmonySimpleProvider.notifier).retryConnect(),
                   onSwitchNode: running ? _showNodeSwitcher : null,
+                  configFreshness: ui.homeStatus.configFreshness,
+                  onConfigRefresh: () => ref
+                      .read(harmonySimpleProvider.notifier)
+                      .forceRefreshConfig(),
                 )
               : AutofillGroup(
                   child: Form(
