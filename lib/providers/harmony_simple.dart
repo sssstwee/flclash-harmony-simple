@@ -535,13 +535,20 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> checkConfigVersion({bool force = false}) async {
-    if (_api.session == null || state.busy || _versionCheckInFlight) return;
+    if (!ref.mounted ||
+        _api.session == null ||
+        state.busy ||
+        _versionCheckInFlight) {
+      return;
+    }
     if (!force && !_isVersionCheckDue()) return;
     _versionCheckInFlight = true;
     _bindConfigFetchRoute();
     try {
       final localVersion = await _api.readConfigVersion();
+      if (!ref.mounted) return;
       final remote = await _api.fetchConfigVersionInfo();
+      if (!ref.mounted) return;
       if (remote != null) {
         _minCheckInterval = remote.minCheckInterval;
         await _api.saveMinCheckInterval(remote.minCheckInterval);
@@ -552,6 +559,7 @@ class HarmonySimple extends _$HarmonySimple {
       } else {
         needsDownload = !await _api.probeConfigNotModified();
       }
+      if (!ref.mounted) return;
       _versionCheckFailures = 0;
       _lastVersionCheckAt = DateTime.now();
       _markConfigUpToDate(checkedAt: _lastVersionCheckAt);
@@ -569,6 +577,7 @@ class HarmonySimple extends _$HarmonySimple {
         );
       }
     } on HarmonyAccountError catch (error) {
+      if (!ref.mounted) return;
       if (error == HarmonyAccountError.expired) {
         await logout(expired: true);
         return;
@@ -577,6 +586,7 @@ class HarmonySimple extends _$HarmonySimple {
       _lastVersionCheckAt = DateTime.now();
       _markConfigCheckFailed(error);
     } catch (_) {
+      if (!ref.mounted) return;
       _versionCheckFailures++;
       _lastVersionCheckAt = DateTime.now();
       _markConfigCheckFailed(HarmonyAccountError.unavailable);
@@ -602,7 +612,9 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> _markConfigUpToDate({DateTime? checkedAt}) async {
+    if (!ref.mounted) return;
     final version = shortConfigVersionLabel(await _api.readConfigVersion());
+    if (!ref.mounted) return;
     _setConfigFreshness(
       state.homeStatus.configFreshness.copyWith(
         kind: HarmonyConfigFreshnessKind.upToDate,
@@ -614,6 +626,7 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   void _markConfigCheckFailed(HarmonyAccountError error) {
+    if (!ref.mounted) return;
     final reason = switch (error) {
       HarmonyAccountError.rateLimited =>
         currentAppLocalizations.harmonyConfigCheckReasonRateLimit,
@@ -631,6 +644,7 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   void _setConfigFreshness(HarmonyConfigFreshness freshness) {
+    if (!ref.mounted) return;
     state = state.copyWith(
       homeStatus: state.homeStatus.copyWith(configFreshness: freshness),
     );
