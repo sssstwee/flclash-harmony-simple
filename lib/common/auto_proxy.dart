@@ -119,9 +119,9 @@ Future<AutoSelectOutcome?> autoSelectProxy(
       } on TimeoutException {
         delays[name] = null;
         return null;
-      } catch (error) {
+      } catch (_) {
         delays[name] = null;
-        rethrow;
+        return null;
       }
     });
   }
