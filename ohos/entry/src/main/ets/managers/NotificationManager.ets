@@ -63,14 +63,16 @@ export default class NotificationManager {
   }
 
   subscribe(): Promise<void> {
-    return this.lock.acquire(this.context.abilityInfo.name).then((unlock: () => void) => {
+    return this.lock.acquire(this.context.abilityInfo.name).then((unlock: () => void): Promise<void> => {
       this.unlock = unlock
-      if (globalState.runState === RunState.start) this.startContinuousTask()
-      return commonEventManager.subscribe(this.subscriber, (commonEventData: commonEventManager.CommonEventData) => {
+      if (globalState.runState === RunState.start) {
+        void this.startContinuousTask()
+      }
+      return commonEventManager.subscribeToEvent(this.subscriber, (commonEventData: commonEventManager.CommonEventData) => {
         if (commonEventData.event === 'SERVICE_START') {
-          this.startContinuousTask()
+          void this.startContinuousTask()
         } else if (commonEventData.event === 'SERVICE_STOP') {
-          this.stopContinuousTask()
+          void this.stopContinuousTask()
           this.clearNotification()
         }
       }).catch((err: Error) => {

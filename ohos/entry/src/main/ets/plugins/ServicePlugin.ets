@@ -32,7 +32,7 @@ export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
     this.notificationActionSubscriber = commonEventManager.createSubscriberSync({
       events: ['HARMONY_NOTIF_ACTION'],
     } as commonEventManager.CommonEventSubscribeInfo)
-    commonEventManager.subscribe(this.notificationActionSubscriber, (event: commonEventManager.CommonEventData) => {
+    commonEventManager.subscribeToEvent(this.notificationActionSubscriber, (event: commonEventManager.CommonEventData) => {
       const action = event.data ?? ''
       if (action) this.channel?.invokeMethod('notificationAction', action)
     })
