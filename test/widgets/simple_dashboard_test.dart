@@ -282,16 +282,16 @@ void main() {
       scoped(
         api: SignedOutApi(),
         child: app(
-          const MediaQuery(
-            data: MediaQueryData(disableAnimations: true),
+          MediaQuery(
+            data: const MediaQueryData(disableAnimations: true),
             child: SimpleConnectionPanel(
               phase: ConnectionPhase.disconnected,
               username: 'harmony',
-              configFreshness: HarmonyConfigFreshness(
+              configFreshness: const HarmonyConfigFreshness(
                 kind: HarmonyConfigFreshnessKind.discoveringUpdate,
                 refreshInProgress: true,
               ),
-              homeStatus: HarmonyHomeStatus(configSyncInProgress: true),
+              homeStatus: const HarmonyHomeStatus(configSyncInProgress: true),
               onConfigRefresh: () {},
             ),
           ),
