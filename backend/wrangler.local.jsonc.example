@@ -7,7 +7,7 @@
     "nodejs_compat"
   ],
   "workers_dev": false,
-  "triggers": { "crons": ["*/5 * * * *"] },
+  "triggers": { "crons": [] },
   "vars": {
     "AUTH_ORIGIN": "https://YOUR-PAGES-OR-WORKERS-ORIGIN.example"
   },

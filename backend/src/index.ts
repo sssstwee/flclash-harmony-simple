@@ -1,4 +1,6 @@
-import { syncSubscription } from './subscription_sync';
+import { timingSafeEqual } from 'node:crypto';
+import { SUBSCRIPTION_MAX_BYTES, validateSubscription } from './subscription_sync';
+import { configUpsertSql } from './config_write.mjs';
 import { createAuth } from './auth';
 import {
   DEFAULT_MIN_CHECK_SECONDS,
@@ -171,12 +173,13 @@ async function loadConfigFor(user: AuthenticatedUser, env: Env): Promise<Authori
 }
 
 export default {
-  async scheduled(_controller, env, ctx) {
-    ctx.waitUntil(syncSubscription(env));
-  },
   async fetch(request, env, ctx) {
     try {
       const path = new URL(request.url).pathname;
+
+      if (path === '/v1/admin/subscription' && request.method === 'POST') {
+        return await pushSubscription(request, env);
+      }
 
       if (path === '/health' && request.method === 'GET') {
         return Response.json({ status: 'ok', app: '小猫AI代理' });
@@ -312,4 +315,56 @@ async function readLimited(request: Request, max: number): Promise<ArrayBuffer |
     offset += part.byteLength;
   }
   return result.buffer;
+}
+
+// Hash both credentials to fixed-size buffers before constant-time comparison.
+async function validPushToken(request: Request, secret: string | undefined): Promise<boolean> {
+  if (!secret) return false;
+  const authorization = request.headers.get('Authorization') ?? '';
+  const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  const digest = (value: string) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  const [expected, actual] = await Promise.all([digest(secret), digest(supplied)]);
+  return timingSafeEqual(new Uint8Array(expected), new Uint8Array(actual)) && authorization.startsWith('Bearer ');
+}
+
+async function pushSubscription(request: Request, env: Env): Promise<Response> {
+  if (!await validPushToken(request, env.SUBSCRIPTION_PUSH_TOKEN)) return failure('UNAUTHORIZED', 401);
+  const params = new URL(request.url).searchParams;
+  const scope = params.get('scope') ?? 'default';
+  const key = params.get('key') ?? '';
+  if (![...params.keys()].every(name => name === 'scope' || name === 'key') ||
+      params.getAll('scope').length > 1 || params.getAll('key').length > 1 ||
+      !['default', 'user', 'group'].includes(scope) ||
+      (scope === 'default' ? key !== '' : !key.trim()) ||
+      key.length > 128 || /[\x00-\x1f\x7f]/.test(key)) return failure('INVALID_SCOPE', 400);
+
+  // A single atomic counter shared by all scopes and Worker isolates.
+  const minute = Math.floor(Date.now() / 60_000);
+  const quota = await env.DB.prepare(
+    'INSERT INTO subscription_push_rate_limit (id, minute, count) VALUES (1, ?, 1) ' +
+    'ON CONFLICT(id) DO UPDATE SET minute=excluded.minute, count=CASE WHEN minute=excluded.minute THEN count+1 ELSE 1 END ' +
+    'WHERE minute != excluded.minute OR count < 10 RETURNING count',
+  ).bind(minute).first();
+  if (!quota) return failure('RATE_LIMITED', 429);
+  const body = await readLimited(request, SUBSCRIPTION_MAX_BYTES);
+  if (body === null) return failure('BODY_TOO_LARGE', 413);
+  let content: string;
+  try {
+    content = new TextDecoder('utf-8', { fatal: true }).decode(body);
+    validateSubscription(content);
+  } catch { return failure('INVALID_SUBSCRIPTION', 400); }
+
+  // D1 batch is a transaction; the existing trigger backs up a changed row.
+  const [previous, written] = await env.DB.batch([
+    env.DB.prepare('SELECT content FROM proxy_config WHERE scope=? AND scope_key=?').bind(scope, key),
+    env.DB.prepare(configUpsertSql(['?', '?', '?', '?']))
+      .bind(scope, key, content, new Date().toISOString()),
+  ]);
+  const old = previous.results[0] as { content: string } | undefined;
+  const meta = (value: string) => configRowMeta({ scope, scope_key: key, content: value });
+  return Response.json({
+    changed: written.meta.changes > 0,
+    oldVersion: old ? (await meta(old.content)).version : null,
+    newVersion: (await meta(content)).version,
+  }, { headers: { 'Cache-Control': 'no-store' } });
 }
