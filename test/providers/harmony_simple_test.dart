@@ -119,7 +119,8 @@ class _Api extends HarmonyAccountApi {
     if (commitFailure != null) {
       throw commitFailure!;
     }
-    if (session?.token != expectedToken || session?.username != value.username) {
+    if (session?.token != expectedToken ||
+        session?.username != value.username) {
       throw HarmonyAccountError.expired;
     }
     commits++;
@@ -381,7 +382,11 @@ class _Harness {
           {'name': 'fast', 'type': 'trojan'},
         ],
         'proxy-groups': [
-          {'name': 'Main', 'type': 'select', 'proxies': ['fast']},
+          {
+            'name': 'Main',
+            'type': 'select',
+            'proxies': ['fast'],
+          },
         ],
       };
     });
@@ -398,36 +403,33 @@ void main() {
     await AppLocalizations.load(const Locale('zh', 'CN'));
   });
 
-  test('runtime platform and core routing boundary work without swallowed errors', () async {
-    final harness = _Harness();
-    harness.installRoute();
-    // Keep the platform and routing boundary outside the notifier's
-    // user-facing catch so runtime compatibility failures have a useful stack.
-    // Test-only diagnostic for the fork SDK / host runtime compatibility edge.
-    try {
-      expect(Platform.isOhos, Platform.operatingSystem == 'ohos');
-    } on NoSuchMethodError catch (error, stack) {
-      expect(error.toString(), contains('isOhos'));
-      debugPrint('Host runtime lacks the legacy Platform.isOhos getter: $error');
-      debugPrintStack(stackTrace: stack);
-    }
-    expect(system.isOhos, Platform.operatingSystem == 'ohos');
-    final config = await harness.container.read(harmonyCoreControllerProvider).getConfig(7);
-    final rules = system.isOhos
-        ? defaultRoutingRules(config)
-        : List<String>.from(config['rules']);
-    final groups = harness.container.read(groupsProvider);
-    expect(groups, hasLength(1));
-    final group = connectionGroup(groups, rules);
-    expect(group, isNotNull);
-    final root = group!;
-    final selected = await autoSelectProxy(root, groups, (name) async {
-      final delay = await harness.controller.getDelay(root.testUrl!, name);
-      return delay.value;
-    });
-    expect(selected?.name, 'fast');
-    expect(harness.events, ['read-config', 'probe']);
-  });
+  test(
+    'runtime platform and core routing boundary work without swallowed errors',
+    () async {
+      final harness = _Harness();
+      harness.installRoute();
+      // Keep the platform and routing boundary outside the notifier's
+      // user-facing catch so runtime compatibility failures have a useful stack.
+      expect(system.isOhos, Platform.operatingSystem == 'ohos');
+      final config = await harness.container
+          .read(harmonyCoreControllerProvider)
+          .getConfig(7);
+      final rules = system.isOhos
+          ? defaultRoutingRules(config)
+          : List<String>.from(config['rules']);
+      final groups = harness.container.read(groupsProvider);
+      expect(groups, hasLength(1));
+      final group = connectionGroup(groups, rules);
+      expect(group, isNotNull);
+      final root = group!;
+      final selected = await autoSelectProxy(root, groups, (name) async {
+        final delay = await harness.controller.getDelay(root.testUrl!, name);
+        return delay.value;
+      });
+      expect(selected?.name, 'fast');
+      expect(harness.events, ['read-config', 'probe']);
+    },
+  );
 
   test('credential failure clears busy using the real notifier', () async {
     final harness = _Harness();
@@ -436,111 +438,150 @@ void main() {
 
     await harness.notifier.login('alice', 'wrong');
 
-    expect(harness.state.error, AppLocalizations.current.harmonyCredentialsError);
+    expect(
+      harness.state.error,
+      AppLocalizations.current.harmonyCredentialsError,
+    );
     expect(harness.state.busy, isFalse);
     expect(harness.state.session, isNull);
   });
 
-  test('validation failure never commits validators and a retry downloads again', () async {
-    final harness = _Harness();
-    harness.files.saveFailure = HarmonyAccountError.config;
-    harness.api.downloads.addAll([
-      HarmonyConfigDownload(bytes: _config, etag: '"new"', lastModified: 'new-date'),
-      HarmonyConfigDownload(bytes: _config, etag: '"new"', lastModified: 'new-date'),
-    ]);
+  test(
+    'validation failure never commits validators and a retry downloads again',
+    () async {
+      final harness = _Harness();
+      harness.files.saveFailure = HarmonyAccountError.config;
+      harness.api.downloads.addAll([
+        HarmonyConfigDownload(
+          bytes: _config,
+          etag: '"new"',
+          lastModified: 'new-date',
+        ),
+        HarmonyConfigDownload(
+          bytes: _config,
+          etag: '"new"',
+          lastModified: 'new-date',
+        ),
+      ]);
 
-    await harness.notifier.bootstrap();
-    expect(harness.api.commits, 0);
-    expect(harness.api.metadata, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.error, AppLocalizations.current.harmonyConfigError);
+      await harness.notifier.bootstrap();
+      expect(harness.api.commits, 0);
+      expect(harness.api.metadata, isNull);
+      expect(harness.state.remoteProfile, isNull);
+      expect(harness.state.error, AppLocalizations.current.harmonyConfigError);
 
-    harness.files.saveFailure = null;
-    await harness.notifier.bootstrap();
+      harness.files.saveFailure = null;
+      await harness.notifier.bootstrap();
 
-    expect(harness.api.requests.map((request) => request.etag), [null, null]);
-    expect(harness.api.commits, 1);
-    expect(harness.api.metadata?.lastModified, 'new-date');
-    expect(harness.state.remoteProfile, isNotNull);
-    expect(harness.state.error, isNull);
-    expect(harness.events.sublist(harness.events.length - 4), ['core-ready', 'save', 'put', 'commit']);
-  });
+      expect(harness.api.requests.map((request) => request.etag), [null, null]);
+      expect(harness.api.commits, 1);
+      expect(harness.api.metadata?.lastModified, 'new-date');
+      expect(harness.state.remoteProfile, isNotNull);
+      expect(harness.state.error, isNull);
+      expect(harness.events.sublist(harness.events.length - 4), [
+        'core-ready',
+        'save',
+        'put',
+        'commit',
+      ]);
+    },
+  );
 
-  test('database persistence failure cannot acknowledge downloaded validators', () async {
-    final harness = _Harness();
-    harness.profiles.putFailure = StateError('database unavailable');
-    harness.api.downloads.add(HarmonyConfigDownload(bytes: _config, etag: '"new"'));
+  test(
+    'database persistence failure cannot acknowledge downloaded validators',
+    () async {
+      final harness = _Harness();
+      harness.profiles.putFailure = StateError('database unavailable');
+      harness.api.downloads.add(
+        HarmonyConfigDownload(bytes: _config, etag: '"new"'),
+      );
 
-    await harness.notifier.bootstrap();
+      await harness.notifier.bootstrap();
 
-    expect(harness.api.commits, 0);
-    expect(harness.api.metadata, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.bootstrapping, isFalse);
-    expect(harness.state.error, isNotNull);
-  });
+      expect(harness.api.commits, 0);
+      expect(harness.api.metadata, isNull);
+      expect(harness.state.remoteProfile, isNull);
+      expect(harness.state.bootstrapping, isFalse);
+      expect(harness.state.error, isNotNull);
+    },
+  );
 
-  test('online 304 selects a verified cache without marking it offline', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+  test(
+    'online 304 selects a verified cache without marking it offline',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
 
-    await harness.notifier.bootstrap();
+      await harness.notifier.bootstrap();
 
-    expect(harness.api.requests.single.etag, '"accepted-etag"');
-    expect(harness.state.remoteProfile?.id, 7);
-    expect(harness.state.usingCachedConfig, isFalse);
-    expect(harness.container.read(currentProfileIdProvider), 7);
-    expect(harness.events, isNot(contains('save')));
-    expect(harness.state.error, isNull);
-  });
+      expect(harness.api.requests.single.etag, '"accepted-etag"');
+      expect(harness.state.remoteProfile?.id, 7);
+      expect(harness.state.usingCachedConfig, isFalse);
+      expect(harness.container.read(currentProfileIdProvider), 7);
+      expect(harness.events, isNot(contains('save')));
+      expect(harness.state.error, isNull);
+    },
+  );
 
-  test('missing cache retries an unsolicited 304 once without validators', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.api.metadata = _metadata();
-    harness.api.downloads.addAll([
-      const HarmonyConfigDownload(notModified: true),
-      HarmonyConfigDownload(bytes: _config, etag: '"fresh"'),
-    ]);
+  test(
+    'missing cache retries an unsolicited 304 once without validators',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.api.metadata = _metadata();
+      harness.api.downloads.addAll([
+        const HarmonyConfigDownload(notModified: true),
+        HarmonyConfigDownload(bytes: _config, etag: '"fresh"'),
+      ]);
 
-    await harness.notifier.bootstrap();
+      await harness.notifier.bootstrap();
 
-    expect(harness.api.requests, hasLength(2));
-    expect(harness.api.requests.map((request) => request.etag), [null, null]);
-    expect(harness.state.remoteProfile, isNotNull);
-    expect(harness.api.metadata?.etag, '"fresh"');
-    expect(harness.state.usingCachedConfig, isFalse);
-  });
+      expect(harness.api.requests, hasLength(2));
+      expect(harness.api.requests.map((request) => request.etag), [null, null]);
+      expect(harness.state.remoteProfile, isNotNull);
+      expect(harness.api.metadata?.etag, '"fresh"');
+      expect(harness.state.usingCachedConfig, isFalse);
+    },
+  );
 
-  test('a second bodyless 304 is a config error, not an infinite retry', () async {
-    final harness = _Harness();
-    harness.api.downloads.addAll([
-      const HarmonyConfigDownload(notModified: true),
-      const HarmonyConfigDownload(notModified: true),
-    ]);
+  test(
+    'a second bodyless 304 is a config error, not an infinite retry',
+    () async {
+      final harness = _Harness();
+      harness.api.downloads.addAll([
+        const HarmonyConfigDownload(notModified: true),
+        const HarmonyConfigDownload(notModified: true),
+      ]);
 
-    await harness.notifier.bootstrap();
+      await harness.notifier.bootstrap();
 
-    expect(harness.api.requests, hasLength(2));
-    expect(harness.api.commits, 0);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.error, AppLocalizations.current.harmonyConfigError);
-    expect(harness.state.bootstrapping, isFalse);
-  });
+      expect(harness.api.requests, hasLength(2));
+      expect(harness.api.commits, 0);
+      expect(harness.state.remoteProfile, isNull);
+      expect(harness.state.error, AppLocalizations.current.harmonyConfigError);
+      expect(harness.state.bootstrapping, isFalse);
+    },
+  );
 
-  test('transport unavailability can use only an account-bound verified cache', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    harness.api.downloads.add(HarmonyAccountError.unavailable);
+  test(
+    'transport unavailability can use only an account-bound verified cache',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(HarmonyAccountError.unavailable);
 
-    await harness.notifier.bootstrap();
+      await harness.notifier.bootstrap();
 
-    expect(harness.state.remoteProfile?.id, 7);
-    expect(harness.state.usingCachedConfig, isTrue);
-    expect(harness.state.error, isNull);
-  });
+      expect(harness.state.remoteProfile?.id, 7);
+      expect(harness.state.usingCachedConfig, isTrue);
+      expect(harness.state.error, isNull);
+    },
+  );
 
-  for (final error in [HarmonyAccountError.config, HarmonyAccountError.rateLimited]) {
+  for (final error in [
+    HarmonyAccountError.config,
+    HarmonyAccountError.rateLimited,
+  ]) {
     test('$error does not silently activate the offline fallback', () async {
       final harness = _Harness(initial: [_profile()]);
       harness.cache();
@@ -549,201 +590,249 @@ void main() {
       await harness.notifier.bootstrap();
 
       expect(harness.state.usingCachedConfig, isFalse);
-      expect(harness.state.error, error == HarmonyAccountError.config
-          ? AppLocalizations.current.harmonyConfigError
-          : AppLocalizations.current.harmonyRateLimited);
+      expect(
+        harness.state.error,
+        error == HarmonyAccountError.config
+            ? AppLocalizations.current.harmonyConfigError
+            : AppLocalizations.current.harmonyRateLimited,
+      );
       expect(harness.events, isNot(contains('start')));
     });
   }
 
   for (final badCache in ['wrong-account', 'corrupt', 'empty', 'missing']) {
-    test('$badCache cache is neither conditionally requested nor used offline', () async {
+    test(
+      '$badCache cache is neither conditionally requested nor used offline',
+      () async {
+        final harness = _Harness(initial: [_profile()]);
+        harness.cache(username: badCache == 'wrong-account' ? 'bob' : 'alice');
+        if (badCache == 'corrupt') {
+          harness.files.bytes[7] = Uint8List.fromList([99]);
+        }
+        if (badCache == 'empty') {
+          harness.files.bytes[7] = Uint8List(0);
+        }
+        if (badCache == 'missing') {
+          harness.files.bytes.remove(7);
+        }
+        harness.api.downloads.add(HarmonyAccountError.unavailable);
+
+        await harness.notifier.bootstrap();
+
+        expect(harness.api.requests.single.etag, isNull);
+        expect(harness.state.remoteProfile, isNull);
+        expect(harness.state.usingCachedConfig, isFalse);
+        expect(harness.files.deleted, contains(7));
+      },
+    );
+  }
+
+  test(
+    'logout completes UI cleanup even if storage, stop and profile cleanup fail',
+    () async {
       final harness = _Harness(initial: [_profile()]);
-      harness.cache(username: badCache == 'wrong-account' ? 'bob' : 'alice');
-      if (badCache == 'corrupt') harness.files.bytes[7] = Uint8List.fromList([99]);
-      if (badCache == 'empty') harness.files.bytes[7] = Uint8List(0);
-      if (badCache == 'missing') harness.files.bytes.remove(7);
-      harness.api.downloads.add(HarmonyAccountError.unavailable);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.api.logoutFailure = StateError('keystore unavailable');
+      harness.setup.stopFailure = StateError('core unavailable');
+      harness.profiles.deleteFailure = StateError('database unavailable');
+      harness.files.deleteFailure = StateError('filesystem unavailable');
+
+      await harness.notifier.logout();
+
+      expect(harness.state.busy, isFalse);
+      expect(harness.state.disconnecting, isFalse);
+      expect(harness.state.bootstrapping, isFalse);
+      expect(harness.state.session, isNull);
+      expect(harness.state.remoteProfile, isNull);
+      expect(harness.state.usingCachedConfig, isFalse);
+      expect(harness.api.isAuthorized, isFalse);
+      expect(harness.files.deleted, contains(7));
+    },
+  );
+
+  test(
+    'config authorization expiry during bootstrap signs out and deletes cache',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(HarmonyAccountError.expired);
 
       await harness.notifier.bootstrap();
 
-      expect(harness.api.requests.single.etag, isNull);
-      expect(harness.state.remoteProfile, isNull);
-      expect(harness.state.usingCachedConfig, isFalse);
-      expect(harness.files.deleted, contains(7));
-    });
-  }
-
-  test('logout completes UI cleanup even if storage, stop and profile cleanup fail', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
-    await harness.notifier.bootstrap();
-    harness.api.logoutFailure = StateError('keystore unavailable');
-    harness.setup.stopFailure = StateError('core unavailable');
-    harness.profiles.deleteFailure = StateError('database unavailable');
-    harness.files.deleteFailure = StateError('filesystem unavailable');
-
-    await harness.notifier.logout();
-
-    expect(harness.state.busy, isFalse);
-    expect(harness.state.disconnecting, isFalse);
-    expect(harness.state.bootstrapping, isFalse);
-    expect(harness.state.session, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.usingCachedConfig, isFalse);
-    expect(harness.api.isAuthorized, isFalse);
-    expect(harness.files.deleted, contains(7));
-  });
-
-  test('config authorization expiry during bootstrap signs out and deletes cache', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    harness.api.downloads.add(HarmonyAccountError.expired);
-
-    await harness.notifier.bootstrap();
-
-    expect(harness.api.logouts, 1);
-    expect(harness.state.session, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.error, AppLocalizations.current.harmonySessionExpired);
-    expect(harness.state.busy, isFalse);
-    expect(harness.state.bootstrapping, isFalse);
-  });
-
-  test('logout during a download cannot restore a profile or commit cache', () async {
-    final harness = _Harness();
-    final response = Completer<HarmonyConfigDownload>();
-    final downloading = Completer<void>();
-    harness.api.downloads.add(response.future);
-    harness.api.downloadStarted = () => downloading.complete();
-    final bootstrapping = harness.notifier.bootstrap();
-    await downloading.future;
-    await harness.notifier.logout();
-    response.complete(HarmonyConfigDownload(bytes: _config, etag: '"late"'));
-    await bootstrapping;
-
-    expect(harness.api.commits, 0);
-    expect(harness.state.session, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.busy, isFalse);
-    expect(harness.state.bootstrapping, isFalse);
-    expect(harness.events, isNot(contains('save')));
-  });
-
-  test('logout during cached-file verification cannot resurrect that profile', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    final reading = Completer<void>();
-    final read = Completer<Uint8List?>();
-    harness.files.readHook = (_) {
-      if (!reading.isCompleted) {
-        reading.complete();
-      }
-      return read.future;
-    };
-    final bootstrapping = harness.notifier.bootstrap();
-    await reading.future;
-    await harness.notifier.logout();
-    read.complete(_config);
-    await bootstrapping;
-
-    expect(harness.state.session, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.usingCachedConfig, isFalse);
-    expect(harness.api.requests, isEmpty);
-  });
-
-  for (final stage in ['save', 'database']) {
-    test('logout joins an in-flight $stage before deleting its profile', () async {
-      final harness = _Harness();
-      final entered = Completer<void>();
-      final release = Completer<void>();
-      if (stage == 'save') {
-        harness.files.saveHook = (_, _) {
-          entered.complete();
-          return release.future;
-        };
-      } else {
-        harness.profiles.putHook = (_) {
-          entered.complete();
-          return release.future;
-        };
-      }
-      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config, etag: '"late"'));
-      final bootstrapping = harness.notifier.bootstrap();
-      await entered.future;
-      final loggingOut = harness.notifier.logout();
+      expect(harness.api.logouts, 1);
       expect(harness.state.session, isNull);
-      expect(harness.api.isAuthorized, isFalse);
-      expect(harness.state.busy, isTrue);
-      release.complete();
-      await Future.wait([bootstrapping, loggingOut]);
+      expect(harness.state.remoteProfile, isNull);
+      expect(
+        harness.state.error,
+        AppLocalizations.current.harmonySessionExpired,
+      );
+      expect(harness.state.busy, isFalse);
+      expect(harness.state.bootstrapping, isFalse);
+    },
+  );
+
+  test(
+    'logout during a download cannot restore a profile or commit cache',
+    () async {
+      final harness = _Harness();
+      final response = Completer<HarmonyConfigDownload>();
+      final downloading = Completer<void>();
+      harness.api.downloads.add(response.future);
+      harness.api.downloadStarted = () => downloading.complete();
+      final bootstrapping = harness.notifier.bootstrap();
+      await downloading.future;
+      await harness.notifier.logout();
+      response.complete(HarmonyConfigDownload(bytes: _config, etag: '"late"'));
+      await bootstrapping;
 
       expect(harness.api.commits, 0);
-      expect(harness.container.read(profilesProvider), isEmpty);
-      expect(harness.files.bytes, isEmpty);
       expect(harness.state.session, isNull);
       expect(harness.state.remoteProfile, isNull);
       expect(harness.state.busy, isFalse);
       expect(harness.state.bootstrapping, isFalse);
-    });
+      expect(harness.events, isNot(contains('save')));
+    },
+  );
+
+  test(
+    'logout during cached-file verification cannot resurrect that profile',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      final reading = Completer<void>();
+      final read = Completer<Uint8List?>();
+      harness.files.readHook = (_) {
+        if (!reading.isCompleted) {
+          reading.complete();
+        }
+        return read.future;
+      };
+      final bootstrapping = harness.notifier.bootstrap();
+      await reading.future;
+      await harness.notifier.logout();
+      read.complete(_config);
+      await bootstrapping;
+
+      expect(harness.state.session, isNull);
+      expect(harness.state.remoteProfile, isNull);
+      expect(harness.state.usingCachedConfig, isFalse);
+      expect(harness.api.requests, isEmpty);
+    },
+  );
+
+  for (final stage in ['save', 'database']) {
+    test(
+      'logout joins an in-flight $stage before deleting its profile',
+      () async {
+        final harness = _Harness();
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        if (stage == 'save') {
+          harness.files.saveHook = (_, _) {
+            entered.complete();
+            return release.future;
+          };
+        } else {
+          harness.profiles.putHook = (_) {
+            entered.complete();
+            return release.future;
+          };
+        }
+        harness.api.downloads.add(
+          HarmonyConfigDownload(bytes: _config, etag: '"late"'),
+        );
+        final bootstrapping = harness.notifier.bootstrap();
+        await entered.future;
+        final loggingOut = harness.notifier.logout();
+        expect(harness.state.session, isNull);
+        expect(harness.api.isAuthorized, isFalse);
+        expect(harness.state.busy, isTrue);
+        release.complete();
+        await Future.wait([bootstrapping, loggingOut]);
+
+        expect(harness.api.commits, 0);
+        expect(harness.container.read(profilesProvider), isEmpty);
+        expect(harness.files.bytes, isEmpty);
+        expect(harness.state.session, isNull);
+        expect(harness.state.remoteProfile, isNull);
+        expect(harness.state.busy, isFalse);
+        expect(harness.state.bootstrapping, isFalse);
+      },
+    );
   }
 
-  test('connect errors clear busy even when the native stop operation also fails', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
-    await harness.notifier.bootstrap();
-    harness.api.downloads.add(HarmonyAccountError.rateLimited);
-    harness.setup.stopFailure = StateError('native service unavailable');
+  test(
+    'connect errors clear busy even when the native stop operation also fails',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.api.downloads.add(HarmonyAccountError.rateLimited);
+      harness.setup.stopFailure = StateError('native service unavailable');
 
-    await harness.notifier.toggleConnect();
+      await harness.notifier.toggleConnect();
 
-    expect(harness.state.error, AppLocalizations.current.harmonyRateLimited);
-    expect(harness.state.busy, isFalse);
-    expect(harness.state.disconnecting, isFalse);
-    expect(harness.state.usingCachedConfig, isFalse);
-    expect(harness.setup.starts, isEmpty);
-  });
+      expect(harness.state.error, AppLocalizations.current.harmonyRateLimited);
+      expect(harness.state.busy, isFalse);
+      expect(harness.state.disconnecting, isFalse);
+      expect(harness.state.usingCachedConfig, isFalse);
+      expect(harness.setup.starts, isEmpty);
+    },
+  );
 
-  test('an expired periodic session check signs out without retaining profile access', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
-    await harness.notifier.bootstrap();
-    harness.api.restoreFailure = HarmonyAccountError.expired;
+  test(
+    'an expired periodic session check signs out without retaining profile access',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.api.restoreFailure = HarmonyAccountError.expired;
 
-    await harness.notifier.checkSession();
+      await harness.notifier.checkSession();
 
-    expect(harness.state.session, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.state.error, AppLocalizations.current.harmonySessionExpired);
-    expect(harness.state.busy, isFalse);
-    expect(harness.api.logouts, 1);
-  });
+      expect(harness.state.session, isNull);
+      expect(harness.state.remoteProfile, isNull);
+      expect(
+        harness.state.error,
+        AppLocalizations.current.harmonySessionExpired,
+      );
+      expect(harness.state.busy, isFalse);
+      expect(harness.api.logouts, 1);
+    },
+  );
 
-  test('connect applies once and preserves the selected route when starting', () async {
-    final harness = _Harness(initial: [_profile()]);
-    harness.cache();
-    harness.api.downloads.addAll([
-      const HarmonyConfigDownload(notModified: true),
-      const HarmonyConfigDownload(notModified: true),
-    ]);
-    await harness.notifier.bootstrap();
-    harness.installRoute();
+  test(
+    'connect applies once and preserves the selected route when starting',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.addAll([
+        const HarmonyConfigDownload(notModified: true),
+        const HarmonyConfigDownload(notModified: true),
+      ]);
+      await harness.notifier.bootstrap();
+      harness.installRoute();
 
-    await harness.notifier.toggleConnect();
+      await harness.notifier.toggleConnect();
 
-    expect(harness.state.error, isNull, reason: 'Connection events: ${harness.events}');
-    expect(harness.setup.applies, 1);
-    expect(harness.setup.starts, [(isInit: true, profileApplied: true)]);
-    expect(harness.proxies.changes, {'Main': 'fast'});
-    expect(harness.profiles.selections, {'Main': 'fast'});
-    expect(harness.container.read(isStartProvider), isTrue);
-    expect(harness.state.error, isNull);
-    expect(harness.state.busy, isFalse);
-  });
+      expect(
+        harness.state.error,
+        isNull,
+        reason: 'Connection events: ${harness.events}',
+      );
+      expect(harness.setup.applies, 1);
+      expect(harness.setup.starts, [(isInit: true, profileApplied: true)]);
+      expect(harness.proxies.changes, {'Main': 'fast'});
+      expect(harness.profiles.selections, {'Main': 'fast'});
+      expect(harness.container.read(isStartProvider), isTrue);
+      expect(harness.state.error, isNull);
+      expect(harness.state.busy, isFalse);
+    },
+  );
 
   test('a late successful probe cannot start VPN after logout', () async {
     final harness = _Harness(initial: [_profile()]);
@@ -765,12 +854,16 @@ void main() {
       probing.future,
       connecting.then((_) {
         if (!probing.isCompleted) {
-          fail('Connection ended before probing: ${harness.state.error}; events: ${harness.events}');
+          fail(
+            'Connection ended before probing: ${harness.state.error}; events: ${harness.events}',
+          );
         }
       }),
     ]);
     await harness.notifier.logout();
-    probe.complete(const Delay(name: 'fast', value: 1, url: 'https://example.test'));
+    probe.complete(
+      const Delay(name: 'fast', value: 1, url: 'https://example.test'),
+    );
     await connecting;
 
     expect(harness.setup.starts, isEmpty);

@@ -125,17 +125,12 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           dart run tool/generate_app_icon.dart
 
-      - name: Report regenerated sources
-        if: always()
+      - name: Check generated sources and formatting
         run: |
-          python3 - <<'PYGEN'
-          import base64, json, pathlib, subprocess
-          paths = subprocess.check_output(['git', 'diff', '--name-only', '-z']).decode().split('\0')
-          for name in paths:
-              path = pathlib.Path(name)
-              if name and path.is_file() and (name.startswith(('lib/', 'test/', 'tool/')) or name.endswith('.png')):
-                  print('GENERATED_SOURCE ' + json.dumps({'path': name, 'base64': base64.b64encode(path.read_bytes()).decode()}))
-          PYGEN
+          git diff --exit-code -- lib test tool assets/images/icon.png \
+            ohos/AppScope/resources/base/media/background.png \
+            ohos/AppScope/resources/base/media/foreground.png \
+            ohos/entry/src/main/resources/base/media/icon.png
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
