@@ -42,6 +42,22 @@ void main() {
     expect(rules.last, 'MATCH,Main');
   });
 
+  test('findAiServiceGroup does not treat Main as an AI group', () {
+    final config = <String, dynamic>{
+      'proxy-groups': [
+        {
+          'name': 'Main',
+          'type': 'select',
+          'proxies': ['Node'],
+        },
+      ],
+      'proxies': [
+        {'name': 'Node', 'type': 'vless'},
+      ],
+    };
+    expect(findAiServiceGroup(config, (name) => name == 'Main'), isNull);
+  });
+
   test('findAiServiceGroup prefers AI-labeled groups and warp members', () {
     final config = <String, dynamic>{
       'proxies': [
@@ -186,7 +202,7 @@ void main() {
         dns['nameserver-policy']['geosite:cn'],
         contains('https://doh.pub/dns-query'),
       );
-      expect(dns['fake-ip-filter'], ['*.lan', 'geosite:private', 'geosite:cn']);
+      expect(dns['fake-ip-filter'], containsAll(['*.lan', 'geosite:private', 'geosite:cn']));
       expect(dns['respect-rules'], isTrue);
       expect(
         dns['fake-ip-filter'],

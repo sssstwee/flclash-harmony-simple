@@ -102,14 +102,20 @@ String? findAiServiceGroup(
   final nodes = (config['proxies'] as List? ?? []).cast<Map>();
 
   bool nameHintsAi(String name) {
+    if (name.contains('🤖') || name.contains('智能')) return true;
     final lower = name.toLowerCase();
-    return lower.contains('ai') ||
-        lower.contains('gpt') ||
-        lower.contains('openai') ||
-        lower.contains('claude') ||
-        lower.contains('gemini') ||
-        name.contains('🤖') ||
-        name.contains('智能');
+    const keywords = [
+      'ai服务',
+      'ai-service',
+      'openai',
+      'chatgpt',
+      'claude',
+      'gemini',
+      'gpt',
+    ];
+    if (keywords.any(lower.contains)) return true;
+    // Avoid false positives such as "Main" matching substring "ai".
+    return RegExp(r'(?:^|[^a-zA-Z])ai(?:[^a-zA-Z]|$)').hasMatch(name);
   }
 
   bool nameHintsWarp(String name) {
