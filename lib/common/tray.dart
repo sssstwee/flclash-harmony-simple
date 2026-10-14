@@ -53,7 +53,7 @@ class Tray {
       isTemplate: system.isMacOS,
     );
     if (!Platform.isLinux) {
-      await trayManager.setToolTip(appName);
+      await trayManager.setToolTip(appDisplayName);
     }
   }
 

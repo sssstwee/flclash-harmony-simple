@@ -291,11 +291,11 @@ class Utils {
   }
 
   String getBackupFileName() {
-    return '${appName}_backup_${DateTime.now().show}.zip';
+    return '${appDisplayName}_backup_${DateTime.now().show}.zip';
   }
 
   String get logFile {
-    return '${appName}_${DateTime.now().show}.log';
+    return '${appDisplayName}_${DateTime.now().show}.log';
   }
 
   Future<String?> getLocalIpAddress() async {

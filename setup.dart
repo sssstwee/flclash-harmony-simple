@@ -4,6 +4,14 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:path/path.dart' as p;
 
+// Change only the downloadable filename. app_name also controls native binary
+// lookup and installation identity in the pinned distributor.
+const artifactNameTemplate =
+    'xiaomao-ai-proxy-{{build_name}}-{{platform}}'
+    '{{#description}}-{{description}}{{/description}}'
+    '{{#is_installer}}-setup{{/is_installer}}'
+    '{{#ext}}.{{ext}}{{/ext}}';
+
 const _allTargets = <String, String>{
   'android': 'apk',
   'linux': 'deb', // appimage + rpm added for amd64 only
@@ -190,6 +198,8 @@ Future<int> _package(
       platform,
       '--targets',
       targets,
+      '--artifact-name',
+      artifactNameTemplate,
       if (androidArch != null)
         '--build-target-platform=${_androidFlutterTarget[androidArch]!}',
       if (flutterBuildArgs.isNotEmpty)
