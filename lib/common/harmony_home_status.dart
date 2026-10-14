@@ -1,4 +1,5 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:fl_clash/common/harmony_config_freshness.dart';
 
 /// Novice-facing home screen status (no settings required).
 enum HarmonyNetworkKind { wifi, cellular, other, unknown }
@@ -14,6 +15,7 @@ class HarmonyHomeStatus {
   final DateTime? lastConfigSyncAt;
   final DateTime? lastHealthCheckAt;
   final bool? lastHealthCheckOk;
+  final HarmonyConfigFreshness configFreshness;
 
   const HarmonyHomeStatus({
     this.routeKind,
@@ -24,6 +26,7 @@ class HarmonyHomeStatus {
     this.lastConfigSyncAt,
     this.lastHealthCheckAt,
     this.lastHealthCheckOk,
+    this.configFreshness = const HarmonyConfigFreshness(),
   });
 
   HarmonyHomeStatus copyWith({
@@ -37,6 +40,7 @@ class HarmonyHomeStatus {
     DateTime? lastHealthCheckAt,
     bool? lastHealthCheckOk,
     bool clearHealthCheck = false,
+    HarmonyConfigFreshness? configFreshness,
   }) {
     return HarmonyHomeStatus(
       routeKind: routeKind ?? this.routeKind,
@@ -54,6 +58,7 @@ class HarmonyHomeStatus {
       lastHealthCheckOk: clearHealthCheck
           ? null
           : (lastHealthCheckOk ?? this.lastHealthCheckOk),
+      configFreshness: configFreshness ?? this.configFreshness,
     );
   }
 

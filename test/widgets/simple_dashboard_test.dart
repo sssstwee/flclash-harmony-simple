@@ -6,6 +6,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/harmony_simple.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/simple.dart';
+import 'package:fl_clash/common/harmony_config_freshness.dart';
 import 'package:fl_clash/common/harmony_home_status.dart';
 import 'package:fl_clash/common/harmony_user_issue.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
@@ -244,6 +245,62 @@ void main() {
     expect(find.text('暂时无法更新订阅'), findsOneWidget);
     expect(find.textContaining('账号服务器暂时连不上'), findsOneWidget);
     expect(find.textContaining('点「连接」'), findsWidgets);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('config freshness row shows up-to-date text and refresh control', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.disconnected,
+            username: 'harmony',
+            configFreshness: HarmonyConfigFreshness(
+              kind: HarmonyConfigFreshnessKind.upToDate,
+              versionShort: 'abcd1234',
+              lastCheckedAt: DateTime(2026, 3, 20, 14, 30),
+            ),
+            onConfigRefresh: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('配置已是最新'), findsOneWidget);
+    expect(find.textContaining('abcd1234'), findsOneWidget);
+    expect(find.byKey(const Key('harmony_config_refresh')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('config freshness row shows updating state while syncing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.connected,
+            username: 'harmony',
+            configFreshness: const HarmonyConfigFreshness(
+              kind: HarmonyConfigFreshnessKind.discoveringUpdate,
+              refreshInProgress: true,
+            ),
+            homeStatus: const HarmonyHomeStatus(configSyncInProgress: true),
+            onConfigRefresh: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('发现新配置，正在更新…'), findsOneWidget);
+    expect(
+      tester.widget<IconButton>(find.byKey(const Key('harmony_config_refresh'))).onPressed,
+      isNull,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

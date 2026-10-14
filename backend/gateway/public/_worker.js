@@ -7,7 +7,13 @@ const SECURITY_HEADERS = {
 };
 
 function isAllowedPath(pathname) {
-  if (pathname === '/health' || pathname === '/v1/config') return true;
+  if (
+    pathname === '/health' ||
+    pathname === '/v1/config' ||
+    pathname === '/v1/config/version'
+  ) {
+    return true;
+  }
   return pathname.startsWith('/api/auth/');
 }
 

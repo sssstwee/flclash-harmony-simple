@@ -1,4 +1,9 @@
 import { createAuth } from './auth';
+import {
+  DEFAULT_MIN_CHECK_SECONDS,
+  configContentMeta,
+  etagMatches,
+} from './config_meta';
 
 const authRoutes = new Map([
   ['/api/auth/sign-in/username', 'POST'],
@@ -29,12 +34,15 @@ function failure(code: string, status: number) {
   return Response.json({ code }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-function configHeaders(updatedAt: string) {
+async function configHeaders(content: string, updatedAt: string) {
+  const meta = await configContentMeta(content);
   return {
     'Content-Type': 'application/yaml; charset=utf-8',
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff',
     'Last-Modified': new Date(updatedAt).toUTCString(),
+    ETag: meta.etag,
+    'X-Config-Version': meta.version,
   };
 }
 
@@ -124,6 +132,65 @@ function auditConfigFetch(
   );
 }
 
+async function notModifiedResponse(content: string, updatedAt: string) {
+  const meta = await configContentMeta(content);
+  return new Response(null, {
+    status: 304,
+    headers: {
+      'Cache-Control': 'private, no-store',
+      'Last-Modified': new Date(updatedAt).toUTCString(),
+      ETag: meta.etag,
+      'X-Config-Version': meta.version,
+    },
+  });
+}
+
+async function isConfigUnchanged(
+  config: ConfigRow,
+  request: Request,
+): Promise<boolean> {
+  const meta = await configContentMeta(config.content);
+  const ifNoneMatch = request.headers.get('If-None-Match');
+  if (ifNoneMatch && etagMatches(ifNoneMatch, meta.etag)) {
+    return true;
+  }
+  const ifModifiedSince = request.headers.get('If-Modified-Since');
+  if (ifModifiedSince) {
+    const serverSec = Math.floor(new Date(config.updated_at).getTime() / 1000);
+    const clientSec = Math.floor(new Date(ifModifiedSince).getTime() / 1000);
+    if (
+      !Number.isNaN(clientSec) &&
+      !Number.isNaN(serverSec) &&
+      serverSec <= clientSec
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+type AuthorizedConfig =
+  | { ok: true; session: { user: { id: string } }; config: ConfigRow }
+  | { ok: false; response: Response };
+
+async function loadAuthorizedConfig(request: Request, env: Env): Promise<AuthorizedConfig> {
+  const auth = getAuth(env);
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user?.id) {
+    return { ok: false, response: failure('UNAUTHORIZED', 401) };
+  }
+
+  const configGroup = await env.DB.prepare('SELECT config_group FROM user WHERE id = ?')
+    .bind(session.user.id)
+    .first<{ config_group: string | null }>()
+    .then(row => row?.config_group ?? null);
+
+  const config = await resolveProxyConfig(env.DB, session.user.id, configGroup);
+  if (!config) return { ok: false, response: failure('CONFIG_UNAVAILABLE', 503) };
+
+  return { ok: true, session, config };
+}
+
 export default {
   async fetch(request, env, ctx) {
     try {
@@ -146,48 +213,48 @@ export default {
         return response;
       }
 
+      if (path === '/v1/config/version' && request.method === 'GET') {
+        const loaded = await loadAuthorizedConfig(request, env);
+        if (!loaded.ok) return loaded.response;
+        const { config } = loaded;
+        const meta = await configContentMeta(config.content);
+        const updatedUnix = Math.floor(new Date(config.updated_at).getTime() / 1000);
+        return Response.json(
+          {
+            version: meta.version,
+            updated_at: updatedUnix,
+            min_check_seconds: DEFAULT_MIN_CHECK_SECONDS,
+          },
+          {
+            headers: {
+              'Cache-Control': 'no-cache',
+              'X-Content-Type-Options': 'nosniff',
+            },
+          },
+        );
+      }
+
       if (path !== '/v1/config' || request.method !== 'GET') {
         return failure('NOT_FOUND', 404);
       }
 
-      const auth = getAuth(env);
-      const session = await auth.api.getSession({ headers: request.headers });
-      if (!session?.user?.id) return failure('UNAUTHORIZED', 401);
+      const loaded = await loadAuthorizedConfig(request, env);
+      if (!loaded.ok) return loaded.response;
+      const { session, config } = loaded;
 
       const allowed = await allowConfigFetch(env.DB, session.user.id);
       if (!allowed) return failure('RATE_LIMITED', 429);
 
-      const configGroup = await env.DB.prepare('SELECT config_group FROM user WHERE id = ?')
-        .bind(session.user.id)
-        .first<{ config_group: string | null }>()
-        .then(row => row?.config_group ?? null);
-
-      const config = await resolveProxyConfig(env.DB, session.user.id, configGroup);
-      if (!config) return failure('CONFIG_UNAVAILABLE', 503);
-
-      const ifModifiedSince = request.headers.get('If-Modified-Since');
-      if (ifModifiedSince) {
-        const serverSec = Math.floor(new Date(config.updated_at).getTime() / 1000);
-        const clientSec = Math.floor(new Date(ifModifiedSince).getTime() / 1000);
-        if (
-          !Number.isNaN(clientSec) &&
-          !Number.isNaN(serverSec) &&
-          serverSec <= clientSec
-        ) {
-          return new Response(null, {
-            status: 304,
-            headers: {
-              'Cache-Control': 'private, no-store',
-              'Last-Modified': new Date(config.updated_at).toUTCString(),
-            },
-          });
-        }
+      if (await isConfigUnchanged(config, request)) {
+        return notModifiedResponse(config.content, config.updated_at);
       }
 
       const clientIp = request.headers.get('cf-connecting-ip');
       auditConfigFetch(ctx, env.DB, session.user.id, config.scope, config.scope_key, clientIp);
 
-      return new Response(config.content, { headers: configHeaders(config.updated_at) });
+      return new Response(config.content, {
+        headers: await configHeaders(config.content, config.updated_at),
+      });
     } catch (error) {
       console.error(
         JSON.stringify({ event: 'request_failed', type: error instanceof Error ? error.name : 'unknown' }),

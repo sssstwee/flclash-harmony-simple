@@ -5019,6 +5019,116 @@ class AppLocalizations {
     );
   }
 
+  /// `Config is up to date (v {version}, checked {time})`
+  String harmonyConfigFreshUpToDate(String version, String time) {
+    return Intl.message(
+      'Config is up to date (v $version, checked $time)',
+      name: 'harmonyConfigFreshUpToDate',
+      desc: '',
+      args: [version, time],
+    );
+  }
+
+  /// `New config found, updating…`
+  String get harmonyConfigFreshUpdating {
+    return Intl.message(
+      'New config found, updating…',
+      name: 'harmonyConfigFreshUpdating',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config updated automatically`
+  String get harmonyConfigFreshAutoUpdated {
+    return Intl.message(
+      'Config updated automatically',
+      name: 'harmonyConfigFreshAutoUpdated',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Cannot check for updates; using cached config ({reason})`
+  String harmonyConfigFreshCheckFailed(String reason) {
+    return Intl.message(
+      'Cannot check for updates; using cached config ($reason)',
+      name: 'harmonyConfigFreshCheckFailed',
+      desc: '',
+      args: [reason],
+    );
+  }
+
+  /// `Refresh config`
+  String get harmonyConfigRefreshTooltip {
+    return Intl.message(
+      'Refresh config',
+      name: 'harmonyConfigRefreshTooltip',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config refreshed`
+  String get harmonyConfigRefreshSuccess {
+    return Intl.message(
+      'Config refreshed',
+      name: 'harmonyConfigRefreshSuccess',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Config refresh failed`
+  String get harmonyConfigRefreshFailed {
+    return Intl.message(
+      'Config refresh failed',
+      name: 'harmonyConfigRefreshFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Please wait a moment`
+  String get harmonyConfigRefreshDebounced {
+    return Intl.message(
+      'Please wait a moment',
+      name: 'harmonyConfigRefreshDebounced',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network unavailable`
+  String get harmonyConfigCheckReasonOffline {
+    return Intl.message(
+      'Network unavailable',
+      name: 'harmonyConfigCheckReasonOffline',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Too many requests`
+  String get harmonyConfigCheckReasonRateLimit {
+    return Intl.message(
+      'Too many requests',
+      name: 'harmonyConfigCheckReasonRateLimit',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Service temporarily unavailable`
+  String get harmonyConfigCheckReasonServer {
+    return Intl.message(
+      'Service temporarily unavailable',
+      name: 'harmonyConfigCheckReasonServer',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Connection details`
   String get harmonyStatusSection {
     return Intl.message(

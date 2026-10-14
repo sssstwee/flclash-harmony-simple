@@ -636,6 +636,28 @@
       }
     }
   },
+  "harmonyConfigFreshUpToDate": "Config is up to date (v {version}, checked {time})",
+  "@harmonyConfigFreshUpToDate": {
+    "placeholders": {
+      "version": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "harmonyConfigFreshUpdating": "New config found, updating…",
+  "harmonyConfigFreshAutoUpdated": "Config updated automatically",
+  "harmonyConfigFreshCheckFailed": "Cannot check for updates; using cached config ({reason})",
+  "@harmonyConfigFreshCheckFailed": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "harmonyConfigRefreshTooltip": "Refresh config",
+  "harmonyConfigRefreshSuccess": "Config refreshed",
+  "harmonyConfigRefreshFailed": "Config refresh failed",
+  "harmonyConfigRefreshDebounced": "Please wait a moment",
+  "harmonyConfigCheckReasonOffline": "Network unavailable",
+  "harmonyConfigCheckReasonRateLimit": "Too many requests",
+  "harmonyConfigCheckReasonServer": "Service temporarily unavailable",
   "harmonyStatusSection": "Connection details",
   "harmonyIssueTitleOfflineCached": "Cannot refresh subscription",
   "harmonyIssueDetailOfflineCached": "The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.",

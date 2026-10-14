@@ -35,7 +35,8 @@
 
 - `POST /api/auth/sign-in/username`：用户名和密码登录，返回签名会话头 `set-auth-token`。
 - `GET /api/auth/get-session`、`POST /api/auth/sign-out`：验证或撤销会话。
-- `GET /v1/config`：需要有效签名 Bearer 会话；支持 `If-Modified-Since`（304）；每用户每分钟 30 次；拉取写入审计表 `config_fetch_audit`。
+- `GET /v1/config`：需要有效签名 Bearer 会话；响应含 `ETag`（配置 SHA-256）与 `X-Config-Version`（16 位 hex）；支持 `If-None-Match` / `If-Modified-Since`（304）；每用户每分钟 30 次；拉取写入审计表 `config_fetch_audit`。
+- `GET /v1/config/version`：轻量版本检查，JSON `version` / `updated_at`（Unix 秒）/ `min_check_seconds`；仅 GET，勿用 HEAD。
 - `GET /health`：不含账号或配置信息的健康检查。
 
 会话有效期七天；每 IP 每分钟最多尝试登录五次。密码、会话、配置和订阅 URL 不写入日志。原生客户端仅使用 HTTPS，服务器不开放其他认证接口。`npm run check` 执行 TypeScript 检查、Workers 运行时的认证/限流/配置访问测试和部署预检。GitHub Actions 也运行该检查。

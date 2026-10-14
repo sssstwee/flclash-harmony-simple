@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
+import 'package:fl_clash/common/harmony_config_check.dart';
+import 'package:fl_clash/common/harmony_config_freshness.dart';
 import 'package:fl_clash/common/harmony_connect.dart';
 import 'package:fl_clash/common/harmony_home_status.dart';
 import 'package:fl_clash/common/harmony_user_issue.dart';
@@ -14,6 +17,7 @@ import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/state.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'generated/harmony_simple.g.dart';
@@ -78,12 +82,22 @@ HarmonyAccountApi harmonyAccountApi(Ref ref) => harmonyAccount;
 @Riverpod(keepAlive: true)
 class HarmonySimple extends _$HarmonySimple {
   static const _healthCheckInterval = Duration(minutes: 5);
+  static const _manualRefreshDebounce = Duration(seconds: 2);
+  static const _versionPollTick = Duration(minutes: 1);
 
   HarmonyAccountApi get _api => ref.read(harmonyAccountApiProvider);
 
   Timer? _configRefreshTimer;
   Timer? _healthCheckTimer;
+  Timer? _versionCheckTimer;
   Duration _configRefreshInterval = const Duration(hours: 24);
+  Duration _minCheckInterval = harmonyDefaultVersionCheckInterval;
+  DateTime? _lastVersionCheckAt;
+  int _versionCheckFailures = 0;
+  DateTime? _lastManualRefreshAt;
+  bool _manualRefreshInFlight = false;
+  bool _versionCheckInFlight = false;
+  final Random _random = Random();
 
   @override
   HarmonySimpleState build() {
@@ -107,7 +121,10 @@ class HarmonySimple extends _$HarmonySimple {
           ),
         );
         _configRefreshInterval = await _api.readConfigRefreshInterval();
+        _minCheckInterval = await _api.readMinCheckInterval();
         _scheduleConfigRefresh();
+        _scheduleVersionCheck();
+        unawaited(checkConfigVersion(force: true));
       } else {
         state = state.copyWith(clearSession: true);
         await _cleanupOrphanRemoteProfiles();
@@ -155,8 +172,17 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> handleNetworkChange() async {
+    if (_api.session == null) return;
+    unawaited(checkConfigVersion());
     if (!ref.read(isStartProvider) || state.busy) return;
     await reevaluateRoute();
+  }
+
+  Future<void> onAppResumed() async {
+    await checkSession();
+    if (_api.session != null) {
+      unawaited(checkConfigVersion(force: true));
+    }
   }
 
   Future<void> reevaluateRoute() async {
@@ -187,6 +213,9 @@ class HarmonySimple extends _$HarmonySimple {
       final session = await _api.login(username, password);
       state = state.copyWith(session: session, clearError: true);
       await _syncRemoteProfile(fallbackOnNetworkError: false);
+      _minCheckInterval = await _api.readMinCheckInterval();
+      _scheduleVersionCheck();
+      unawaited(checkConfigVersion(force: true));
     } on HarmonyAccountError catch (error) {
       state = state.copyWith(
         error: _message(error),
@@ -310,6 +339,164 @@ class HarmonySimple extends _$HarmonySimple {
     );
     _scheduleConfigRefresh();
     _scheduleHealthCheck();
+    _scheduleVersionCheck();
+    unawaited(checkConfigVersion(force: true));
+  }
+
+  Future<bool> forceRefreshConfig() async {
+    if (_api.session == null || state.busy) return false;
+    final now = DateTime.now();
+    if (_manualRefreshInFlight) return false;
+    if (_lastManualRefreshAt != null &&
+        now.difference(_lastManualRefreshAt!) < _manualRefreshDebounce) {
+      globalState.showNotifier(
+        currentAppLocalizations.harmonyConfigRefreshDebounced,
+      );
+      return false;
+    }
+    _lastManualRefreshAt = now;
+    _manualRefreshInFlight = true;
+    _setConfigFreshness(
+      state.homeStatus.configFreshness.copyWith(refreshInProgress: true),
+    );
+    var ok = false;
+    try {
+      await _syncRemoteProfile(
+        fallbackOnNetworkError: true,
+        background: true,
+        skipConditionals: true,
+        hotApplyWhenConnected: true,
+        manualRefresh: true,
+      );
+      ok = true;
+      globalState.showNotifier(
+        currentAppLocalizations.harmonyConfigRefreshSuccess,
+      );
+    } on HarmonyAccountError catch (error) {
+      if (error == HarmonyAccountError.expired) {
+        await logout(expired: true);
+      } else {
+        _markConfigCheckFailed(error);
+        globalState.showNotifier(
+          currentAppLocalizations.harmonyConfigRefreshFailed,
+        );
+      }
+    } catch (_) {
+      _markConfigCheckFailed(HarmonyAccountError.unavailable);
+      globalState.showNotifier(
+        currentAppLocalizations.harmonyConfigRefreshFailed,
+      );
+    } finally {
+      _manualRefreshInFlight = false;
+      _setConfigFreshness(
+        state.homeStatus.configFreshness.copyWith(refreshInProgress: false),
+      );
+    }
+    return ok;
+  }
+
+  Future<void> checkConfigVersion({bool force = false}) async {
+    if (_api.session == null || state.busy || _versionCheckInFlight) return;
+    if (!force && !_isVersionCheckDue()) return;
+    _versionCheckInFlight = true;
+    _bindConfigFetchRoute();
+    try {
+      final localVersion = await _api.readConfigVersion();
+      final remote = await _api.fetchConfigVersionInfo();
+      if (remote != null) {
+        _minCheckInterval = remote.minCheckInterval;
+        await _api.saveMinCheckInterval(remote.minCheckInterval);
+      }
+      var needsDownload = false;
+      if (remote != null) {
+        needsDownload =
+            localVersion == null || localVersion != remote.version;
+      } else {
+        needsDownload = !await _api.probeConfigNotModified();
+      }
+      _versionCheckFailures = 0;
+      _lastVersionCheckAt = DateTime.now();
+      _markConfigUpToDate(checkedAt: _lastVersionCheckAt);
+      if (needsDownload) {
+        _setConfigFreshness(
+          state.homeStatus.configFreshness.copyWith(
+            kind: HarmonyConfigFreshnessKind.discoveringUpdate,
+            lastCheckedAt: _lastVersionCheckAt,
+          ),
+        );
+        await _syncRemoteProfile(
+          fallbackOnNetworkError: true,
+          background: true,
+          hotApplyWhenConnected: true,
+        );
+      }
+    } on HarmonyAccountError catch (error) {
+      if (error == HarmonyAccountError.expired) {
+        await logout(expired: true);
+        return;
+      }
+      _versionCheckFailures++;
+      _lastVersionCheckAt = DateTime.now();
+      _markConfigCheckFailed(error);
+    } catch (_) {
+      _versionCheckFailures++;
+      _lastVersionCheckAt = DateTime.now();
+      _markConfigCheckFailed(HarmonyAccountError.unavailable);
+    } finally {
+      _versionCheckInFlight = false;
+    }
+  }
+
+  bool _isVersionCheckDue() {
+    if (_lastVersionCheckAt == null) return true;
+    final delay = _versionCheckFailures > 0
+        ? versionCheckBackoffDelay(_versionCheckFailures, _minCheckInterval)
+        : applyVersionCheckJitter(_minCheckInterval, _random);
+    return DateTime.now().isAfter(_lastVersionCheckAt!.add(delay));
+  }
+
+  void _bindConfigFetchRoute() {
+    if (ref.read(isStartProvider)) {
+      _api.localMixedProxyPort = ref.read(patchClashConfigProvider).mixedPort;
+    } else {
+      _api.localMixedProxyPort = null;
+    }
+  }
+
+  Future<void> _markConfigUpToDate({DateTime? checkedAt}) async {
+    final version = shortConfigVersionLabel(await _api.readConfigVersion());
+    _setConfigFreshness(
+      state.homeStatus.configFreshness.copyWith(
+        kind: HarmonyConfigFreshnessKind.upToDate,
+        versionShort: version,
+        lastCheckedAt: checkedAt ?? DateTime.now(),
+        clearFailureReason: true,
+      ),
+    );
+  }
+
+  void _markConfigCheckFailed(HarmonyAccountError error) {
+    final reason = switch (error) {
+      HarmonyAccountError.rateLimited =>
+        currentAppLocalizations.harmonyConfigCheckReasonRateLimit,
+      HarmonyAccountError.config ||
+      HarmonyAccountError.unavailable =>
+        currentAppLocalizations.harmonyConfigCheckReasonServer,
+      _ => currentAppLocalizations.harmonyConfigCheckReasonOffline,
+    };
+    _setConfigFreshness(
+      state.homeStatus.configFreshness.copyWith(
+        kind: HarmonyConfigFreshnessKind.checkFailedUsingCache,
+        failureReason: reason,
+        lastCheckedAt: DateTime.now(),
+      ),
+    );
+  }
+
+  void _setConfigFreshness(HarmonyConfigFreshness freshness) {
+    state = state.copyWith(
+      homeStatus: state.homeStatus.copyWith(configFreshness: freshness),
+    );
   }
 
   Future<bool> _applyBestRoute({required bool showNoRouteError}) async {
@@ -379,25 +566,30 @@ class HarmonySimple extends _$HarmonySimple {
   Future<void> _syncRemoteProfile({
     required bool fallbackOnNetworkError,
     bool background = false,
+    bool skipConditionals = false,
+    bool hotApplyWhenConnected = false,
+    bool manualRefresh = false,
   }) async {
+    _bindConfigFetchRoute();
     if (background) {
       state = state.copyWith(
         homeStatus: state.homeStatus.copyWith(configSyncInProgress: true),
       );
     }
     try {
-      final lastModified = await _api.readConfigLastModified();
-      final download = await _api.downloadConfig(ifModifiedSince: lastModified);
+      final download = await _api.downloadConfig(
+        ifModifiedSince: skipConditionals
+            ? null
+            : await _api.readConfigLastModified(),
+        ifNoneMatch: skipConditionals ? null : await _api.readConfigEtag(),
+      );
       if (download.notModified) {
         final existing = state.remoteProfile ?? _findRemoteProfile();
         if (existing != null) {
-          state = state.copyWith(
-            remoteProfile: existing,
-            usingCachedConfig: true,
-            issue: state.issue ?? HarmonyUserIssue.offlineCached,
-          );
           ref.read(currentProfileIdProvider.notifier).value = existing.id;
+          state = state.copyWith(remoteProfile: existing);
         }
+        await _markConfigUpToDate(checkedAt: DateTime.now());
         return;
       }
       final bytes = download.bytes;
@@ -418,14 +610,35 @@ class HarmonySimple extends _$HarmonySimple {
           .read(profilesActionProvider.notifier)
           .putProfile(profile.copyWith(autoUpdate: false));
       ref.read(currentProfileIdProvider.notifier).value = profile.id;
+      final now = DateTime.now();
+      final autoUpdated =
+          hotApplyWhenConnected &&
+          ref.read(isStartProvider) &&
+          !manualRefresh;
       state = state.copyWith(
         remoteProfile: profile,
         usingCachedConfig: false,
         clearIssue: true,
         homeStatus: state.homeStatus.copyWith(
-          lastConfigSyncAt: DateTime.now(),
+          lastConfigSyncAt: now,
+          configFreshness: state.homeStatus.configFreshness.copyWith(
+            kind: autoUpdated
+                ? HarmonyConfigFreshnessKind.autoUpdated
+                : HarmonyConfigFreshnessKind.upToDate,
+            versionShort: shortConfigVersionLabel(
+              download.configVersion ?? await _api.readConfigVersion(),
+            ),
+            lastCheckedAt: now,
+            autoUpdatedAt: autoUpdated ? now : null,
+            clearFailureReason: true,
+          ),
         ),
       );
+      if (hotApplyWhenConnected && ref.read(isStartProvider)) {
+        final setup = ref.read(setupActionProvider.notifier);
+        await setup.applyProfile(force: true, silence: true);
+        await _applyBestRoute(showNoRouteError: false);
+      }
     } on HarmonyAccountError catch (error) {
       if (error == HarmonyAccountError.expired) rethrow;
       if (fallbackOnNetworkError) {
@@ -438,6 +651,7 @@ class HarmonySimple extends _$HarmonySimple {
             issue: harmonyUserIssueFromAccount(error) ??
                 HarmonyUserIssue.offlineCached,
           );
+          _markConfigCheckFailed(error);
           return;
         }
       }
@@ -459,9 +673,7 @@ class HarmonySimple extends _$HarmonySimple {
     if (_api.session == null) return;
     _configRefreshTimer = Timer.periodic(_configRefreshInterval, (_) {
       if (_api.session == null || state.busy) return;
-      unawaited(
-        _syncRemoteProfile(fallbackOnNetworkError: true, background: true),
-      );
+      unawaited(checkConfigVersion(force: true));
     });
   }
 
@@ -471,6 +683,16 @@ class HarmonySimple extends _$HarmonySimple {
     _healthCheckTimer = Timer.periodic(_healthCheckInterval, (_) {
       if (!ref.read(isStartProvider) || state.busy) return;
       unawaited(reevaluateRoute());
+      unawaited(checkConfigVersion());
+    });
+  }
+
+  void _scheduleVersionCheck() {
+    _versionCheckTimer?.cancel();
+    if (_api.session == null) return;
+    _versionCheckTimer = Timer.periodic(_versionPollTick, (_) {
+      if (_api.session == null || state.busy) return;
+      unawaited(checkConfigVersion());
     });
   }
 
@@ -479,6 +701,8 @@ class HarmonySimple extends _$HarmonySimple {
     _configRefreshTimer = null;
     _healthCheckTimer?.cancel();
     _healthCheckTimer = null;
+    _versionCheckTimer?.cancel();
+    _versionCheckTimer = null;
   }
 
   Profile? _findRemoteProfile() {

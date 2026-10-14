@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/common/harmony_config_freshness.dart';
 import 'package:fl_clash/common/harmony_home_status.dart';
 import 'package:fl_clash/common/harmony_user_issue.dart';
 import 'package:fl_clash/views/dashboard/widgets/harmony_issue_copy.dart';
@@ -32,6 +34,8 @@ class SimpleConnectionPanel extends ConsumerWidget {
   final HarmonyHomeStatus homeStatus;
   final bool showReconnectHint;
   final HarmonyUserIssue? issue;
+  final HarmonyConfigFreshness configFreshness;
+  final VoidCallback? onConfigRefresh;
 
   const SimpleConnectionPanel({
     super.key,
@@ -48,6 +52,8 @@ class SimpleConnectionPanel extends ConsumerWidget {
     this.homeStatus = const HarmonyHomeStatus(),
     this.showReconnectHint = true,
     this.issue,
+    this.configFreshness = const HarmonyConfigFreshness(),
+    this.onConfigRefresh,
   });
 
   @override
@@ -79,7 +85,13 @@ class SimpleConnectionPanel extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       children: [
         ConnectionIndicator(phase: phase),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        _ConfigFreshnessRow(
+          freshness: configFreshness,
+          configSyncInProgress: homeStatus.configSyncInProgress,
+          onRefresh: onConfigRefresh,
+        ),
+        const SizedBox(height: 12),
         AnimatedSwitcher(
           duration: reducedMotion
               ? Duration.zero
@@ -176,6 +188,90 @@ class SimpleConnectionPanel extends ConsumerWidget {
         const SizedBox(height: 24),
         _AccountFooter(username: username, onLogout: busy ? null : onLogout),
       ],
+    );
+  }
+}
+
+class _ConfigFreshnessRow extends StatelessWidget {
+  final HarmonyConfigFreshness freshness;
+  final bool configSyncInProgress;
+  final VoidCallback? onRefresh;
+
+  const _ConfigFreshnessRow({
+    required this.freshness,
+    this.configSyncInProgress = false,
+    this.onRefresh,
+  });
+
+  String _formatTime(DateTime time) {
+    return DateFormat('HH:mm').format(time.toLocal());
+  }
+
+  String _message(AppLocalizations texts) {
+    final kind = freshness.displayKind;
+    return switch (kind) {
+      HarmonyConfigFreshnessKind.discoveringUpdate =>
+        texts.harmonyConfigFreshUpdating,
+      HarmonyConfigFreshnessKind.autoUpdated =>
+        texts.harmonyConfigFreshAutoUpdated,
+      HarmonyConfigFreshnessKind.checkFailedUsingCache =>
+        texts.harmonyConfigFreshCheckFailed(
+          freshness.failureReason ??
+              texts.harmonyConfigCheckReasonServer,
+        ),
+      HarmonyConfigFreshnessKind.upToDate ||
+      HarmonyConfigFreshnessKind.unknown =>
+        texts.harmonyConfigFreshUpToDate(
+          freshness.versionShort ?? '—',
+          freshness.lastCheckedAt != null
+              ? _formatTime(freshness.lastCheckedAt!)
+              : '—',
+        ),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = context.appLocalizations;
+    final busy = freshness.refreshInProgress || configSyncInProgress;
+    final kind = freshness.displayKind;
+    final color = kind == HarmonyConfigFreshnessKind.checkFailedUsingCache
+        ? context.colorScheme.error
+        : context.colorScheme.onSurfaceVariant;
+    return Material(
+      color: context.colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                _message(texts),
+                style: context.textTheme.bodySmall?.copyWith(
+                  color: color,
+                  height: 1.35,
+                ),
+              ),
+            ),
+            IconButton(
+              key: const Key('harmony_config_refresh'),
+              tooltip: texts.harmonyConfigRefreshTooltip,
+              onPressed: busy ? null : onRefresh,
+              icon: busy
+                  ? SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: context.colorScheme.primary,
+                      ),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -280,8 +376,9 @@ class _HomeInsightCard extends StatelessWidget {
             : texts.harmonyAutoReconnectOff,
       );
     }
-    if (homeStatus.configSyncInProgress) {
-      lines.add(texts.harmonyConfigUpdating);
+    if (homeStatus.configFreshness.displayKind ==
+        HarmonyConfigFreshnessKind.autoUpdated) {
+      lines.add(texts.harmonyConfigFreshAutoUpdated);
     } else if (homeStatus.lastConfigSyncAt != null) {
       lines.add(
         texts.harmonyConfigSyncedAt(_formatTime(homeStatus.lastConfigSyncAt!)),

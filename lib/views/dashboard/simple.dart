@@ -66,7 +66,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(ref.read(harmonySimpleProvider.notifier).checkSession());
+      unawaited(ref.read(harmonySimpleProvider.notifier).onAppResumed());
     }
   }
 
@@ -182,6 +182,10 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   onLogout: () => ref.read(harmonySimpleProvider.notifier).logout(),
                   onRetry: () => ref.read(harmonySimpleProvider.notifier).retryConnect(),
                   onSwitchNode: running ? _showNodeSwitcher : null,
+                  configFreshness: ui.homeStatus.configFreshness,
+                  onConfigRefresh: () => ref
+                      .read(harmonySimpleProvider.notifier)
+                      .forceRefreshConfig(),
                 )
               : AutofillGroup(
                   child: Form(

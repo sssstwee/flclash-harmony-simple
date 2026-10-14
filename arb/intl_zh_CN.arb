@@ -636,6 +636,28 @@
       }
     }
   },
+  "harmonyConfigFreshUpToDate": "配置已是最新（版本 {version}，{time} 检查）",
+  "@harmonyConfigFreshUpToDate": {
+    "placeholders": {
+      "version": { "type": "String" },
+      "time": { "type": "String" }
+    }
+  },
+  "harmonyConfigFreshUpdating": "发现新配置，正在更新…",
+  "harmonyConfigFreshAutoUpdated": "配置已自动更新",
+  "harmonyConfigFreshCheckFailed": "无法检查更新，正在使用缓存配置（{reason}）",
+  "@harmonyConfigFreshCheckFailed": {
+    "placeholders": {
+      "reason": { "type": "String" }
+    }
+  },
+  "harmonyConfigRefreshTooltip": "刷新配置",
+  "harmonyConfigRefreshSuccess": "配置已更新",
+  "harmonyConfigRefreshFailed": "配置刷新失败",
+  "harmonyConfigRefreshDebounced": "请稍后再试",
+  "harmonyConfigCheckReasonOffline": "网络不可用",
+  "harmonyConfigCheckReasonRateLimit": "请求过于频繁",
+  "harmonyConfigCheckReasonServer": "服务器暂时不可用",
   "harmonyStatusSection": "连接说明",
   "harmonyIssueTitleOfflineCached": "暂时无法更新订阅",
   "harmonyIssueDetailOfflineCached": "账号服务器暂时连不上，正在使用上次保存的线路。可先点下方「连接」尝试上网；网络恢复后会自动更新配置。",

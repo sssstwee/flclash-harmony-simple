@@ -11,6 +11,9 @@ class MemoryStore extends HarmonySessionStore {
   String? lastModified;
   String? reconnect;
   String? refreshSeconds;
+  String? etag;
+  String? configVersion;
+  String? minCheckSeconds;
 
   @override
   Future<String?> read() async => token;
@@ -78,12 +81,54 @@ class MemoryStore extends HarmonySessionStore {
   }
 
   @override
+  Future<String?> readConfigEtag() async => etag;
+
+  @override
+  Future<void> writeConfigEtag(String value) async {
+    etag = value;
+  }
+
+  @override
+  Future<void> deleteConfigEtag() async {
+    etag = null;
+  }
+
+  @override
+  Future<String?> readConfigVersion() async => configVersion;
+
+  @override
+  Future<void> writeConfigVersion(String value) async {
+    configVersion = value;
+  }
+
+  @override
+  Future<void> deleteConfigVersion() async {
+    configVersion = null;
+  }
+
+  @override
+  Future<int?> readMinCheckSeconds() async => int.tryParse(minCheckSeconds ?? '');
+
+  @override
+  Future<void> writeMinCheckSeconds(int seconds) async {
+    minCheckSeconds = '$seconds';
+  }
+
+  @override
+  Future<void> deleteMinCheckSeconds() async {
+    minCheckSeconds = null;
+  }
+
+  @override
   Future<void> clearAll() async {
     token = null;
     meta = null;
     lastModified = null;
     reconnect = null;
     refreshSeconds = null;
+    etag = null;
+    configVersion = null;
+    minCheckSeconds = null;
   }
 }
 
