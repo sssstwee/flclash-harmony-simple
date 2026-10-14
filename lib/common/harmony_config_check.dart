@@ -18,8 +18,8 @@ Duration harmonyMinCheckIntervalFromSeconds(int? seconds) {
 
 Duration applyVersionCheckJitter(Duration base, Random random) {
   if (base <= Duration.zero) return base;
-  final maxJitterMs = (base.inMilliseconds * harmonyVersionCheckJitterMaxFraction)
-      .round();
+  final maxJitterMs =
+      (base.inMilliseconds * harmonyVersionCheckJitterMaxFraction).round();
   if (maxJitterMs <= 0) return base;
   final jitter = random.nextInt(maxJitterMs * 2 + 1) - maxJitterMs;
   return Duration(milliseconds: max(base.inMilliseconds + jitter, 1000));
@@ -72,7 +72,10 @@ class HarmonyConfigVersionInfo {
   static DateTime? _parseUpdatedAt(Object? updatedRaw) {
     if (updatedRaw == null) return null;
     if (updatedRaw is int) {
-      return DateTime.fromMillisecondsSinceEpoch(updatedRaw * 1000, isUtc: true);
+      return DateTime.fromMillisecondsSinceEpoch(
+        updatedRaw * 1000,
+        isUtc: true,
+      );
     }
     if (updatedRaw is double) {
       return DateTime.fromMillisecondsSinceEpoch(

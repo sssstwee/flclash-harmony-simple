@@ -1,12 +1,7 @@
 /// Transport hints used to fail over quickly when UDP is blocked.
 enum ProxyTransportKind { udpHeavy, tcpFriendly, unknown }
 
-const _udpHeavyTypes = {
-  'hysteria',
-  'hysteria2',
-  'tuic',
-  'wireguard',
-};
+const _udpHeavyTypes = {'hysteria', 'hysteria2', 'tuic', 'wireguard'};
 
 const _tcpFriendlyTypes = {
   'vless',

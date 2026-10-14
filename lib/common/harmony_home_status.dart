@@ -44,13 +44,10 @@ class HarmonyHomeStatus {
   }) {
     return HarmonyHomeStatus(
       routeKind: routeKind ?? this.routeKind,
-      aiGroupName: clearAiGroupName
-          ? null
-          : (aiGroupName ?? this.aiGroupName),
+      aiGroupName: clearAiGroupName ? null : (aiGroupName ?? this.aiGroupName),
       networkKind: networkKind ?? this.networkKind,
       autoReconnectArmed: autoReconnectArmed ?? this.autoReconnectArmed,
-      configSyncInProgress:
-          configSyncInProgress ?? this.configSyncInProgress,
+      configSyncInProgress: configSyncInProgress ?? this.configSyncInProgress,
       lastConfigSyncAt: lastConfigSyncAt ?? this.lastConfigSyncAt,
       lastHealthCheckAt: clearHealthCheck
           ? null

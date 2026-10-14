@@ -202,7 +202,10 @@ void main() {
         dns['nameserver-policy']['geosite:cn'],
         contains('https://doh.pub/dns-query'),
       );
-      expect(dns['fake-ip-filter'], containsAll(['*.lan', 'geosite:private', 'geosite:cn']));
+      expect(
+        dns['fake-ip-filter'],
+        containsAll(['*.lan', 'geosite:private', 'geosite:cn']),
+      );
       expect(dns['respect-rules'], isTrue);
       expect(
         dns['fake-ip-filter'],

@@ -83,7 +83,8 @@ class MemoryStore extends HarmonySessionStore {
   }
 
   @override
-  Future<int?> readConfigRefreshSeconds() async => int.tryParse(refreshSeconds ?? '');
+  Future<int?> readConfigRefreshSeconds() async =>
+      int.tryParse(refreshSeconds ?? '');
 
   @override
   Future<void> writeConfigRefreshSeconds(int seconds) async {
@@ -122,7 +123,8 @@ class MemoryStore extends HarmonySessionStore {
   }
 
   @override
-  Future<int?> readMinCheckSeconds() async => int.tryParse(minCheckSeconds ?? '');
+  Future<int?> readMinCheckSeconds() async =>
+      int.tryParse(minCheckSeconds ?? '');
 
   @override
   Future<void> writeMinCheckSeconds(int seconds) async {

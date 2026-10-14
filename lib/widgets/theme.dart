@@ -55,22 +55,27 @@ class SliderDefaultsM3 extends SliderThemeData {
   Color? get inactiveTrackColor => _colors.secondaryContainer;
 
   @override
-  Color? get secondaryActiveTrackColor => _colors.primary.withValues(alpha: 0.54);
+  Color? get secondaryActiveTrackColor =>
+      _colors.primary.withValues(alpha: 0.54);
 
   @override
-  Color? get disabledActiveTrackColor => _colors.onSurface.withValues(alpha: 0.38);
+  Color? get disabledActiveTrackColor =>
+      _colors.onSurface.withValues(alpha: 0.38);
 
   @override
-  Color? get disabledInactiveTrackColor => _colors.onSurface.withValues(alpha: 0.12);
+  Color? get disabledInactiveTrackColor =>
+      _colors.onSurface.withValues(alpha: 0.12);
 
   @override
-  Color? get disabledSecondaryActiveTrackColor => _colors.onSurface.withValues(alpha: 0.38);
+  Color? get disabledSecondaryActiveTrackColor =>
+      _colors.onSurface.withValues(alpha: 0.38);
 
   @override
   Color? get activeTickMarkColor => _colors.onPrimary.withValues(alpha: 1.0);
 
   @override
-  Color? get inactiveTickMarkColor => _colors.onSecondaryContainer.withValues(alpha: 1.0);
+  Color? get inactiveTickMarkColor =>
+      _colors.onSecondaryContainer.withValues(alpha: 1.0);
 
   @override
   Color? get disabledActiveTickMarkColor => _colors.onInverseSurface;

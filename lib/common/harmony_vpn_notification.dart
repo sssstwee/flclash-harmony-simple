@@ -43,9 +43,7 @@ HarmonyVpnNotificationPhase resolveHarmonyVpnNotificationPhase({
   if (busy && !isStart) {
     return HarmonyVpnNotificationPhase.connecting;
   }
-  if (isStart &&
-      autoReconnectArmed &&
-      (hasReconnectableIssue || busy)) {
+  if (isStart && autoReconnectArmed && (hasReconnectableIssue || busy)) {
     return HarmonyVpnNotificationPhase.reconnecting;
   }
   if (isStart) {

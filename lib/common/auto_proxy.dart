@@ -99,9 +99,10 @@ Future<AutoSelectOutcome?> autoSelectProxy(
     } catch (_) {
       delays[name] = null;
     }
-    if (!preferTcp && inferPreferTcpFromDelays(delays, {
-      for (final key in delays.keys) key: kindFor(key),
-    })) {
+    if (!preferTcp &&
+        inferPreferTcpFromDelays(delays, {
+          for (final key in delays.keys) key: kindFor(key),
+        })) {
       preferTcp = true;
     }
     return delays[name];

@@ -101,9 +101,7 @@ class ApplicationState extends ConsumerState<Application> {
       );
     }
     return AndroidManager(
-      child: HarmonyNotificationManager(
-        child: TileManager(child: child),
-      ),
+      child: HarmonyNotificationManager(child: TileManager(child: child)),
     );
   }
 

@@ -1,7 +1,5 @@
 /// Built-in overseas categories inserted before the catch-all rule.
-const builtinGeositeCategories = [
-  ('GEOSITE,category-ai-!cn', 'ai'),
-];
+const builtinGeositeCategories = [('GEOSITE,category-ai-!cn', 'ai')];
 
 /// Reuses the bundled Mihomo GeoSite/GeoIP databases for automatic split routing.
 List<String> defaultRoutingRules(Map<String, dynamic> config) {
@@ -59,7 +57,8 @@ List<String> defaultRoutingRules(Map<String, dynamic> config) {
 
   final categoryRules = <String>[
     for (final entry in builtinGeositeCategories)
-      if (resolveBuiltinCategoryGroup(config, entry.$2, hasProxy) case final group?)
+      if (resolveBuiltinCategoryGroup(config, entry.$2, hasProxy)
+          case final group?)
         '${entry.$1},$group',
   ];
 

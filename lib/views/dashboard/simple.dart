@@ -41,8 +41,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
       (_) => ref.read(harmonySimpleProvider.notifier).checkSession(),
     );
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      if (_lastConnectivity != null &&
-          listEquals(_lastConnectivity, results)) {
+      if (_lastConnectivity != null && listEquals(_lastConnectivity, results)) {
         return;
       }
       _lastConnectivity = results;

@@ -35,7 +35,10 @@ class _HarmonyNotificationManagerState
     super.initState();
     if (!system.isOhos) return;
     service?.addListener(this);
-    _timer = Timer.periodic(_pushInterval, (_) => _pushNotification(force: false));
+    _timer = Timer.periodic(
+      _pushInterval,
+      (_) => _pushNotification(force: false),
+    );
     ref.listenManual(isStartProvider, (prev, next) {
       if (prev == next) return;
       if (!next) {
@@ -74,7 +77,8 @@ class _HarmonyNotificationManagerState
     final running = ref.read(isStartProvider);
     final ui = ref.read(harmonySimpleProvider);
     if (!running && !ui.busy && !ui.disconnecting) {
-      if (_lastPayload?.phase != HarmonyVpnNotificationPhase.disconnected.name) {
+      if (_lastPayload?.phase !=
+          HarmonyVpnNotificationPhase.disconnected.name) {
         await service?.clearVpnNotification();
         _lastPayload = null;
       }
@@ -86,16 +90,11 @@ class _HarmonyNotificationManagerState
         now.difference(_lastPushAt!) < _pushInterval) {
       return;
     }
-    final live = ref
-        .read(trafficsProvider)
-        .list
-        .safeLast(const Traffic());
+    final live = ref.read(trafficsProvider).list.safeLast(const Traffic());
     final total = ref.read(totalTrafficProvider);
     final profile = ref.read(currentProfileProvider);
     final groupName = profile?.currentGroupName;
-    final lineName = groupName == null
-        ? null
-        : profile?.selectedMap[groupName];
+    final lineName = groupName == null ? null : profile?.selectedMap[groupName];
     final freshness = ui.homeStatus.configFreshness;
     final configHint = harmonyVpnConfigHintForNotification(
       configAutoUpdatedRecently:

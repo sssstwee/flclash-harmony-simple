@@ -24,14 +24,8 @@ void main() {
       'hy2': ProxyTransportKind.udpHeavy,
       'tcp': ProxyTransportKind.tcpFriendly,
     };
-    expect(
-      inferPreferTcpFromDelays({'hy2': null, 'tcp': 42}, kinds),
-      isTrue,
-    );
-    expect(
-      inferPreferTcpFromDelays({'hy2': 10, 'tcp': 42}, kinds),
-      isFalse,
-    );
+    expect(inferPreferTcpFromDelays({'hy2': null, 'tcp': 42}, kinds), isTrue);
+    expect(inferPreferTcpFromDelays({'hy2': 10, 'tcp': 42}, kinds), isFalse);
   });
 
   test('sorts manual candidates TCP-first when preferTcp is set', () {

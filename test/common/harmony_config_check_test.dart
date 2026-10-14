@@ -37,13 +37,7 @@ void main() {
   });
 
   test('etag matching ignores weak prefix and list values', () {
-    expect(
-      harmonyEtagMatches(
-        'W/"abc", "def"',
-        '"abc"',
-      ),
-      isTrue,
-    );
+    expect(harmonyEtagMatches('W/"abc", "def"', '"abc"'), isTrue);
     expect(harmonyEtagMatches('"zzz"', '"abc"'), isFalse);
   });
 }

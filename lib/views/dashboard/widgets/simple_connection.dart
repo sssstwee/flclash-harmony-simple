@@ -66,7 +66,8 @@ class SimpleConnectionPanel extends ConsumerWidget {
     final issueCopy = issue == null ? null : harmonyIssueCopy(texts, issue!);
     final hasError =
         phase == ConnectionPhase.error || error != null || issueCopy != null;
-    final status = issueCopy?.title ??
+    final status =
+        issueCopy?.title ??
         switch (phase) {
           ConnectionPhase.disconnected => texts.simpleReady,
           ConnectionPhase.connecting => texts.harmonyConnecting,
@@ -169,11 +170,16 @@ class SimpleConnectionPanel extends ConsumerWidget {
                   Text(
                     error!,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: context.colorScheme.onErrorContainer),
+                    style: TextStyle(
+                      color: context.colorScheme.onErrorContainer,
+                    ),
                   ),
                   if (onRetry != null) ...[
                     const SizedBox(height: 8),
-                    TextButton(onPressed: onRetry, child: Text(texts.harmonyRetry)),
+                    TextButton(
+                      onPressed: onRetry,
+                      child: Text(texts.harmonyRetry),
+                    ),
                   ],
                 ],
               ),
@@ -182,7 +188,10 @@ class SimpleConnectionPanel extends ConsumerWidget {
         ] else if (hasError && issueCopy != null && onRetry != null) ...[
           const SizedBox(height: 8),
           Center(
-            child: TextButton(onPressed: onRetry, child: Text(texts.harmonyRetry)),
+            child: TextButton(
+              onPressed: onRetry,
+              child: Text(texts.harmonyRetry),
+            ),
           ),
         ],
         const SizedBox(height: 24),
@@ -216,17 +225,15 @@ class _ConfigFreshnessRow extends StatelessWidget {
         texts.harmonyConfigFreshAutoUpdated,
       HarmonyConfigFreshnessKind.checkFailedUsingCache =>
         texts.harmonyConfigFreshCheckFailed(
-          freshness.failureReason ??
-              texts.harmonyConfigCheckReasonServer,
+          freshness.failureReason ?? texts.harmonyConfigCheckReasonServer,
         ),
       HarmonyConfigFreshnessKind.upToDate ||
-      HarmonyConfigFreshnessKind.unknown =>
-        texts.harmonyConfigFreshUpToDate(
-          freshness.versionShort ?? '—',
-          freshness.lastCheckedAt != null
-              ? _formatTime(freshness.lastCheckedAt!)
-              : '—',
-        ),
+      HarmonyConfigFreshnessKind.unknown => texts.harmonyConfigFreshUpToDate(
+        freshness.versionShort ?? '—',
+        freshness.lastCheckedAt != null
+            ? _formatTime(freshness.lastCheckedAt!)
+            : '—',
+      ),
     };
   }
 
@@ -341,26 +348,22 @@ class _HomeInsightCard extends StatelessWidget {
     final texts = context.appLocalizations;
     final lines = <String>[];
     if (homeStatus.routeKind != null) {
-      lines.add(
-        switch (homeStatus.routeKind!) {
-          HarmonyRouteKind.automaticGroup => texts.harmonyRouteReasonAuto,
-          HarmonyRouteKind.tcpPreferred => texts.harmonyRouteReasonTcp,
-          HarmonyRouteKind.manual => texts.harmonyRouteReasonManual,
-        },
-      );
+      lines.add(switch (homeStatus.routeKind!) {
+        HarmonyRouteKind.automaticGroup => texts.harmonyRouteReasonAuto,
+        HarmonyRouteKind.tcpPreferred => texts.harmonyRouteReasonTcp,
+        HarmonyRouteKind.manual => texts.harmonyRouteReasonManual,
+      });
     }
     final aiGroup = homeStatus.aiGroupName;
     if (aiGroup != null && aiGroup.isNotEmpty) {
       lines.add(texts.harmonyAiRoutingHint(aiGroup));
     }
-    lines.add(
-      switch (homeStatus.networkKind) {
-        HarmonyNetworkKind.wifi => texts.harmonyNetworkWifi,
-        HarmonyNetworkKind.cellular => texts.harmonyNetworkCellular,
-        HarmonyNetworkKind.other => texts.harmonyNetworkOther,
-        HarmonyNetworkKind.unknown => texts.harmonyNetworkUnknown,
-      },
-    );
+    lines.add(switch (homeStatus.networkKind) {
+      HarmonyNetworkKind.wifi => texts.harmonyNetworkWifi,
+      HarmonyNetworkKind.cellular => texts.harmonyNetworkCellular,
+      HarmonyNetworkKind.other => texts.harmonyNetworkOther,
+      HarmonyNetworkKind.unknown => texts.harmonyNetworkUnknown,
+    });
     if (running && homeStatus.lastHealthCheckAt != null) {
       final time = _formatTime(homeStatus.lastHealthCheckAt!);
       lines.add(
@@ -423,11 +426,7 @@ class _NodeCard extends StatelessWidget {
   final int? delayMs;
   final VoidCallback? onSwitch;
 
-  const _NodeCard({
-    required this.nodeName,
-    this.delayMs,
-    this.onSwitch,
-  });
+  const _NodeCard({required this.nodeName, this.delayMs, this.onSwitch});
 
   @override
   Widget build(BuildContext context) {

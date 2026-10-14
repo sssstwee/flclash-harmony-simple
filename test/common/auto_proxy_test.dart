@@ -133,27 +133,30 @@ void main() {
     },
   );
 
-  test('probes TCP-friendly nodes before UDP-heavy ones when preferTcpFirst', () async {
-    const root = Group(
-      name: 'Main',
-      type: GroupType.Selector,
-      all: [
-        Proxy(name: 'hy2', type: 'Hysteria2'),
-        Proxy(name: 'vless', type: 'Vless'),
-      ],
-    );
-    final result = await autoSelectProxy(
-      root,
-      [root],
-      (name) async => name == 'vless' ? 5 : null,
-      transportKinds: const {
-        'hy2': ProxyTransportKind.udpHeavy,
-        'vless': ProxyTransportKind.tcpFriendly,
-      },
-      preferTcpFirst: true,
-    );
-    expect(result?.name, 'vless');
-  });
+  test(
+    'probes TCP-friendly nodes before UDP-heavy ones when preferTcpFirst',
+    () async {
+      const root = Group(
+        name: 'Main',
+        type: GroupType.Selector,
+        all: [
+          Proxy(name: 'hy2', type: 'Hysteria2'),
+          Proxy(name: 'vless', type: 'Vless'),
+        ],
+      );
+      final result = await autoSelectProxy(
+        root,
+        [root],
+        (name) async => name == 'vless' ? 5 : null,
+        transportKinds: const {
+          'hy2': ProxyTransportKind.udpHeavy,
+          'vless': ProxyTransportKind.tcpFriendly,
+        },
+        preferTcpFirst: true,
+      );
+      expect(result?.name, 'vless');
+    },
+  );
 
   test(
     'manual-only probes finish at 24 seconds and never start a fourth batch',

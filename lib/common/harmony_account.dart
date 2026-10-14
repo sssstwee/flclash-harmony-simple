@@ -76,21 +76,27 @@ class HarmonySessionStore {
   Future<String?> readConfigVersion() =>
       _channel.invokeMethod<String>('read', _arguments(_configVersionKey));
 
-  Future<void> writeConfigVersion(String value) =>
-      _channel.invokeMethod<void>('write', _arguments(_configVersionKey, value));
+  Future<void> writeConfigVersion(String value) => _channel.invokeMethod<void>(
+    'write',
+    _arguments(_configVersionKey, value),
+  );
 
   Future<void> deleteConfigVersion() =>
       _channel.invokeMethod<void>('delete', _arguments(_configVersionKey));
 
   Future<bool> readReconnectOnLaunch() async {
-    final raw = await _channel.invokeMethod<String>('read', _arguments(_reconnectKey));
+    final raw = await _channel.invokeMethod<String>(
+      'read',
+      _arguments(_reconnectKey),
+    );
     return raw == '1';
   }
 
-  Future<void> writeReconnectOnLaunch(bool value) => _channel.invokeMethod<void>(
-    'write',
-    _arguments(_reconnectKey, value ? '1' : '0'),
-  );
+  Future<void> writeReconnectOnLaunch(bool value) =>
+      _channel.invokeMethod<void>(
+        'write',
+        _arguments(_reconnectKey, value ? '1' : '0'),
+      );
 
   Future<void> deleteReconnectOnLaunch() =>
       _channel.invokeMethod<void>('delete', _arguments(_reconnectKey));
@@ -103,22 +109,24 @@ class HarmonySessionStore {
     return int.tryParse(raw ?? '');
   }
 
-  Future<void> writeConfigRefreshSeconds(int seconds) =>
-      _channel.invokeMethod<void>(
-        'write',
-        _arguments(_configRefreshKey, '$seconds'),
-      );
+  Future<void> writeConfigRefreshSeconds(int seconds) => _channel
+      .invokeMethod<void>('write', _arguments(_configRefreshKey, '$seconds'));
 
   Future<void> deleteConfigRefreshSeconds() =>
       _channel.invokeMethod<void>('delete', _arguments(_configRefreshKey));
 
   Future<int?> readMinCheckSeconds() async {
-    final raw = await _channel.invokeMethod<String>('read', _arguments(_minCheckKey));
+    final raw = await _channel.invokeMethod<String>(
+      'read',
+      _arguments(_minCheckKey),
+    );
     return int.tryParse(raw ?? '');
   }
 
-  Future<void> writeMinCheckSeconds(int seconds) =>
-      _channel.invokeMethod<void>('write', _arguments(_minCheckKey, '$seconds'));
+  Future<void> writeMinCheckSeconds(int seconds) => _channel.invokeMethod<void>(
+    'write',
+    _arguments(_minCheckKey, '$seconds'),
+  );
 
   Future<void> deleteMinCheckSeconds() =>
       _channel.invokeMethod<void>('delete', _arguments(_minCheckKey));
@@ -343,7 +351,8 @@ class HarmonyAccountApi {
 
   Future<String?> readConfigVersion() => _store(_storage.readConfigVersion);
 
-  Future<bool> readReconnectOnLaunch() => _store(_storage.readReconnectOnLaunch);
+  Future<bool> readReconnectOnLaunch() =>
+      _store(_storage.readReconnectOnLaunch);
 
   Future<void> setReconnectOnLaunch(bool value) =>
       _store(() => _storage.writeReconnectOnLaunch(value));
@@ -720,12 +729,16 @@ class HarmonyAccountApi {
     ResponseType responseType = ResponseType.json,
     Map<String, String>? headers,
   }) async {
-    assert(method != 'HEAD', 'HEAD is not allowed for Harmony config endpoints');
+    assert(
+      method != 'HEAD',
+      'HEAD is not allowed for Harmony config endpoints',
+    );
     final uri = Uri.tryParse(_http.options.baseUrl);
     if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) {
       throw HarmonyAccountError.unavailable;
     }
-    final configPath = path == harmonyConfigPath || path == harmonyConfigVersionPath;
+    final configPath =
+        path == harmonyConfigPath || path == harmonyConfigVersionPath;
     try {
       return await _requestWithRouteFallback(
         path,

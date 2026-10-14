@@ -7,14 +7,8 @@ void main() {
 proxies: []
 profile-update-interval: 3600
 ''';
-    expect(
-      profileUpdateIntervalFromYaml(yaml),
-      const Duration(hours: 1),
-    );
-    expect(
-      profileUpdateIntervalFromHeader('7200'),
-      const Duration(hours: 2),
-    );
+    expect(profileUpdateIntervalFromYaml(yaml), const Duration(hours: 1));
+    expect(profileUpdateIntervalFromHeader('7200'), const Duration(hours: 2));
     expect(profileUpdateIntervalFromValue(0), isNull);
   });
 }

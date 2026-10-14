@@ -164,7 +164,11 @@ class HarmonySimple extends _$HarmonySimple {
     }
     _restoring = true;
     final operation = ++_operation;
-    state = state.copyWith(bootstrapping: true, clearError: true, clearIssue: true);
+    state = state.copyWith(
+      bootstrapping: true,
+      clearError: true,
+      clearIssue: true,
+    );
     var shouldReconnect = false;
     try {
       final session = await _api.restore();
@@ -427,7 +431,10 @@ class HarmonySimple extends _$HarmonySimple {
     }
   }
 
-  Future<void> _connectVpn({required int operation, required String token}) async {
+  Future<void> _connectVpn({
+    required int operation,
+    required String token,
+  }) async {
     final setup = ref.read(setupActionProvider.notifier);
     await _syncRemoteProfile(
       fallbackOnNetworkError: true,
@@ -446,7 +453,9 @@ class HarmonySimple extends _$HarmonySimple {
     ref
         .read(patchClashConfigProvider.notifier)
         .update((s) => s.copyWith(mode: Mode.rule));
-    ref.read(vpnSettingProvider.notifier).update((s) => s.copyWith(enable: true));
+    ref
+        .read(vpnSettingProvider.notifier)
+        .update((s) => s.copyWith(enable: true));
     await setup.applyProfile(force: true);
     _ensureCurrent(operation, token);
     final applied = await _applyBestRoute(showNoRouteError: true);
@@ -539,8 +548,7 @@ class HarmonySimple extends _$HarmonySimple {
       }
       var needsDownload = false;
       if (remote != null) {
-        needsDownload =
-            localVersion == null || localVersion != remote.version;
+        needsDownload = localVersion == null || localVersion != remote.version;
       } else {
         needsDownload = !await _api.probeConfigNotModified();
       }
@@ -609,8 +617,7 @@ class HarmonySimple extends _$HarmonySimple {
     final reason = switch (error) {
       HarmonyAccountError.rateLimited =>
         currentAppLocalizations.harmonyConfigCheckReasonRateLimit,
-      HarmonyAccountError.config ||
-      HarmonyAccountError.unavailable =>
+      HarmonyAccountError.config || HarmonyAccountError.unavailable =>
         currentAppLocalizations.harmonyConfigCheckReasonServer,
       _ => currentAppLocalizations.harmonyConfigCheckReasonOffline,
     };
@@ -679,7 +686,9 @@ class HarmonySimple extends _$HarmonySimple {
           .read(profilesActionProvider.notifier)
           .updateCurrentSelectedMap(entry.key, entry.value);
     }
-    ref.read(proxiesActionProvider.notifier).updateCurrentGroupName(group!.name);
+    ref
+        .read(proxiesActionProvider.notifier)
+        .updateCurrentGroupName(group!.name);
     return true;
   }
 
@@ -825,9 +834,7 @@ class HarmonySimple extends _$HarmonySimple {
       ref.read(currentProfileIdProvider.notifier).value = profile.id;
       final now = DateTime.now();
       final autoUpdated =
-          hotApplyWhenConnected &&
-          ref.read(isStartProvider) &&
-          !manualRefresh;
+          hotApplyWhenConnected && ref.read(isStartProvider) && !manualRefresh;
       state = state.copyWith(
         remoteProfile: profile,
         usingCachedConfig: false,
@@ -865,7 +872,8 @@ class HarmonySimple extends _$HarmonySimple {
           state = state.copyWith(
             remoteProfile: existing,
             usingCachedConfig: true,
-            issue: harmonyUserIssueFromAccount(error) ??
+            issue:
+                harmonyUserIssueFromAccount(error) ??
                 HarmonyUserIssue.offlineCached,
           );
           _markConfigCheckFailed(error);
@@ -878,7 +886,8 @@ class HarmonySimple extends _$HarmonySimple {
         state = state.copyWith(
           homeStatus: state.homeStatus.copyWith(
             configSyncInProgress: false,
-            lastConfigSyncAt: state.homeStatus.lastConfigSyncAt ?? DateTime.now(),
+            lastConfigSyncAt:
+                state.homeStatus.lastConfigSyncAt ?? DateTime.now(),
           ),
         );
       }
