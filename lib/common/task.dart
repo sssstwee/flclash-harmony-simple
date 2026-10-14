@@ -228,9 +228,10 @@ Future<VM2<String, String>> _makeRealProfileTask(
     for (final entry in subscriptionDns.entries) {
       if (entry.key == 'enable') continue;
       if (const {
-        'nameserver-policy',
-        'proxy-server-nameserver-policy',
-      }.contains(entry.key) && entry.value is Map) {
+            'nameserver-policy',
+            'proxy-server-nameserver-policy',
+          }.contains(entry.key) &&
+          entry.value is Map) {
         dns[entry.key] = {
           ...Map<String, dynamic>.from(dns[entry.key] as Map? ?? {}),
           ...Map<String, dynamic>.from(entry.value as Map),

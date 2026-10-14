@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/fixed.dart';
 import 'package:fl_clash/common/harmony_account.dart';
-import 'package:fl_clash/common/harmony_recovery.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
@@ -92,16 +91,16 @@ Finder get primaryFilledButton => find.descendant(
 
 Widget app(Widget child, {Locale locale = const Locale('zh', 'CN')}) =>
     MaterialApp(
-  locale: locale,
-  localizationsDelegates: const [
-    AppLocalizations.delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ],
-  supportedLocales: AppLocalizations.delegate.supportedLocales,
-  home: Scaffold(body: child),
-);
+      locale: locale,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: AppLocalizations.delegate.supportedLocales,
+      home: Scaffold(body: child),
+    );
 
 Widget scoped({required Widget child, required SignedOutApi api}) {
   return ProviderScope(
@@ -439,33 +438,34 @@ void main() {
     });
   }
 
-  testWidgets('cached settings do not imply that a healthy network is offline', (
-    tester,
-  ) async {
-    final texts = await AppLocalizations.load(const Locale('en'));
-    await tester.pumpWidget(
-      scoped(
-        api: SignedOutApi(),
-        child: app(
-          const SimpleConnectionPanel(
-            phase: ConnectionPhase.connected,
-            username: 'harmony',
-            connectionRequested: true,
-            domesticHealthy: true,
-            foreignHealthy: true,
-            usingCachedConfig: true,
+  testWidgets(
+    'cached settings do not imply that a healthy network is offline',
+    (tester) async {
+      final texts = await AppLocalizations.load(const Locale('en'));
+      await tester.pumpWidget(
+        scoped(
+          api: SignedOutApi(),
+          child: app(
+            const SimpleConnectionPanel(
+              phase: ConnectionPhase.connected,
+              username: 'harmony',
+              connectionRequested: true,
+              domesticHealthy: true,
+              foreignHealthy: true,
+              usingCachedConfig: true,
+            ),
+            locale: const Locale('en'),
           ),
-          locale: const Locale('en'),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text(texts.harmonyConnected), findsOneWidget);
-    expect(find.text('Using saved connection settings'), findsOneWidget);
-    expect(find.textContaining('(offline)'), findsNothing);
-    expect(find.text(texts.harmonyOffline), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      );
+      await tester.pumpAndSettle();
+      expect(find.text(texts.harmonyConnected), findsOneWidget);
+      expect(find.text('Using saved connection settings'), findsOneWidget);
+      expect(find.textContaining('(offline)'), findsNothing);
+      expect(find.text(texts.harmonyOffline), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('busy checking blocks retry, sign-out and duplicate actions', (
     tester,
@@ -501,84 +501,95 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('visible health strings follow locale changes on the same screen', (
-    tester,
-  ) async {
-    final locale = ValueNotifier(const Locale('en'));
-    addTearDown(locale.dispose);
-    await tester.pumpWidget(
-      scoped(
-        api: SignedOutApi(),
-        child: ValueListenableBuilder<Locale>(
-          valueListenable: locale,
-          builder: (context, value, child) => app(child!, locale: value),
-          child: const SimpleConnectionPanel(
-            phase: ConnectionPhase.degraded,
-            username: 'harmony',
-            connectionRequested: true,
-            domesticHealthy: true,
-            foreignHealthy: false,
-          ),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Connection partly available'), findsOneWidget);
-    locale.value = const Locale('zh', 'CN');
-    await tester.pumpAndSettle();
-    expect(find.text('部分网络不可用'), findsOneWidget);
-    expect(find.text('Connection partly available'), findsNothing);
-    locale.value = const Locale('en');
-    await tester.pumpAndSettle();
-    expect(find.text('Connection partly available'), findsOneWidget);
-    expect(find.text('部分网络不可用'), findsNothing);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
-
-  testWidgets('status is a live region and reduced-motion recovery stays still', (
-    tester,
-  ) async {
-    final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
-    for (final phase in [ConnectionPhase.checking, ConnectionPhase.reconnecting]) {
+  testWidgets(
+    'visible health strings follow locale changes on the same screen',
+    (tester) async {
+      final locale = ValueNotifier(const Locale('en'));
+      addTearDown(locale.dispose);
       await tester.pumpWidget(
         scoped(
           api: SignedOutApi(),
-          child: app(
-            MediaQuery(
-              data: const MediaQueryData(disableAnimations: true),
-              child: SimpleConnectionPanel(
-                phase: phase,
-                username: 'harmony',
-                connectionRequested: true,
-                onToggle: () {},
-              ),
+          child: ValueListenableBuilder<Locale>(
+            valueListenable: locale,
+            builder: (context, value, child) => app(child!, locale: value),
+            child: const SimpleConnectionPanel(
+              phase: ConnectionPhase.degraded,
+              username: 'harmony',
+              connectionRequested: true,
+              domesticHealthy: true,
+              foreignHealthy: false,
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      final status = phase == ConnectionPhase.checking
-          ? '正在检查连接…'
-          : '正在自动重连…';
-      final liveRegion = find.byWidgetPredicate(
-        (widget) => widget is Semantics &&
-            widget.properties.liveRegion == true &&
-            widget.properties.label == status,
-      );
-      expect(liveRegion, findsOneWidget);
-      expect(find.bySemanticsLabel(status), findsOneWidget);
-      expect(
-        tester.widget<CircularProgressIndicator>(
-          find.byType(CircularProgressIndicator),
-        ).value,
-        isNotNull,
-      );
-      expect(tester.binding.hasScheduledFrame, isFalse);
-      expect(tester.takeException(), isNull);
-    }
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      expect(find.text('Connection partly available'), findsOneWidget);
+      locale.value = const Locale('zh', 'CN');
+      await tester.pumpAndSettle();
+      expect(find.text('部分网络不可用'), findsOneWidget);
+      expect(find.text('Connection partly available'), findsNothing);
+      locale.value = const Locale('en');
+      await tester.pumpAndSettle();
+      expect(find.text('Connection partly available'), findsOneWidget);
+      expect(find.text('部分网络不可用'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
+  testWidgets(
+    'status is a live region and reduced-motion recovery stays still',
+    (tester) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        for (final phase in [
+          ConnectionPhase.checking,
+          ConnectionPhase.reconnecting,
+        ]) {
+          await tester.pumpWidget(
+            scoped(
+              api: SignedOutApi(),
+              child: app(
+                MediaQuery(
+                  data: const MediaQueryData(disableAnimations: true),
+                  child: SimpleConnectionPanel(
+                    phase: phase,
+                    username: 'harmony',
+                    connectionRequested: true,
+                    onToggle: () {},
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final status = phase == ConnectionPhase.checking
+              ? '正在检查连接…'
+              : '正在自动重连…';
+          final liveRegion = find.byWidgetPredicate(
+            (widget) =>
+                widget is Semantics &&
+                widget.properties.liveRegion == true &&
+                widget.properties.label == status,
+          );
+          expect(liveRegion, findsOneWidget);
+          expect(find.bySemanticsLabel(status), findsOneWidget);
+          expect(
+            tester
+                .widget<CircularProgressIndicator>(
+                  find.byType(CircularProgressIndicator),
+                )
+                .value,
+            isNotNull,
+          );
+          expect(tester.binding.hasScheduledFrame, isFalse);
+          expect(tester.takeException(), isNull);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        semantics.dispose();
+      }
+    },
+  );
 
   for (final change in ['logout', 'new session', 'recovery', 'recovered']) {
     testWidgets('late node sheet is ignored after $change', (tester) async {
@@ -643,42 +654,43 @@ void main() {
     });
   }
 
-  testWidgets('an existing account error is relocalized without another login', (
-    tester,
-  ) async {
-    final controller = ControlledHarmonySimple(
-      const HarmonySimpleState(
-        bootstrapping: false,
-        errorCause: HarmonySimpleError.credentials,
-      ),
-    );
-    final locale = ValueNotifier(const Locale('en'));
-    addTearDown(locale.dispose);
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          harmonySimpleProvider.overrideWith(() => controller),
-          profilesProvider.overrideWith(_EmptyProfiles.new),
-          initProvider.overrideWithValue(true),
-          isStartProvider.overrideWithValue(false),
-        ],
-        child: ValueListenableBuilder<Locale>(
-          valueListenable: locale,
-          builder: (context, value, child) => app(child!, locale: value),
-          child: const SimpleDashboardView(),
+  testWidgets(
+    'an existing account error is relocalized without another login',
+    (tester) async {
+      final controller = ControlledHarmonySimple(
+        const HarmonySimpleState(
+          bootstrapping: false,
+          errorCause: HarmonySimpleError.credentials,
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Incorrect username or password.'));
-    expect(find.text('Incorrect username or password.'), findsOneWidget);
-    locale.value = const Locale('zh', 'CN');
-    await tester.pumpAndSettle();
-    expect(find.text('用户名或密码错误。'), findsOneWidget);
-    expect(find.text('Incorrect username or password.'), findsNothing);
-    expect(controller.switches, isEmpty);
-    await tester.pumpWidget(const SizedBox.shrink());
-  });
+      );
+      final locale = ValueNotifier(const Locale('en'));
+      addTearDown(locale.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            harmonySimpleProvider.overrideWith(() => controller),
+            profilesProvider.overrideWith(_EmptyProfiles.new),
+            initProvider.overrideWithValue(true),
+            isStartProvider.overrideWithValue(false),
+          ],
+          child: ValueListenableBuilder<Locale>(
+            valueListenable: locale,
+            builder: (context, value, child) => app(child!, locale: value),
+            child: const SimpleDashboardView(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Incorrect username or password.'));
+      expect(find.text('Incorrect username or password.'), findsOneWidget);
+      locale.value = const Locale('zh', 'CN');
+      await tester.pumpAndSettle();
+      expect(find.text('用户名或密码错误。'), findsOneWidget);
+      expect(find.text('Incorrect username or password.'), findsNothing);
+      expect(controller.switches, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('repeated health changes never leave a stale success label', (
     tester,
@@ -716,12 +728,13 @@ void main() {
           find.text('已连接'),
           value == ConnectionPhase.connected ? findsOneWidget : findsNothing,
         );
-        expect(tester.widget<FilledButton>(primaryFilledButton).onPressed,
-            isNotNull);
+        expect(
+          tester.widget<FilledButton>(primaryFilledButton).onPressed,
+          isNotNull,
+        );
         expect(tester.takeException(), isNull);
       }
     }
     await tester.pumpWidget(const SizedBox.shrink());
   });
-
 }

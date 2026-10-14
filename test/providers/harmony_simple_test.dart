@@ -380,7 +380,7 @@ class _Harness {
       name: managed ? 'Harmony Auto' : 'Main',
       type: managed ? GroupType.URLTest : GroupType.Selector,
       testUrl: 'https://example.test',
-      all: [Proxy(name: 'fast', type: 'Trojan')],
+      all: const [Proxy(name: 'fast', type: 'Trojan')],
     );
     container.read(groupsProvider.notifier).value = [group];
     when(() => controller.getConfig(any())).thenAnswer((_) async {
@@ -401,8 +401,9 @@ class _Harness {
         ],
       };
     });
-    when(() => controller.getHarmonyNetworkState()).thenAnswer((_) async =>
-        (connected: true, captivePortal: false));
+    when(
+      () => controller.getHarmonyNetworkState(),
+    ).thenAnswer((_) async => (connected: true, captivePortal: false));
     when(() => controller.refreshHarmonyHealth()).thenAnswer((_) async {
       events.add('refresh-managed');
       return true;
@@ -913,43 +914,48 @@ void main() {
     return harness;
   }
 
-  test('failed recovery preserves direct flows and reuses installed config', () async {
-    final harness = await connectedHarness();
-    final requests = harness.api.requests.length;
-    final applies = harness.setup.applies;
-    when(() => harness.controller.getHealthDelay(any(), any()))
-        .thenAnswer((invocation) async => Delay(
+  test(
+    'failed recovery preserves direct flows and reuses installed config',
+    () async {
+      final harness = await connectedHarness();
+      final requests = harness.api.requests.length;
+      final applies = harness.setup.applies;
+      when(() => harness.controller.getHealthDelay(any(), any())).thenAnswer(
+        (invocation) async => Delay(
           name: invocation.positionalArguments[1] as String,
           value: invocation.positionalArguments[1] == 'DIRECT' ? 10 : -1,
           url: invocation.positionalArguments[0] as String,
-        ));
+        ),
+      );
 
-    await harness.notifier.retryConnect();
-    await harness.notifier.retryConnect();
+      await harness.notifier.retryConnect();
+      await harness.notifier.retryConnect();
 
-    expect(harness.state.health, HarmonyConnectionHealth.degraded);
-    expect(harness.state.actualConnected, isFalse);
-    expect(harness.state.domesticHealthy, isTrue);
-    expect(harness.state.foreignHealthy, isFalse);
-    expect(harness.state.connectionRequested, isTrue);
-    expect(harness.state.busy, isFalse);
-    expect(harness.state.nextRetryAt, isNotNull);
-    expect(harness.container.read(isStartProvider), isTrue);
-    expect(harness.api.requests.length, requests);
-    expect(harness.setup.applies, applies);
-    expect(harness.setup.starts, hasLength(1));
-    expect(harness.events, isNot(contains('stop')));
-  });
+      expect(harness.state.health, HarmonyConnectionHealth.degraded);
+      expect(harness.state.actualConnected, isFalse);
+      expect(harness.state.domesticHealthy, isTrue);
+      expect(harness.state.foreignHealthy, isFalse);
+      expect(harness.state.connectionRequested, isTrue);
+      expect(harness.state.busy, isFalse);
+      expect(harness.state.nextRetryAt, isNotNull);
+      expect(harness.container.read(isStartProvider), isTrue);
+      expect(harness.api.requests.length, requests);
+      expect(harness.setup.applies, applies);
+      expect(harness.setup.starts, hasLength(1));
+      expect(harness.events, isNot(contains('stop')));
+    },
+  );
 
   test('domestic failure does not reselect a working overseas route', () async {
     final harness = await connectedHarness();
     harness.proxies.changes.clear();
-    when(() => harness.controller.getHealthDelay(any(), any()))
-        .thenAnswer((invocation) async => Delay(
-          name: invocation.positionalArguments[1] as String,
-          value: invocation.positionalArguments[1] == 'DIRECT' ? -1 : 10,
-          url: invocation.positionalArguments[0] as String,
-        ));
+    when(() => harness.controller.getHealthDelay(any(), any())).thenAnswer(
+      (invocation) async => Delay(
+        name: invocation.positionalArguments[1] as String,
+        value: invocation.positionalArguments[1] == 'DIRECT' ? -1 : 10,
+        url: invocation.positionalArguments[0] as String,
+      ),
+    );
 
     await harness.notifier.retryConnect();
 
@@ -981,15 +987,16 @@ void main() {
     final harness = await connectedHarness();
     final started = Completer<void>();
     final delayed = Completer<Delay>();
-    when(() => harness.controller.getHealthDelay(any(), any()))
-        .thenAnswer((_) {
-          if (!started.isCompleted) started.complete();
-          return delayed.future;
-        });
+    when(() => harness.controller.getHealthDelay(any(), any())).thenAnswer((_) {
+      if (!started.isCompleted) started.complete();
+      return delayed.future;
+    });
     final recovering = harness.notifier.retryConnect();
     await started.future;
     harness.notifier.handleNetworkChanged(connected: false);
-    delayed.complete(const Delay(name: 'fast', value: 1, url: 'https://example.test'));
+    delayed.complete(
+      const Delay(name: 'fast', value: 1, url: 'https://example.test'),
+    );
     await recovering;
 
     expect(harness.state.health, HarmonyConnectionHealth.offline);
@@ -1021,100 +1028,189 @@ void main() {
     released.complete();
     await Future.wait([connecting, loggingOut]);
 
-    expect(harness.events.indexOf('start'), lessThan(harness.events.indexOf('stop')));
+    expect(
+      harness.events.indexOf('start'),
+      lessThan(harness.events.indexOf('stop')),
+    );
     expect(harness.container.read(isStartProvider), isFalse);
     expect(harness.state.actualConnected, isFalse);
     expect(harness.state.session, isNull);
   });
 
-  test('managed failover refreshes shared health before strict root validation', () async {
-    final harness = await connectedHarness(managed: true);
-    harness.events.clear();
-    var refreshed = false;
-    when(() => harness.controller.refreshHarmonyHealth()).thenAnswer((_) async {
-      harness.events.add('refresh-managed');
-      refreshed = true;
-      return true;
-    });
-    when(() => harness.controller.getHealthDelay(any(), any()))
-        .thenAnswer((invocation) async {
+  test(
+    'managed failover refreshes shared health before strict root validation',
+    () async {
+      final harness = await connectedHarness(managed: true);
+      harness.events.clear();
+      var refreshed = false;
+      when(() => harness.controller.refreshHarmonyHealth()).thenAnswer((
+        _,
+      ) async {
+        harness.events.add('refresh-managed');
+        refreshed = true;
+        return true;
+      });
+      when(() => harness.controller.getHealthDelay(any(), any())).thenAnswer((
+        invocation,
+      ) async {
+        final name = invocation.positionalArguments[1] as String;
+        harness.events.add('health-$name');
+        return Delay(
+          name: name,
+          value: name == 'DIRECT' || refreshed ? 10 : -1,
+          url: invocation.positionalArguments[0] as String,
+        );
+      });
+
+      await harness.notifier.retryConnect();
+
+      expect(harness.state.actualConnected, isTrue);
+      expect(harness.events, contains('refresh-managed'));
+      expect(
+        harness.events.lastIndexOf('health-Harmony Auto'),
+        greaterThan(harness.events.indexOf('refresh-managed')),
+      );
+      expect(
+        harness.events.where((event) => event == 'health-Harmony Auto'),
+        hasLength(2),
+        reason: 'One failed root check and one verified recovery',
+      );
+      expect(
+        harness.proxies.changes,
+        isEmpty,
+        reason: 'The managed automatic group must not pin a leaf',
+      );
+      expect(harness.api.requests, hasLength(2));
+      expect(harness.setup.applies, 1);
+      expect(harness.setup.starts, hasLength(1));
+      expect(harness.events, isNot(contains('stop')));
+    },
+  );
+
+  test(
+    'typed errors resolve with the locale supplied by the current UI',
+    () async {
+      const state = HarmonySimpleState(
+        errorCause: HarmonySimpleError.credentials,
+      );
+      final english = await AppLocalizations.load(const Locale('en'));
+      expect(state.resolveError(english), english.harmonyCredentialsError);
+      final chinese = await AppLocalizations.load(const Locale('zh', 'CN'));
+      expect(state.resolveError(chinese), chinese.harmonyCredentialsError);
+      expect(state.error, chinese.harmonyCredentialsError);
+    },
+  );
+
+  test(
+    'confirmed OS portal pauses probes and clears without a Wi-Fi type change',
+    () async {
+      final harness = await connectedHarness(managed: true);
+      harness.events.clear();
+      when(
+        () => harness.controller.getHarmonyNetworkState(),
+      ).thenAnswer((_) async => (connected: true, captivePortal: true));
+
+      await harness.notifier.retryConnect();
+
+      expect(harness.state.health, HarmonyConnectionHealth.captivePortal);
+      expect(harness.state.actualConnected, isFalse);
+      expect(harness.state.domesticHealthy, isNull);
+      expect(harness.state.foreignHealthy, isNull);
+      expect(harness.state.connectionRequested, isTrue);
+      expect(
+        harness.events,
+        isEmpty,
+        reason: 'Portal checks must not fan out probes',
+      );
+      when(
+        () => harness.controller.getHarmonyNetworkState(),
+      ).thenAnswer((_) async => (connected: true, captivePortal: false));
+      await harness.notifier.retryConnect();
+      expect(harness.state.actualConnected, isTrue);
+      expect(harness.api.requests, hasLength(2));
+      expect(harness.setup.starts, hasLength(1));
+    },
+  );
+
+  test(
+    'a delayed resume lookup cannot restart foreground work after pause',
+    () async {
+      final harness = await connectedHarness();
+      harness.notifier.onAppPaused();
+      final checking = Completer<void>();
+      final available = Completer<bool>();
+      harness.connectivityHook = () {
+        checking.complete();
+        return available.future;
+      };
+      harness.events.clear();
+      final resuming = harness.notifier.onAppResumed();
+      await checking.future;
+      harness.notifier.onAppPaused();
+      available.complete(true);
+      await resuming;
+
+      expect(harness.state.actualConnected, isFalse);
+      expect(harness.state.connectionRequested, isTrue);
+      expect(harness.events, isEmpty);
+    },
+  );
+
+  for (final rootHealthy in [true, false]) {
+    test(
+      'managed provider-name collision requires native strict success: $rootHealthy',
+      () async {
+        final harness = _Harness(initial: [_profile()], managed: true);
+        harness.cache();
+        harness.api.downloads.addAll([
+          const HarmonyConfigDownload(notModified: true),
+          const HarmonyConfigDownload(notModified: true),
+        ]);
+        await harness.notifier.bootstrap();
+        harness.installRoute(managed: true);
+        harness.container.read(groupsProvider.notifier).value = const [
+          Group(
+            name: 'Harmony Auto',
+            type: GroupType.URLTest,
+            all: [Proxy(name: 'Harmony Auto', type: 'Trojan')],
+          ),
+        ];
+        harness.events.clear();
+        when(() => harness.controller.getHealthDelay(any(), any())).thenAnswer((
+          invocation,
+        ) async {
           final name = invocation.positionalArguments[1] as String;
           harness.events.add('health-$name');
           return Delay(
             name: name,
-            value: name == 'DIRECT' || refreshed ? 10 : -1,
+            value: name == 'DIRECT' || rootHealthy ? 10 : -1,
             url: invocation.positionalArguments[0] as String,
           );
         });
 
-    await harness.notifier.retryConnect();
+        await harness.notifier.toggleConnect();
 
-    expect(harness.state.actualConnected, isTrue);
-    expect(harness.events, contains('refresh-managed'));
-    expect(harness.events.lastIndexOf('health-Harmony Auto'),
-        greaterThan(harness.events.indexOf('refresh-managed')));
-    expect(harness.events.where((event) => event == 'health-Harmony Auto'),
-        hasLength(2), reason: 'One failed root check and one verified recovery');
-    expect(harness.proxies.changes, isEmpty,
-        reason: 'The managed automatic group must not pin a leaf');
-    expect(harness.api.requests, hasLength(2));
-    expect(harness.setup.applies, 1);
-    expect(harness.setup.starts, hasLength(1));
-    expect(harness.events, isNot(contains('stop')));
-  });
-
-  test('typed errors resolve with the locale supplied by the current UI', () async {
-    const state = HarmonySimpleState(errorCause: HarmonySimpleError.credentials);
-    final english = await AppLocalizations.load(const Locale('en'));
-    expect(state.resolveError(english), english.harmonyCredentialsError);
-    final chinese = await AppLocalizations.load(const Locale('zh', 'CN'));
-    expect(state.resolveError(chinese), chinese.harmonyCredentialsError);
-    expect(state.error, chinese.harmonyCredentialsError);
-  });
-
-
-  test('confirmed OS portal pauses probes and clears without a Wi-Fi type change', () async {
-    final harness = await connectedHarness(managed: true);
-    harness.events.clear();
-    when(() => harness.controller.getHarmonyNetworkState())
-        .thenAnswer((_) async => (connected: true, captivePortal: true));
-
-    await harness.notifier.retryConnect();
-
-    expect(harness.state.health, HarmonyConnectionHealth.captivePortal);
-    expect(harness.state.actualConnected, isFalse);
-    expect(harness.state.domesticHealthy, isNull);
-    expect(harness.state.foreignHealthy, isNull);
-    expect(harness.state.connectionRequested, isTrue);
-    expect(harness.events, isEmpty, reason: 'Portal checks must not fan out probes');
-    when(() => harness.controller.getHarmonyNetworkState())
-        .thenAnswer((_) async => (connected: true, captivePortal: false));
-    await harness.notifier.retryConnect();
-    expect(harness.state.actualConnected, isTrue);
-    expect(harness.api.requests, hasLength(2));
-    expect(harness.setup.starts, hasLength(1));
-  });
-
-
-  test('a delayed resume lookup cannot restart foreground work after pause', () async {
-    final harness = await connectedHarness();
-    harness.notifier.onAppPaused();
-    final checking = Completer<void>();
-    final available = Completer<bool>();
-    harness.connectivityHook = () {
-      checking.complete();
-      return available.future;
-    };
-    harness.events.clear();
-    final resuming = harness.notifier.onAppResumed();
-    await checking.future;
-    harness.notifier.onAppPaused();
-    available.complete(true);
-    await resuming;
-
-    expect(harness.state.actualConnected, isFalse);
-    expect(harness.state.connectionRequested, isTrue);
-    expect(harness.events, isEmpty);
-  });
+        expect(harness.state.actualConnected, rootHealthy);
+        expect(
+          harness.state.health,
+          rootHealthy
+              ? HarmonyConnectionHealth.connected
+              : HarmonyConnectionHealth.noRoute,
+        );
+        expect(
+          harness.events.where((event) => event == 'health-Harmony Auto'),
+          hasLength(1),
+          reason: 'Verify the native managed root exactly once, never a leaf alias',
+        );
+        expect(
+          harness.events.indexOf('refresh-managed'),
+          lessThan(harness.events.indexOf('health-Harmony Auto')),
+        );
+        expect(harness.proxies.changes, isEmpty);
+        expect(harness.setup.starts, hasLength(rootHealthy ? 1 : 0));
+        expect(harness.api.requests, hasLength(2));
+      },
+    );
+  }
 
 }

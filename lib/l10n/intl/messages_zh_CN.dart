@@ -307,29 +307,72 @@ class MessageLookup extends MessageLookupByLibrary {
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage("前往配置脚本"),
     "harmonyAccount": MessageLookupByLibrary.simpleMessage("账号"),
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
-      "国内和内网直连，国外网络自动使用代理。",
+      "默认内网和国内流量直连，国外流量使用代理；同时遵循订阅中已配置的规则，包括面向整个国家或地区的策略。",
+    ),
+    "harmonyCaptivePortal": MessageLookupByLibrary.simpleMessage("当前网络可能需要登录"),
+    "harmonyCaptivePortalHint": MessageLookupByLibrary.simpleMessage(
+      "当前网络提示需要登录。请打开 Wi-Fi 登录页面，完成登录后返回应用。",
+    ),
+    "harmonyCheckFailed": MessageLookupByLibrary.simpleMessage("检查未通过"),
+    "harmonyCheckPassed": MessageLookupByLibrary.simpleMessage("检查通过"),
+    "harmonyCheckPending": MessageLookupByLibrary.simpleMessage("尚未验证"),
+    "harmonyChecking": MessageLookupByLibrary.simpleMessage("正在检查连接…"),
+    "harmonyCheckingHint": MessageLookupByLibrary.simpleMessage(
+      "正在分别检查国内直连和国外代理。",
     ),
     "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
       "暂时无法获取可用线路，请稍后点击连接重试。",
     ),
+    "harmonyConnected": MessageLookupByLibrary.simpleMessage("已连接"),
     "harmonyConnecting": MessageLookupByLibrary.simpleMessage("正在连接…"),
     "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
       "用户名或密码错误。",
     ),
     "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("当前节点"),
+    "harmonyDegraded": MessageLookupByLibrary.simpleMessage("部分网络不可用"),
+    "harmonyDegradedHint": MessageLookupByLibrary.simpleMessage(
+      "两项连接检查尚未全部通过，请检查网络或重试。",
+    ),
     "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage("正在断开…"),
+    "harmonyDomesticCheck": MessageLookupByLibrary.simpleMessage("国内 · 直连"),
+    "harmonyDomesticUnavailable": MessageLookupByLibrary.simpleMessage(
+      "国内直连检查未通过，请检查 Wi-Fi 或移动网络。",
+    ),
     "harmonyDownload": MessageLookupByLibrary.simpleMessage("下载"),
+    "harmonyForeignCheck": MessageLookupByLibrary.simpleMessage("国外 · 代理"),
+    "harmonyForeignUnavailable": MessageLookupByLibrary.simpleMessage(
+      "国外代理检查未通过。若持续失败，请联系管理员检查线路是否可用。",
+    ),
+    "harmonyHealthyHint": MessageLookupByLibrary.simpleMessage(
+      "国内直连和国外代理检查已通过，个别应用或网站仍可能无法访问。",
+    ),
     "harmonyLatency": MessageLookupByLibrary.simpleMessage("延迟"),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("登录"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
-      "登录后自动获取线路，无需手动添加订阅。",
+      "使用管理员提供的用户名和密码登录，应用会自动获取线路。",
+    ),
+    "harmonyLoginRequired": MessageLookupByLibrary.simpleMessage("需要登录"),
+    "harmonyLoginRequiredHint": MessageLookupByLibrary.simpleMessage(
+      "请使用管理员提供的有效账号登录。账号已过期或不可用时无法连接。",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("退出登录"),
+    "harmonyNoRoute": MessageLookupByLibrary.simpleMessage("暂无可用的国外线路"),
+    "harmonyNoRouteHint": MessageLookupByLibrary.simpleMessage(
+      "暂时没有代理线路通过检查，请稍后重试，或联系管理员检查线路。",
+    ),
+    "harmonyOffline": MessageLookupByLibrary.simpleMessage("网络不可用"),
     "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
-      "正在使用缓存配置（离线）",
+      "正在使用已保存的线路配置",
+    ),
+    "harmonyOfflineHint": MessageLookupByLibrary.simpleMessage(
+      "请检查 Wi-Fi 或移动网络。仅凭检查失败，无法确定具体原因。",
     ),
     "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
       "尝试次数过多，请一分钟后重试。",
+    ),
+    "harmonyReconnecting": MessageLookupByLibrary.simpleMessage("正在自动重连…"),
+    "harmonyReconnectingHint": MessageLookupByLibrary.simpleMessage(
+      "正在重新尝试可用线路，您可以随时断开。",
     ),
     "harmonyRequired": MessageLookupByLibrary.simpleMessage("请填写此项。"),
     "harmonyRetry": MessageLookupByLibrary.simpleMessage("重试"),
@@ -343,6 +386,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("切换节点"),
     "harmonyUpload": MessageLookupByLibrary.simpleMessage("上传"),
     "harmonyUsername": MessageLookupByLibrary.simpleMessage("用户名"),
+    "harmonyVpnConsentHint": MessageLookupByLibrary.simpleMessage(
+      "首次连接需要您允许系统 VPN 授权。若之前拒绝，请点击连接并允许授权。连接还需要可用网络和有效账号。",
+    ),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage("是否缓存修改"),
     "hideFromList": MessageLookupByLibrary.simpleMessage("从列表中隐藏"),
     "host": MessageLookupByLibrary.simpleMessage("主机"),

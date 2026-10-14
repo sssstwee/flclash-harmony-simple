@@ -83,10 +83,12 @@ class SimpleConnectionPanel extends ConsumerWidget {
       ConnectionPhase.connected => texts.harmonyHealthyHint,
       ConnectionPhase.checking => texts.harmonyCheckingHint,
       ConnectionPhase.reconnecting => texts.harmonyReconnectingHint,
-      ConnectionPhase.degraded when domesticHealthy == false &&
-          foreignHealthy == true => texts.harmonyDomesticUnavailable,
-      ConnectionPhase.degraded when foreignHealthy == false &&
-          domesticHealthy == true => texts.harmonyForeignUnavailable,
+      ConnectionPhase.degraded
+          when domesticHealthy == false && foreignHealthy == true =>
+        texts.harmonyDomesticUnavailable,
+      ConnectionPhase.degraded
+          when foreignHealthy == false && domesticHealthy == true =>
+        texts.harmonyForeignUnavailable,
       ConnectionPhase.degraded => texts.harmonyDegradedHint,
       ConnectionPhase.offline => texts.harmonyOfflineHint,
       ConnectionPhase.captivePortal => texts.harmonyCaptivePortalHint,
@@ -95,8 +97,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
       ConnectionPhase.disconnecting => null,
       _ => texts.harmonyVpnConsentHint,
     };
-    final showChecks =
-        canDisconnect && phase != ConnectionPhase.disconnecting;
+    final showChecks = canDisconnect && phase != ConnectionPhase.disconnecting;
     final traffic = ref.watch(totalTrafficProvider);
     final live = ref.watch(
       trafficsProvider.select((state) => state.list.safeLast(const Traffic())),
@@ -310,11 +311,7 @@ class _NodeCard extends StatelessWidget {
   final int? delayMs;
   final VoidCallback? onSwitch;
 
-  const _NodeCard({
-    required this.nodeName,
-    this.delayMs,
-    this.onSwitch,
-  });
+  const _NodeCard({required this.nodeName, this.delayMs, this.onSwitch});
 
   @override
   Widget build(BuildContext context) {

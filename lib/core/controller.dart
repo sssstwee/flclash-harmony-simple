@@ -209,7 +209,8 @@ class CoreController {
   }
 
   /// A native portal flag is evidence; failed HTTPS probes are not.
-  Future<({bool? connected, bool captivePortal})> getHarmonyNetworkState() async {
+  Future<({bool? connected, bool captivePortal})>
+  getHarmonyNetworkState() async {
     final data = json.decode(await _interface.getHarmonyNetworkState()) as Map;
     return (
       connected: data['connected'] as bool?,
@@ -303,4 +304,3 @@ class CoreController {
 }
 
 final coreController = CoreController();
-

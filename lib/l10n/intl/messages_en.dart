@@ -435,31 +435,94 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "harmonyAccount": MessageLookupByLibrary.simpleMessage("Account"),
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
-      "Domestic and local networks connect directly. Overseas networks use the proxy automatically.",
+      "By default, local and domestic traffic connects directly and overseas traffic uses the proxy. Configured subscription rules, including country-wide policies, are respected.",
+    ),
+    "harmonyCaptivePortal": MessageLookupByLibrary.simpleMessage(
+      "Network login may be needed",
+    ),
+    "harmonyCaptivePortalHint": MessageLookupByLibrary.simpleMessage(
+      "Your network reported a sign-in page. Open its Wi-Fi login page, finish signing in, then return here.",
+    ),
+    "harmonyCheckFailed": MessageLookupByLibrary.simpleMessage("Check failed"),
+    "harmonyCheckPassed": MessageLookupByLibrary.simpleMessage("Check passed"),
+    "harmonyCheckPending": MessageLookupByLibrary.simpleMessage(
+      "Not yet verified",
+    ),
+    "harmonyChecking": MessageLookupByLibrary.simpleMessage(
+      "Checking connection…",
+    ),
+    "harmonyCheckingHint": MessageLookupByLibrary.simpleMessage(
+      "Checking domestic direct access and the overseas proxy.",
     ),
     "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
       "Unable to download valid connection settings. Try connecting again later.",
     ),
+    "harmonyConnected": MessageLookupByLibrary.simpleMessage("Connected"),
     "harmonyConnecting": MessageLookupByLibrary.simpleMessage("Connecting…"),
     "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
       "Incorrect username or password.",
     ),
     "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("Current node"),
+    "harmonyDegraded": MessageLookupByLibrary.simpleMessage(
+      "Connection partly available",
+    ),
+    "harmonyDegradedHint": MessageLookupByLibrary.simpleMessage(
+      "The connection checks have not both passed. Check your network or try again.",
+    ),
     "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage(
       "Disconnecting…",
     ),
+    "harmonyDomesticCheck": MessageLookupByLibrary.simpleMessage(
+      "Domestic · direct",
+    ),
+    "harmonyDomesticUnavailable": MessageLookupByLibrary.simpleMessage(
+      "The domestic direct check failed. Check Wi-Fi or mobile data.",
+    ),
     "harmonyDownload": MessageLookupByLibrary.simpleMessage("Download"),
+    "harmonyForeignCheck": MessageLookupByLibrary.simpleMessage(
+      "Overseas · proxy",
+    ),
+    "harmonyForeignUnavailable": MessageLookupByLibrary.simpleMessage(
+      "The overseas proxy check failed. If this continues, ask your service administrator to check the available routes.",
+    ),
+    "harmonyHealthyHint": MessageLookupByLibrary.simpleMessage(
+      "Domestic direct and overseas proxy checks passed. Individual apps or sites may still be unavailable.",
+    ),
     "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("Sign in"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
-      "Sign in to download your connection settings automatically.",
+      "Use the username and password from your service administrator. Connection settings load automatically.",
+    ),
+    "harmonyLoginRequired": MessageLookupByLibrary.simpleMessage(
+      "Sign in required",
+    ),
+    "harmonyLoginRequiredHint": MessageLookupByLibrary.simpleMessage(
+      "Sign in with an active account from your service administrator. An expired or unavailable account cannot connect.",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
+    "harmonyNoRoute": MessageLookupByLibrary.simpleMessage(
+      "No working overseas route",
+    ),
+    "harmonyNoRouteHint": MessageLookupByLibrary.simpleMessage(
+      "No available proxy route passed the check. Try again later or ask your service administrator to check the routes.",
+    ),
+    "harmonyOffline": MessageLookupByLibrary.simpleMessage(
+      "Network unavailable",
+    ),
     "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
-      "Using cached settings (offline)",
+      "Using saved connection settings",
+    ),
+    "harmonyOfflineHint": MessageLookupByLibrary.simpleMessage(
+      "Check Wi-Fi or mobile data. Failed checks alone do not identify the cause.",
     ),
     "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
       "Too many attempts. Try again in one minute.",
+    ),
+    "harmonyReconnecting": MessageLookupByLibrary.simpleMessage(
+      "Reconnecting automatically…",
+    ),
+    "harmonyReconnectingHint": MessageLookupByLibrary.simpleMessage(
+      "Trying an available route again. You can disconnect at any time.",
     ),
     "harmonyRequired": MessageLookupByLibrary.simpleMessage(
       "Please fill in this field.",
@@ -477,6 +540,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("Switch node"),
     "harmonyUpload": MessageLookupByLibrary.simpleMessage("Upload"),
     "harmonyUsername": MessageLookupByLibrary.simpleMessage("Username"),
+    "harmonyVpnConsentHint": MessageLookupByLibrary.simpleMessage(
+      "The first connection needs your approval of the system VPN request. If it was denied, tap Connect and allow it. Internet access and an active account are required.",
+    ),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage(
       "Do you want to cache the changes?",
     ),

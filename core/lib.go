@@ -290,4 +290,3 @@ func forceGC() {
 func updateDns(s *C.char) {
 	handleUpdateDns(takeCString(s))
 }
-

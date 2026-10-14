@@ -84,7 +84,7 @@ jobs:
       - name: Test network observer and VPN lifecycle with in-memory APIs
         run: node --test ../test/native/*.cjs
       - name: Format native recovery sources
-        run: gofmt -w lib.go hub.go common.go constant.go network_recovery.go health.go health_test.go internal/recovery/*.go
+        run: gofmt -w lib.go hub.go common.go constant.go network_recovery.go network_dns_*.go health.go health_test.go internal/recovery/*.go
       - name: Report formatted native sources during implementation
         if: always() && github.head_ref == 'dot/harmony-auto-adapt-20261014-0519'
         run: |

@@ -35,15 +35,19 @@ void main() {
           container.listen(checkIpNumProvider, (_, _) {});
           final before = container.read(checkIpNumProvider);
 
-          await container.read(proxiesActionProvider.notifier).changeProxy(
-            groupName: 'Main',
-            proxyName: 'Node',
-            preserveConnections: preserveConnections,
-          );
+          await container
+              .read(proxiesActionProvider.notifier)
+              .changeProxy(
+                groupName: 'Main',
+                proxyName: 'Node',
+                preserveConnections: preserveConnections,
+              );
 
-          verify(() => core.changeProxy(
-            const ChangeProxyParams(groupName: 'Main', proxyName: 'Node'),
-          )).called(1);
+          verify(
+            () => core.changeProxy(
+              const ChangeProxyParams(groupName: 'Main', proxyName: 'Node'),
+            ),
+          ).called(1);
           if (preserveConnections) {
             verifyNever(() => core.closeConnections());
             verifyNever(() => core.resetConnections());
@@ -71,11 +75,13 @@ void main() {
     final before = container.read(checkIpNumProvider);
 
     await expectLater(
-      container.read(proxiesActionProvider.notifier).changeProxy(
-        groupName: 'Main',
-        proxyName: 'Node',
-        preserveConnections: true,
-      ),
+      container
+          .read(proxiesActionProvider.notifier)
+          .changeProxy(
+            groupName: 'Main',
+            proxyName: 'Node',
+            preserveConnections: true,
+          ),
       throwsStateError,
     );
 
@@ -84,27 +90,28 @@ void main() {
     expect(container.read(checkIpNumProvider), before);
   });
 
-  test('native route error cannot record success or close existing flows', () async {
-    final core = _Core();
-    when(() => core.changeProxy(any())).thenAnswer((_) async => 'not found');
-    final container = ProviderContainer(
-      overrides: [proxiesCoreControllerProvider.overrideWithValue(core)],
-    );
-    addTearDown(container.dispose);
-    container.listen(checkIpNumProvider, (_, _) {});
-    final before = container.read(checkIpNumProvider);
+  test(
+    'native route error cannot record success or close existing flows',
+    () async {
+      final core = _Core();
+      when(() => core.changeProxy(any())).thenAnswer((_) async => 'not found');
+      final container = ProviderContainer(
+        overrides: [proxiesCoreControllerProvider.overrideWithValue(core)],
+      );
+      addTearDown(container.dispose);
+      container.listen(checkIpNumProvider, (_, _) {});
+      final before = container.read(checkIpNumProvider);
 
-    await expectLater(
-      container.read(proxiesActionProvider.notifier).changeProxy(
-        groupName: 'Main',
-        proxyName: 'Node',
-      ),
-      throwsStateError,
-    );
+      await expectLater(
+        container
+            .read(proxiesActionProvider.notifier)
+            .changeProxy(groupName: 'Main', proxyName: 'Node'),
+        throwsStateError,
+      );
 
-    verifyNever(() => core.closeConnections());
-    verifyNever(() => core.resetConnections());
-    expect(container.read(checkIpNumProvider), before);
-  });
-
+      verifyNever(() => core.closeConnections());
+      verifyNever(() => core.resetConnections());
+      expect(container.read(checkIpNumProvider), before);
+    },
+  );
 }

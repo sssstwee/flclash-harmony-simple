@@ -21,16 +21,44 @@ String _normalized(String value) =>
 /// unresolved group is never assumed to be a working outbound proxy.
 bool isHarmonyProxyLeaf(String name, String type) {
   if (const {
-    'direct', 'compatible', 'reject', 'rejectdrop', 'pass', 'passrule',
-    'rematch', 'dns', 'global', '',
+    'direct',
+    'compatible',
+    'reject',
+    'rejectdrop',
+    'pass',
+    'passrule',
+    'rematch',
+    'dns',
+    'global',
+    '',
   }.contains(_normalized(name))) {
     return false;
   }
   return const {
-    'ss', 'shadowsocks', 'ssr', 'shadowsocksr', 'snell', 'socks5', 'http',
-    'vmess', 'vless', 'trojan', 'hysteria', 'hysteria2', 'wireguard', 'tuic',
-    'ssh', 'mieru', 'anytls', 'sudoku', 'masque', 'trusttunnel', 'shadowquic',
-    'openvpn', 'tailscale', 'gostrelay',
+    'ss',
+    'shadowsocks',
+    'ssr',
+    'shadowsocksr',
+    'snell',
+    'socks5',
+    'http',
+    'vmess',
+    'vless',
+    'trojan',
+    'hysteria',
+    'hysteria2',
+    'wireguard',
+    'tuic',
+    'ssh',
+    'mieru',
+    'anytls',
+    'sudoku',
+    'masque',
+    'trusttunnel',
+    'shadowquic',
+    'openvpn',
+    'tailscale',
+    'gostrelay',
   }.contains(_normalized(type));
 }
 
@@ -49,7 +77,10 @@ String effectiveHarmonyAutoGroupName(Map<String, dynamic> config) {
     }
   }
   final names = <String>{
-    'GLOBAL', 'DIRECT', 'REJECT', 'COMPATIBLE',
+    'GLOBAL',
+    'DIRECT',
+    'REJECT',
+    'COMPATIBLE',
     for (final group in groups) group['name'] as String,
     for (final proxy in (config['proxies'] as List? ?? []))
       (proxy as Map)['name'] as String,
@@ -71,7 +102,10 @@ String applyHarmonyAutomaticRouting(Map<String, dynamic> config) {
   final name = effectiveHarmonyAutoGroupName(config);
   final nodes = <String>{
     for (final proxy in (config['proxies'] as List? ?? []).cast<Map>())
-      if (isHarmonyProxyLeaf('${proxy['name'] ?? ''}', '${proxy['type'] ?? ''}'))
+      if (isHarmonyProxyLeaf(
+        '${proxy['name'] ?? ''}',
+        '${proxy['type'] ?? ''}',
+      ))
         proxy['name'] as String,
   }.toList();
   final providers = Map<String, dynamic>.from(
@@ -97,9 +131,9 @@ String applyHarmonyAutomaticRouting(Map<String, dynamic> config) {
     providers[providerName] = provider;
   }
   if (providers.isNotEmpty) config['proxy-providers'] = providers;
-  final groups = _groups(config)
-      .where((group) => group[_managedMarker] != _managedVersion)
-      .toList();
+  final groups = _groups(
+    config,
+  ).where((group) => group[_managedMarker] != _managedVersion).toList();
   for (final group in groups) {
     // Native recovery discovers ownership by this reserved icon. Imported
     // groups must not impersonate the regenerated group's identity.
@@ -165,7 +199,8 @@ List<String> _ruleParts(String rule) {
 }
 
 bool _isCatchAll(List<String> parts) =>
-    parts.isNotEmpty && const {'MATCH', 'FINAL'}.contains(parts.first.toUpperCase());
+    parts.isNotEmpty &&
+    const {'MATCH', 'FINAL'}.contains(parts.first.toUpperCase());
 
 /// LAN protection, subscription exceptions, domestic defaults, then automatic
 /// overseas fallback. The first original catch-all terminates the subscription;
@@ -206,10 +241,13 @@ List<String> defaultRoutingRules(Map<String, dynamic> config) {
           (type == 'IP-CIDR' && payload == '0.0.0.0/0') ||
           (type == 'IP-CIDR6' && payload == '::/0');
       if (type != 'SUB-RULE' &&
-          ((parts[2] == originalTarget && groupNames.contains(originalTarget)) ||
-              (broadOverseas && !const {
-                'REJECT', 'REJECT-DROP',
-              }.contains(parts[2].toUpperCase())))) {
+          ((parts[2] == originalTarget &&
+                  groupNames.contains(originalTarget)) ||
+              (broadOverseas &&
+                  !const {
+                    'REJECT',
+                    'REJECT-DROP',
+                  }.contains(parts[2].toUpperCase())))) {
         parts[2] = target;
         (broadOverseas ? generalRules : exceptions).add(parts.join(','));
         continue;
@@ -246,7 +284,9 @@ void applyDefaultDns(Map<String, dynamic> config) {
     'https://dns.alidns.com/dns-query',
     'https://doh.pub/dns-query',
   ];
-  final policy = Map<String, dynamic>.from(dns['nameserver-policy'] as Map? ?? {});
+  final policy = Map<String, dynamic>.from(
+    dns['nameserver-policy'] as Map? ?? {},
+  );
   // Subscription split-DNS, including its own domestic/private resolvers, wins.
   policy.putIfAbsent('geosite:private', () => ['system://']);
   policy.putIfAbsent('geosite:cn', () => directDns);

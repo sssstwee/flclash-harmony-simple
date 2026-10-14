@@ -4,7 +4,10 @@ import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 
-typedef AutomaticProxySelection = ({String name, Map<String, String> selections});
+typedef AutomaticProxySelection = ({
+  String name,
+  Map<String, String> selections,
+});
 
 bool _safeGroup(Group group, List<Group> groups, Set<String> visited) {
   if (group.type == GroupType.Relay ||
@@ -95,7 +98,8 @@ Future<AutomaticProxySelection?> autoSelectProxy(
     if (!stopped.isCompleted) stopped.complete();
   }
 
-  bool active() => !finished && !stopped.isCompleted && isCurrent?.call() != false;
+  bool active() =>
+      !finished && !stopped.isCompleted && isCurrent?.call() != false;
   final timer = Timer(const Duration(seconds: 24), stop);
   cancelled?.then<void>((_) => stop(), onError: (Object _) => stop());
 
@@ -104,8 +108,9 @@ Future<AutomaticProxySelection?> autoSelectProxy(
     return probes.putIfAbsent(name, () async {
       try {
         final value = await Future.any<int?>([
-          Future<int?>.sync(() => active() ? measure(name) : null)
-              .timeout(const Duration(seconds: 8)),
+          Future<int?>.sync(
+            () => active() ? measure(name) : null,
+          ).timeout(const Duration(seconds: 8)),
           stopped.future.then<int?>((_) => null),
         ]);
         return active() ? value : null;
@@ -127,6 +132,7 @@ Future<AutomaticProxySelection?> autoSelectProxy(
         }
       }
     }
+
     // Only recursively validated, acyclic automatic groups reach this method.
     visit(group);
     return result.toList();
@@ -145,18 +151,24 @@ Future<AutomaticProxySelection?> autoSelectProxy(
 
   Future<AutomaticProxySelection?> select() async {
     // One automatic group at a time keeps warm-up fanout at six globally.
-    for (final candidate in candidates.where((item) => automatic.containsKey(item.name))) {
+    for (final candidate in candidates.where(
+      (item) => automatic.containsKey(item.name),
+    )) {
       if (!active()) return null;
       if (warmAutomatic && !await warm(automatic[candidate.name]!)) continue;
       final value = await delay(candidate.name);
       if (!active()) return null;
       if (value != null && value > 0) return candidate;
     }
-    final manual = candidates.where((item) => !automatic.containsKey(item.name)).toList();
+    final manual = candidates
+        .where((item) => !automatic.containsKey(item.name))
+        .toList();
     for (var offset = 0; offset < manual.length; offset += 6) {
       if (!active()) return null;
       final batch = manual.skip(offset).take(6).toList();
-      final values = await Future.wait(batch.map((candidate) => delay(candidate.name)));
+      final values = await Future.wait(
+        batch.map((candidate) => delay(candidate.name)),
+      );
       if (!active()) return null;
       AutomaticProxySelection? best;
       var bestDelay = double.infinity;

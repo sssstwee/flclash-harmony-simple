@@ -41,6 +41,21 @@ var (
 	debugError    = false
 )
 
+// appProxies follows the same name precedence as rule routing: static groups
+// and built-ins win over provider leaves. Mihomo's AllProxies view overlays
+// provider names, which can hide the actual managed group or even DIRECT.
+// Return an independent map; never mutate Mihomo's shared proxy registry.
+func appProxies() map[string]constant.Proxy {
+	proxies := make(map[string]constant.Proxy)
+	for name, proxy := range tunnel.AllProxies() {
+		proxies[name] = proxy
+	}
+	for name, proxy := range tunnel.Proxies() {
+		proxies[name] = proxy
+	}
+	return proxies
+}
+
 func getExternalProvidersRaw() map[string]cp.Provider {
 	eps := make(map[string]cp.Provider)
 	for n, p := range tunnel.Providers() {
@@ -142,7 +157,7 @@ func stopListeners() {
 }
 
 func patchSelectGroup(mapping map[string]string) {
-	for name, proxy := range tunnel.AllProxies() {
+	for name, proxy := range appProxies() {
 		outbound, ok := proxy.(*adapter.Proxy)
 		if !ok {
 			continue
@@ -284,4 +299,3 @@ func logError(format string, args ...interface{}) {
 		fmt.Fprintf(os.Stderr, "[ERROR] "+format+"\n", args...)
 	}
 }
-

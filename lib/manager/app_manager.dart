@@ -302,4 +302,3 @@ class AppSidebarContainer extends ConsumerWidget {
     );
   }
 }
-

@@ -23,13 +23,15 @@ func probeHealth(ctx context.Context, proxy constant.Proxy, rawURL string) (uint
 
 func newHealthTransport(proxy constant.Proxy, metadata *constant.Metadata) (http.RoundTripper, error) {
 	tlsConfig, err := ca.GetTLSConfig(ca.Option{})
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 			return proxy.DialContext(ctx, metadata)
 		},
-		TLSClientConfig: tlsConfig,
-		DisableKeepAlives: true,
+		TLSClientConfig:     tlsConfig,
+		DisableKeepAlives:   true,
 		TLSHandshakeTimeout: 4 * time.Second,
 	}, nil
 }
@@ -43,9 +45,13 @@ func probeHealthWithTransport(ctx context.Context, proxy constant.Proxy, rawURL 
 		return 0, errors.New("health probe requires HTTPS")
 	}
 	port := u.Port()
-	if port == "" { port = "443" }
+	if port == "" {
+		port = "443"
+	}
 	var metadata constant.Metadata
-	if err := metadata.SetRemoteAddress(net.JoinHostPort(u.Hostname(), port)); err != nil { return 0, err }
+	if err := metadata.SetRemoteAddress(net.JoinHostPort(u.Hostname(), port)); err != nil {
+		return 0, err
+	}
 	// Probe the actual selected leaf of our own group. Calling the group's
 	// DialContext would also trigger Mihomo's unbounded failure health-check,
 	// bypassing the recovery scheduler. Other/nested groups are not health routes.
@@ -64,21 +70,33 @@ func probeHealthWithTransport(ctx context.Context, proxy constant.Proxy, rawURL 
 		proxy = selected
 	}
 	transport, err := factory(proxy, &metadata)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	client := &http.Client{
-		Transport: transport,
+		Transport:     transport,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse },
 	}
 	defer client.CloseIdleConnections()
 	request, err := http.NewRequest(http.MethodHead, rawURL, nil)
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	start := time.Now()
 	response, err := client.Do(request.WithContext(ctx))
-	if err != nil { return 0, err }
+	if err != nil {
+		return 0, err
+	}
 	defer response.Body.Close()
-	if !recovery.HealthyStatus(rawURL, response.StatusCode) { return 0, errors.New("unexpected health status") }
+	if !recovery.HealthyStatus(rawURL, response.StatusCode) {
+		return 0, errors.New("unexpected health status")
+	}
 	elapsed := time.Since(start).Milliseconds()
-	if elapsed < 1 { elapsed = 1 }
-	if elapsed > 65535 { elapsed = 65535 }
+	if elapsed < 1 {
+		elapsed = 1
+	}
+	if elapsed > 65535 {
+		elapsed = 65535
+	}
 	return uint16(elapsed), nil
 }

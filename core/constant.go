@@ -53,10 +53,10 @@ type ChangeProxyParams struct {
 }
 
 type TestDelayParams struct {
-	HealthCheck bool `json:"health-check,omitempty"`
-	ProxyName string `json:"proxy-name"`
-	TestUrl   string `json:"test-url"`
-	Timeout   int64  `json:"timeout"`
+	HealthCheck bool   `json:"health-check,omitempty"`
+	ProxyName   string `json:"proxy-name"`
+	TestUrl     string `json:"test-url"`
+	Timeout     int64  `json:"timeout"`
 }
 
 type ExternalProvider struct {
@@ -144,4 +144,3 @@ func (message *Message) Json() (string, error) {
 	data, err := json.Marshal(message)
 	return string(data), err
 }
-

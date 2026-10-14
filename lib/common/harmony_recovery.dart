@@ -87,7 +87,9 @@ class HarmonyRecoveryTicket {
   Future<T> wait<T>(Future<T> work) => Future.any<T>([
     work,
     cancelled.then<T>((_) => throw HarmonyRecoveryCancelled()),
-    _expired.then<T>((_) => throw TimeoutException('Health check budget elapsed')),
+    _expired.then<T>(
+      (_) => throw TimeoutException('Health check budget elapsed'),
+    ),
   ]);
 }
 
@@ -131,8 +133,11 @@ class HarmonyRecoveryCoordinator {
   HarmonyRecoverySnapshot get snapshot => _snapshot;
   Future<void> get idle => _active ?? Future<void>.value();
   bool get _mayRun =>
-      !_disposed && _requested && _foreground &&
-      _online != false && !_captivePortal;
+      !_disposed &&
+      _requested &&
+      _foreground &&
+      _online != false &&
+      !_captivePortal;
 
   void _emit(HarmonyRecoverySnapshot value) {
     _snapshot = value;
@@ -177,13 +182,15 @@ class HarmonyRecoveryCoordinator {
     if (_active != null) return _active!;
     final completion = Completer<void>();
     _active = completion.future;
-    unawaited(_drain().whenComplete(() {
-      _active = null;
-      // A listener can queue a new check between drain completion and this
-      // microtask. Do not strand that request without a timer.
-      if (_pending && _mayRun) unawaited(checkNow());
-      completion.complete();
-    }));
+    unawaited(
+      _drain().whenComplete(() {
+        _active = null;
+        // A listener can queue a new check between drain completion and this
+        // microtask. Do not strand that request without a timer.
+        if (_pending && _mayRun) unawaited(checkNow());
+        completion.complete();
+      }),
+    );
     return completion.future;
   }
 
@@ -197,10 +204,12 @@ class HarmonyRecoveryCoordinator {
     if (!_mayRun) {
       _emitEnvironment();
     } else {
-      _emit(const HarmonyRecoverySnapshot(
-        health: HarmonyConnectionHealth.checking,
-        connectionRequested: true,
-      ));
+      _emit(
+        const HarmonyRecoverySnapshot(
+          health: HarmonyConnectionHealth.checking,
+          connectionRequested: true,
+        ),
+      );
       _schedule(debounce);
     }
   }
@@ -212,10 +221,12 @@ class HarmonyRecoveryCoordinator {
       _emitEnvironment();
       return;
     }
-    _emit(const HarmonyRecoverySnapshot(
-      health: HarmonyConnectionHealth.checking,
-      connectionRequested: true,
-    ));
+    _emit(
+      const HarmonyRecoverySnapshot(
+        health: HarmonyConnectionHealth.checking,
+        connectionRequested: true,
+      ),
+    );
     _schedule(debounce);
   }
 
@@ -223,10 +234,12 @@ class HarmonyRecoveryCoordinator {
     _foreground = false;
     _invalidate();
     if (_requested) {
-      _emit(const HarmonyRecoverySnapshot(
-        health: HarmonyConnectionHealth.checking,
-        connectionRequested: true,
-      ));
+      _emit(
+        const HarmonyRecoverySnapshot(
+          health: HarmonyConnectionHealth.checking,
+          connectionRequested: true,
+        ),
+      );
     }
   }
 
@@ -238,14 +251,16 @@ class HarmonyRecoveryCoordinator {
   }
 
   void _emitEnvironment() {
-    _emit(HarmonyRecoverySnapshot(
-      health: _captivePortal
-          ? HarmonyConnectionHealth.captivePortal
-          : _online == false
-              ? HarmonyConnectionHealth.offline
-              : HarmonyConnectionHealth.checking,
-      connectionRequested: _requested,
-    ));
+    _emit(
+      HarmonyRecoverySnapshot(
+        health: _captivePortal
+            ? HarmonyConnectionHealth.captivePortal
+            : _online == false
+            ? HarmonyConnectionHealth.offline
+            : HarmonyConnectionHealth.checking,
+        connectionRequested: _requested,
+      ),
+    );
   }
 
   void _schedule(Duration delay) {
@@ -273,13 +288,15 @@ class HarmonyRecoveryCoordinator {
         expired.future,
         () => budgetExpired,
       );
-      _emit(HarmonyRecoverySnapshot(
-        health: _failures == 0
-            ? HarmonyConnectionHealth.checking
-            : HarmonyConnectionHealth.reconnecting,
-        connectionRequested: true,
-        recoveryAttempt: _failures,
-      ));
+      _emit(
+        HarmonyRecoverySnapshot(
+          health: _failures == 0
+              ? HarmonyConnectionHealth.checking
+              : HarmonyConnectionHealth.reconnecting,
+          connectionRequested: true,
+          recoveryAttempt: _failures,
+        ),
+      );
       HarmonyHealthResult result;
       try {
         result = await attempt(ticket);
@@ -301,20 +318,22 @@ class HarmonyRecoveryCoordinator {
       final delay = healthy || environmentBlocked
           ? healthyInterval
           : _failures >= burstAttempts
-              ? cooldown
-              : Duration(
-                  milliseconds: (baseRetry.inMilliseconds *
-                          (1 << (_failures - 1)))
-                      .clamp(0, cooldown.inMilliseconds).toInt(),
-                );
-      _emit(HarmonyRecoverySnapshot(
-        health: result.health,
-        connectionRequested: true,
-        domesticHealthy: environmentBlocked ? null : result.domesticHealthy,
-        foreignHealthy: environmentBlocked ? null : result.foreignHealthy,
-        recoveryAttempt: _failures,
-        nextRetryAt: healthy || environmentBlocked ? null : now().add(delay),
-      ));
+          ? cooldown
+          : Duration(
+              milliseconds: (baseRetry.inMilliseconds * (1 << (_failures - 1)))
+                  .clamp(0, cooldown.inMilliseconds)
+                  .toInt(),
+            );
+      _emit(
+        HarmonyRecoverySnapshot(
+          health: result.health,
+          connectionRequested: true,
+          domesticHealthy: environmentBlocked ? null : result.domesticHealthy,
+          foreignHealthy: environmentBlocked ? null : result.foreignHealthy,
+          recoveryAttempt: _failures,
+          nextRetryAt: healthy || environmentBlocked ? null : now().add(delay),
+        ),
+      );
       if (!_pending) _schedule(delay);
     }
   }

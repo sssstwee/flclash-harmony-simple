@@ -4674,10 +4674,10 @@ class AppLocalizations {
     return Intl.message('Sign in', name: 'harmonyLogin', desc: '', args: []);
   }
 
-  /// `Sign in to download your connection settings automatically.`
+  /// `Use the username and password from your service administrator. Connection settings load automatically.`
   String get harmonyLoginHint {
     return Intl.message(
-      'Sign in to download your connection settings automatically.',
+      'Use the username and password from your service administrator. Connection settings load automatically.',
       name: 'harmonyLoginHint',
       desc: '',
       args: [],
@@ -4779,20 +4779,20 @@ class AppLocalizations {
     );
   }
 
-  /// `Domestic and local networks connect directly. Overseas networks use the proxy automatically.`
+  /// `By default, local and domestic traffic connects directly and overseas traffic uses the proxy. Configured subscription rules, including country-wide policies, are respected.`
   String get harmonyAutomaticHint {
     return Intl.message(
-      'Domestic and local networks connect directly. Overseas networks use the proxy automatically.',
+      'By default, local and domestic traffic connects directly and overseas traffic uses the proxy. Configured subscription rules, including country-wide policies, are respected.',
       name: 'harmonyAutomaticHint',
       desc: '',
       args: [],
     );
   }
 
-  /// `Using cached settings (offline)`
+  /// `Using saved connection settings`
   String get harmonyOfflineConfig {
     return Intl.message(
-      'Using cached settings (offline)',
+      'Using saved connection settings',
       name: 'harmonyOfflineConfig',
       desc: '',
       args: [],
@@ -4864,6 +4864,246 @@ class AppLocalizations {
     return Intl.message(
       'Connection error',
       name: 'simpleErrorState',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connected`
+  String get harmonyConnected {
+    return Intl.message(
+      'Connected',
+      name: 'harmonyConnected',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking connection…`
+  String get harmonyChecking {
+    return Intl.message(
+      'Checking connection…',
+      name: 'harmonyChecking',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Checking domestic direct access and the overseas proxy.`
+  String get harmonyCheckingHint {
+    return Intl.message(
+      'Checking domestic direct access and the overseas proxy.',
+      name: 'harmonyCheckingHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Domestic direct and overseas proxy checks passed. Individual apps or sites may still be unavailable.`
+  String get harmonyHealthyHint {
+    return Intl.message(
+      'Domestic direct and overseas proxy checks passed. Individual apps or sites may still be unavailable.',
+      name: 'harmonyHealthyHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Reconnecting automatically…`
+  String get harmonyReconnecting {
+    return Intl.message(
+      'Reconnecting automatically…',
+      name: 'harmonyReconnecting',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Trying an available route again. You can disconnect at any time.`
+  String get harmonyReconnectingHint {
+    return Intl.message(
+      'Trying an available route again. You can disconnect at any time.',
+      name: 'harmonyReconnectingHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Connection partly available`
+  String get harmonyDegraded {
+    return Intl.message(
+      'Connection partly available',
+      name: 'harmonyDegraded',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The domestic direct check failed. Check Wi-Fi or mobile data.`
+  String get harmonyDomesticUnavailable {
+    return Intl.message(
+      'The domestic direct check failed. Check Wi-Fi or mobile data.',
+      name: 'harmonyDomesticUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The overseas proxy check failed. If this continues, ask your service administrator to check the available routes.`
+  String get harmonyForeignUnavailable {
+    return Intl.message(
+      'The overseas proxy check failed. If this continues, ask your service administrator to check the available routes.',
+      name: 'harmonyForeignUnavailable',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The connection checks have not both passed. Check your network or try again.`
+  String get harmonyDegradedHint {
+    return Intl.message(
+      'The connection checks have not both passed. Check your network or try again.',
+      name: 'harmonyDegradedHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network unavailable`
+  String get harmonyOffline {
+    return Intl.message(
+      'Network unavailable',
+      name: 'harmonyOffline',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Check Wi-Fi or mobile data. Failed checks alone do not identify the cause.`
+  String get harmonyOfflineHint {
+    return Intl.message(
+      'Check Wi-Fi or mobile data. Failed checks alone do not identify the cause.',
+      name: 'harmonyOfflineHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Network login may be needed`
+  String get harmonyCaptivePortal {
+    return Intl.message(
+      'Network login may be needed',
+      name: 'harmonyCaptivePortal',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Your network reported a sign-in page. Open its Wi-Fi login page, finish signing in, then return here.`
+  String get harmonyCaptivePortalHint {
+    return Intl.message(
+      'Your network reported a sign-in page. Open its Wi-Fi login page, finish signing in, then return here.',
+      name: 'harmonyCaptivePortalHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sign in required`
+  String get harmonyLoginRequired {
+    return Intl.message(
+      'Sign in required',
+      name: 'harmonyLoginRequired',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Sign in with an active account from your service administrator. An expired or unavailable account cannot connect.`
+  String get harmonyLoginRequiredHint {
+    return Intl.message(
+      'Sign in with an active account from your service administrator. An expired or unavailable account cannot connect.',
+      name: 'harmonyLoginRequiredHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No working overseas route`
+  String get harmonyNoRoute {
+    return Intl.message(
+      'No working overseas route',
+      name: 'harmonyNoRoute',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No available proxy route passed the check. Try again later or ask your service administrator to check the routes.`
+  String get harmonyNoRouteHint {
+    return Intl.message(
+      'No available proxy route passed the check. Try again later or ask your service administrator to check the routes.',
+      name: 'harmonyNoRouteHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `The first connection needs your approval of the system VPN request. If it was denied, tap Connect and allow it. Internet access and an active account are required.`
+  String get harmonyVpnConsentHint {
+    return Intl.message(
+      'The first connection needs your approval of the system VPN request. If it was denied, tap Connect and allow it. Internet access and an active account are required.',
+      name: 'harmonyVpnConsentHint',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Domestic · direct`
+  String get harmonyDomesticCheck {
+    return Intl.message(
+      'Domestic · direct',
+      name: 'harmonyDomesticCheck',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Overseas · proxy`
+  String get harmonyForeignCheck {
+    return Intl.message(
+      'Overseas · proxy',
+      name: 'harmonyForeignCheck',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Check passed`
+  String get harmonyCheckPassed {
+    return Intl.message(
+      'Check passed',
+      name: 'harmonyCheckPassed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Check failed`
+  String get harmonyCheckFailed {
+    return Intl.message(
+      'Check failed',
+      name: 'harmonyCheckFailed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Not yet verified`
+  String get harmonyCheckPending {
+    return Intl.message(
+      'Not yet verified',
+      name: 'harmonyCheckPending',
       desc: '',
       args: [],
     );

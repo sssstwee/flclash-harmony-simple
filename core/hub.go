@@ -106,7 +106,7 @@ func handleGetProxies() ProxiesData {
 
 	nameList := config.GetProxyNameList()
 
-	proxies := tunnel.AllProxies()
+	proxies := appProxies()
 
 	hasGlobal := false
 
@@ -152,7 +152,7 @@ func handleChangeProxy(data string, fn func(string string)) {
 		}
 		groupName := *params.GroupName
 		proxyName := *params.ProxyName
-		proxies := tunnel.AllProxies()
+		proxies := appProxies()
 		group, ok := proxies[groupName]
 		if !ok {
 			fn("Not found group")
@@ -214,7 +214,7 @@ func handleResetTraffic() {
 func handleAsyncTestDelay(paramsString string, fn func(string)) {
 	var request struct {
 		RefreshManaged bool `json:"refresh-managed"`
-		NetworkState bool `json:"network-state"`
+		NetworkState   bool `json:"network-state"`
 	}
 	if json.Unmarshal([]byte(paramsString), &request) == nil && request.NetworkState {
 		fn(getNativeNetworkState())
@@ -222,7 +222,7 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 	}
 	if json.Unmarshal([]byte(paramsString), &request) == nil && request.RefreshManaged {
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 14 * time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 14*time.Second)
 			defer cancel()
 			fn(strconv.FormatBool(networkRecovery.Refresh(ctx)))
 		}()
@@ -245,7 +245,7 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*time.Duration(params.Timeout))
 		defer cancel()
 
-		proxies := tunnel.AllProxies()
+		proxies := appProxies()
 		proxy := proxies[params.ProxyName]
 
 		delayData := &Delay{
@@ -595,4 +595,3 @@ func init() {
 		})
 	}
 }
-

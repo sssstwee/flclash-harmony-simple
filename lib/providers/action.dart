@@ -750,7 +750,9 @@ class ThemeAction extends _$ThemeAction {
 }
 
 /// Injectable core boundary for route changes and connection-preservation tests.
-final proxiesCoreControllerProvider = Provider<CoreController>((ref) => coreController);
+final proxiesCoreControllerProvider = Provider<CoreController>(
+  (ref) => coreController,
+);
 
 @Riverpod(keepAlive: true)
 class ProxiesAction extends _$ProxiesAction {
@@ -1037,4 +1039,3 @@ class GeoResourceAction extends _$GeoResourceAction {
     });
   }
 }
-
