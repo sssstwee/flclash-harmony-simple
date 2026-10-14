@@ -10,6 +10,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/common/harmony_recovery.dart';
+import 'package:fl_clash/common/verified_profile_backup.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -139,9 +140,33 @@ class HarmonyProfileStore {
   Future<Profile> save(Profile profile, Uint8List bytes) =>
       profile.saveFile(bytes);
 
+  Future<VerifiedProfileBackup> _backup(Profile profile) async {
+    final file = File(await appPath.getProfilePath(profile.id.toString()));
+    return VerifiedProfileBackup(file, profile.id);
+  }
+
+  Future<void> preserve(
+    Profile profile,
+    Uint8List bytes,
+    String contentHash,
+  ) async => (await _backup(profile)).preserve(bytes, contentHash);
+
+  Future<Uint8List?> readBackup(Profile profile, String contentHash) async =>
+      (await _backup(profile)).read(contentHash);
+
+  Future<void> restore(
+    Profile profile,
+    Uint8List bytes,
+    String contentHash,
+  ) async => (await _backup(profile)).restore(bytes, contentHash);
+
   Future<void> delete(Profile profile) async {
     final file = File(await appPath.getProfilePath(profile.id.toString()));
-    await file.safeDelete();
+    try {
+      await file.safeDelete();
+    } finally {
+      await (await _backup(profile)).clear();
+    }
   }
 }
 
@@ -167,6 +192,8 @@ final harmonyConnectivityCheckProvider = Provider<Future<bool> Function()>(
 );
 
 class _SupersededHarmonyOperation implements Exception {}
+
+class _HarmonyCacheUnavailable implements Exception {}
 
 @Riverpod(keepAlive: true)
 HarmonyAccountApi harmonyAccountApi(Ref ref) => harmonyAccount;
@@ -768,32 +795,91 @@ class HarmonySimple extends _$HarmonySimple {
     }
   }
 
+  bool _sameCacheMetadata(
+    HarmonyConfigCacheMetadata? first,
+    HarmonyConfigCacheMetadata? second,
+  ) =>
+      first != null &&
+      second != null &&
+      first.username == second.username &&
+      first.profileId == second.profileId &&
+      first.contentHash == second.contentHash &&
+      first.etag == second.etag &&
+      first.lastModified == second.lastModified;
+
+  bool _matchesCache(Uint8List? bytes, String contentHash) =>
+      bytes != null &&
+      bytes.isNotEmpty &&
+      bytes.length <= harmonyConfigMaxBytes &&
+      sha256.convert(bytes).toString() == contentHash;
+
+  void _hideUnavailableCache() {
+    state = state.copyWith(
+      clearRemoteProfile: true,
+      usingCachedConfig: false,
+    );
+  }
+
+  Future<HarmonyConfigCacheMetadata?> _readCacheMetadata(int operation) async {
+    try {
+      final metadata = await _api.readConfigCache();
+      if (!ref.mounted || operation != _operation) {
+        throw _SupersededHarmonyOperation();
+      }
+      return metadata;
+    } catch (_) {
+      if (ref.mounted && operation == _operation) _hideUnavailableCache();
+      rethrow;
+    }
+  }
+
   Future<Profile?> _verifiedCachedProfile(
     HarmonyConfigCacheMetadata? metadata,
   ) async {
     final token = _api.session?.token;
-    if (metadata == null || metadata.username != _api.session?.username) {
+    final operation = _operation;
+    if (token == null ||
+        metadata == null ||
+        metadata.username != _api.session?.username) {
       return null;
     }
     final profile = _remoteProfiles()
         .where((profile) => profile.id == metadata.profileId)
         .firstOrNull;
-    if (profile == null) {
-      return null;
-    }
+    if (profile == null) return null;
     try {
       final bytes = await _files.read(profile);
-      if (_api.session?.token != token ||
-          !ref.mounted ||
-          bytes == null ||
-          bytes.isEmpty ||
-          bytes.length > harmonyConfigMaxBytes ||
-          sha256.convert(bytes).toString() != metadata.contentHash) {
-        return null;
+      _ensureCurrent(operation, token);
+      if (_matchesCache(bytes, metadata.contentHash)) return profile;
+      final backup = await _files.readBackup(profile, metadata.contentHash);
+      _ensureCurrent(operation, token);
+      if (!_matchesCache(backup, metadata.contentHash)) return null;
+      final recovery = (profile: profile, done: Completer<void>());
+      _profileInstalls.add(recovery);
+      try {
+        // Only the current account's trusted metadata authorizes recovery.
+        // Exact-byte restoration needs no live core and preserves profile IDs,
+        // provider-cache directories and separately stored profile rules.
+        await _files.restore(profile, backup!, metadata.contentHash);
+        _ensureCurrent(operation, token);
+        final restored = await _files.read(profile);
+        _ensureCurrent(operation, token);
+        if (!_matchesCache(restored, metadata.contentHash)) {
+          throw _HarmonyCacheUnavailable();
+        }
+      } finally {
+        recovery.done.complete();
+        _profileInstalls.remove(recovery);
       }
       return profile;
+    } on _SupersededHarmonyOperation {
+      rethrow;
     } catch (_) {
-      return null;
+      _ensureCurrent(operation, token);
+      // IO/restore failures are not evidence of an invalid cache. Abort orphan
+      // cleanup, preserve its row and backup, and never publish unsafe bytes.
+      _hideUnavailableCache();
+      throw _HarmonyCacheUnavailable();
     }
   }
 
@@ -805,7 +891,11 @@ class HarmonySimple extends _$HarmonySimple {
     if (session == null) {
       throw HarmonyAccountError.expired;
     }
-    final metadata = await _api.readConfigCache();
+    final metadata = await _readCacheMetadata(operation);
+    if (metadata == null && _remoteProfiles().isNotEmpty) {
+      _hideUnavailableCache();
+      throw _HarmonyCacheUnavailable();
+    }
     final cached = await _verifiedCachedProfile(metadata);
     _ensureCurrent(operation, session.token);
     if (cached == null) {
@@ -814,6 +904,7 @@ class HarmonySimple extends _$HarmonySimple {
         usingCachedConfig: false,
       );
     }
+    var installationStarted = false;
     try {
       var download = await _api.downloadConfig(
         ifNoneMatch: cached == null ? null : metadata?.etag,
@@ -841,41 +932,127 @@ class HarmonySimple extends _$HarmonySimple {
       }
       await ref.read(coreActionProvider.notifier).tryStartCore();
       _ensureCurrent(operation, session.token);
-      final target =
-          _remoteProfiles().firstOrNull?.copyWith(label: appDisplayName) ??
-          Profile.normal(label: appDisplayName);
+      installationStarted = true;
+      final managed = _remoteProfiles();
+      final retained = managed
+          .where((profile) => profile.label == appDisplayName)
+          .firstOrNull ?? managed.firstOrNull;
+      final target = cached ?? retained ?? Profile.normal(label: appDisplayName);
       final install = (profile: target, done: Completer<void>());
       _profileInstalls.add(install);
-      late final Profile profile;
+      HarmonyConfigCacheMetadata? candidateMetadata;
+      var metadataCommitStarted = false;
       try {
-        profile = await _files.save(target, bytes);
+        if (cached != null && metadata != null) {
+          final previousBytes = await _files.read(cached);
+          _ensureCurrent(operation, session.token);
+          if (!_matchesCache(previousBytes, metadata.contentHash)) {
+            throw _HarmonyCacheUnavailable();
+          }
+          // Protect the accepted generation durably before replacing anything.
+          await _files.preserve(cached, previousBytes!, metadata.contentHash);
+          _ensureCurrent(operation, session.token);
+        }
+        final profile = (await _files.save(target, bytes)).copyWith(
+          autoUpdate: false,
+        );
         _ensureCurrent(operation, session.token);
         await ref
             .read(profilesActionProvider.notifier)
-            .putProfile(profile.copyWith(autoUpdate: false));
+            .putProfile(profile, selectIfEmpty: false);
         _ensureCurrent(operation, session.token);
-      } finally {
-        install.done.complete();
-        _profileInstalls.remove(install);
-      }
-      await _api.commitConfigCache(
-        HarmonyConfigCacheMetadata(
+        candidateMetadata = HarmonyConfigCacheMetadata(
           username: session.username,
           profileId: profile.id,
           contentHash: sha256.convert(bytes).toString(),
           etag: download.etag,
           lastModified: download.lastModified,
-        ),
-        expectedToken: session.token,
-      );
-      _ensureCurrent(operation, session.token);
-      ref.read(currentProfileIdProvider.notifier).value = profile.id;
-      state = state.copyWith(remoteProfile: profile, usingCachedConfig: false);
+        );
+        metadataCommitStarted = true;
+        await _api.commitConfigCache(
+          candidateMetadata,
+          expectedToken: session.token,
+        );
+        _ensureCurrent(operation, session.token);
+        ref.read(currentProfileIdProvider.notifier).value = profile.id;
+        state = state.copyWith(remoteProfile: profile, usingCachedConfig: false);
+      } on _SupersededHarmonyOperation {
+        rethrow;
+      } catch (error, stack) {
+        _ensureCurrent(operation, session.token);
+        if (error == HarmonyAccountError.expired) rethrow;
+        if (cached == null && retained == null && !metadataCommitStarted) {
+          // A new file that never reached the trusted-pointer commit has no
+          // accepted generation to preserve. Clean it while logout still joins
+          // this install, including a DB write that failed after persistence.
+          await _deleteRemoteProfile(target);
+          _ensureCurrent(operation, session.token);
+          _hideUnavailableCache();
+          Error.throwWithStackTrace(error, stack);
+        }
+        try {
+          // A storage error can be reported after its write committed. Read
+          // back the trusted pointer before choosing either byte generation.
+          final actual = await _readCacheMetadata(operation);
+          _ensureCurrent(operation, session.token);
+          if (actual == null && cached == null && retained == null) {
+            // This process created a genuinely new candidate, and read-back
+            // cannot accept it. No previous accepted generation is at risk;
+            // remove the uncommitted candidate so a normal retry can proceed.
+            await _deleteRemoteProfile(target);
+            _ensureCurrent(operation, session.token);
+          }
+          final accepted = await _verifiedCachedProfile(actual);
+          _ensureCurrent(operation, session.token);
+          if (metadataCommitStarted &&
+              _sameCacheMetadata(actual, candidateMetadata) &&
+              accepted != null) {
+            ref.read(currentProfileIdProvider.notifier).value = accepted.id;
+            state = state.copyWith(
+              remoteProfile: accepted,
+              usingCachedConfig: false,
+            );
+            return;
+          }
+          if (cached != null &&
+              _sameCacheMetadata(actual, metadata) &&
+              accepted != null) {
+            try {
+              await ref
+                  .read(profilesActionProvider.notifier)
+                  .putProfile(cached, selectIfEmpty: false);
+            } catch (_) {
+              // Byte recovery and the trusted pointer remain valid even if
+              // restoring cosmetic DB metadata (e.g. last update) fails.
+            }
+            _ensureCurrent(operation, session.token);
+            state = state.copyWith(
+              remoteProfile: accepted,
+              usingCachedConfig: true,
+            );
+          } else {
+            _hideUnavailableCache();
+          }
+        } on _SupersededHarmonyOperation {
+          rethrow;
+        } catch (_) {
+          _ensureCurrent(operation, session.token);
+          // Uncertain pointer or failed rollback: keep both generations and
+          // refuse activation until trusted-metadata recovery can succeed.
+          _hideUnavailableCache();
+        }
+        Error.throwWithStackTrace(error, stack);
+      } finally {
+        install.done.complete();
+        _profileInstalls.remove(install);
+      }
     } on HarmonyAccountError catch (error) {
       _ensureCurrent(operation, session.token);
       // Invalid configs, revoked sessions and rate limits are not network
       // failures. Never hide those behind an unrelated/stale local profile.
-      if (fallbackOnNetworkError && error == HarmonyAccountError.unavailable) {
+      if (!installationStarted &&
+          fallbackOnNetworkError &&
+          error == HarmonyAccountError.unavailable) {
         final existing = await _verifiedCachedProfile(metadata);
         _ensureCurrent(operation, session.token);
         if (existing != null) {
@@ -910,17 +1087,33 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> _cleanupOrphanRemoteProfiles(int operation) async {
-    final metadata = await _api.readConfigCache();
+    final metadata = await _readCacheMetadata(operation);
     if (!ref.mounted || operation != _operation) {
+      return;
+    }
+    if (metadata == null && _api.session != null) {
+      // A missing/malformed/unavailable trusted pointer cannot prove that a
+      // previous accepted generation is safe to discard or overwrite. Keep
+      // every generation until trusted metadata returns or explicit logout.
+      _hideUnavailableCache();
+      if (_remoteProfiles().isNotEmpty) throw _HarmonyCacheUnavailable();
       return;
     }
     var accepted = await _verifiedCachedProfile(metadata);
     if (!ref.mounted || operation != _operation) {
       return;
     }
+    for (final profile in _remoteProfiles()) {
+      if (!ref.mounted || operation != _operation) {
+        return;
+      }
+      if (profile.id != accepted?.id) await _deleteRemoteProfile(profile);
+    }
     final token = _api.session?.token;
     if (accepted != null &&
         accepted.label == legacyAppDisplayName &&
+        !_remoteProfiles().any((profile) =>
+            profile.id != accepted!.id && profile.label == appDisplayName) &&
         token != null) {
       final renamed = accepted.copyWith(label: appDisplayName);
       // Track label-only DB writes too: logout must join them before deleting
@@ -940,12 +1133,6 @@ class HarmonySimple extends _$HarmonySimple {
         migration.done.complete();
         _profileInstalls.remove(migration);
       }
-    }
-    for (final profile in _remoteProfiles()) {
-      if (!ref.mounted || operation != _operation) {
-        return;
-      }
-      if (profile.id != accepted?.id) await _deleteRemoteProfile(profile);
     }
     if (ref.mounted && operation == _operation) {
       state = state.copyWith(

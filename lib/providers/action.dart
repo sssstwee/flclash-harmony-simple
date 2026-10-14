@@ -890,16 +890,20 @@ class ProfilesAction extends _$ProfilesAction {
 
   Future<void> deleteProfile(int id) async {
     await ref.read(profilesProvider.notifier).delAndWait(id);
-    await clearEffect(id);
-    final currentProfileId = ref.read(currentProfileIdProvider);
-    if (currentProfileId == id) {
-      final profiles = ref.read(profilesProvider);
-      if (profiles.isNotEmpty) {
-        final updateId = profiles.first.id;
-        ref.read(currentProfileIdProvider.notifier).value = updateId;
-      } else {
-        ref.read(currentProfileIdProvider.notifier).value = null;
-        ref.read(setupActionProvider.notifier).updateStatus(false);
+    try {
+      await clearEffect(id);
+    } finally {
+      // The row is already deleted, even when file cleanup fails.
+      final currentProfileId = ref.read(currentProfileIdProvider);
+      if (currentProfileId == id) {
+        final profiles = ref.read(profilesProvider);
+        if (profiles.isNotEmpty) {
+          final updateId = profiles.first.id;
+          ref.read(currentProfileIdProvider.notifier).value = updateId;
+        } else {
+          ref.read(currentProfileIdProvider.notifier).value = null;
+          ref.read(setupActionProvider.notifier).updateStatus(false);
+        }
       }
     }
   }
@@ -921,9 +925,12 @@ class ProfilesAction extends _$ProfilesAction {
     }
   }
 
-  Future<void> putProfile(Profile profile) async {
+  Future<void> putProfile(
+    Profile profile, {
+    bool selectIfEmpty = true,
+  }) async {
     await ref.read(profilesProvider.notifier).putAndWait(profile);
-    if (ref.read(currentProfileIdProvider) != null) return;
+    if (!selectIfEmpty || ref.read(currentProfileIdProvider) != null) return;
     ref.read(currentProfileIdProvider.notifier).value = profile.id;
   }
 
