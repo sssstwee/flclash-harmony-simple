@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage only this dot branch's matching unsigned HAP/APP, with provenance."""
+"""Stage this dot branch's final unsigned HAP/APP build outputs, with provenance."""
 import argparse
 import hashlib
 import json
@@ -55,13 +55,12 @@ def stage(root, env):
         ('app', root / 'ohos/build/outputs/default/ohos-default-unsigned.app'),
     ]
     validated = []
+    # APP assembly can regenerate HAP after the distributor copied its first HAP
+    # into dist/. Collect the authoritative final unsigned outputs after both
+    # targets finish, rather than comparing against that stale intermediate copy.
     for extension, raw in pairs:
-        candidates = list((root / 'dist').rglob(f'*.{extension}'))
-        if raw.is_symlink() or not raw.is_file() or len(candidates) != 1:
-            raise ValueError(f'Expected exactly one unsigned {extension} output')
-        source = candidates[0]
-        if source.is_symlink() or not source.is_file() or raw.stat().st_size == 0:
-            raise ValueError(f'Invalid {extension} output')
+        if raw.is_symlink() or not raw.is_file() or raw.stat().st_size == 0:
+            raise ValueError(f'Expected a nonempty final unsigned {extension} output')
         try:
             with zipfile.ZipFile(raw) as archive:
                 if not archive.namelist() or archive.testzip() is not None:
@@ -69,9 +68,7 @@ def stage(root, env):
         except zipfile.BadZipFile as error:
             raise ValueError(f'Invalid {extension} archive') from error
         checksum = digest(raw)
-        if digest(source) != checksum:
-            raise ValueError(f'{extension} does not match its unsigned build output')
-        validated.append((extension, source, checksum))
+        validated.append((extension, raw, checksum))
 
     staging = Path(tempfile.mkdtemp(prefix='.dot-package-', dir=root))
     try:
@@ -81,7 +78,12 @@ def stage(root, env):
             shutil.copyfile(source, output)
             if digest(output) != checksum:
                 raise ValueError(f'{extension} changed while staging')
-            files.append({'name': output.name, 'sha256': checksum, 'bytes': output.stat().st_size})
+            files.append({
+                'name': output.name,
+                'source_path': source.relative_to(root).as_posix(),
+                'sha256': checksum,
+                'bytes': output.stat().st_size,
+            })
         metadata = {
             'repository': REPOSITORY,
             'branch': BRANCH,

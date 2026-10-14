@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 SCRIPT = Path(__file__).resolve().parents[2] / '.github/scripts/stage-dot-package.py'
@@ -71,6 +72,7 @@ class StageDotPackageTest(unittest.TestCase):
         for file in info['files']:
             self.assertEqual(file['sha256'], MODULE.digest(output / file['name']))
             self.assertEqual(file['bytes'], (output / file['name']).stat().st_size)
+            self.assertEqual(file['sha256'], MODULE.digest(self.root / file['source_path']))
 
     def test_rejects_wrong_identity_and_incomplete_provenance(self):
         for key in list(self.env):
@@ -138,17 +140,36 @@ class StageDotPackageTest(unittest.TestCase):
         raw.rename(raw.with_name('entry-default-signed.hap'))
         self.assert_rejected()
 
-    def test_rejects_missing_distributor_output(self):
-        (self.root / 'dist/FlClash-0.8.94-ohos.app').unlink()
-        self.assert_rejected()
+    def test_accepts_final_raw_outputs_without_distributor_directory(self):
+        shutil.rmtree(self.root / 'dist')
+        output = self.run_stage()
+        for extension, raw in self.raw.items():
+            staged = output / f'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.{extension}'
+            self.assertEqual(MODULE.digest(staged), MODULE.digest(raw))
 
-    def test_rejects_multiple_distributor_outputs(self):
-        shutil.copyfile(self.raw['hap'], self.root / 'dist/stale.hap')
-        self.assert_rejected()
+    def test_ignores_unrelated_distributor_outputs(self):
+        (self.root / 'dist/stale.hap').write_bytes(b'unrelated package')
+        (self.root / 'dist/FlClash-0.8.94-ohos.app').write_bytes(b'stale app copy')
+        output = self.run_stage()
+        self.assertNotIn('stale.hap', {path.name for path in output.iterdir()})
+        staged = output / 'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.app'
+        self.assertEqual(MODULE.digest(staged), MODULE.digest(self.raw['app']))
 
-    def test_rejects_changed_distributor_bytes(self):
-        (self.root / 'dist/FlClash-0.8.94-ohos.app').write_bytes(b'unrelated package')
-        self.assert_rejected()
+    def test_stages_final_regenerated_hap_instead_of_stale_distributor_copy(self):
+        early_hap = self.root / 'dist/FlClash-0.8.94-ohos.hap'
+        earlier_digest = MODULE.digest(early_hap)
+        # The later APP target regenerates raw HAP; dist still holds target one's copy.
+        with zipfile.ZipFile(self.raw['hap'], 'w') as archive:
+            archive.writestr('module.json', '{"test":"final HAP after APP assembly"}')
+        output = self.run_stage()
+        staged = output / 'dot-harmony-auto-adapt-aaaaaaaaaaaa-unsigned.hap'
+        self.assertEqual(MODULE.digest(staged), MODULE.digest(self.raw['hap']))
+        self.assertNotEqual(MODULE.digest(staged), earlier_digest)
+        self.assertEqual(MODULE.digest(early_hap), earlier_digest)
+        info = json.loads((output / 'BUILD-INFO.json').read_text())
+        hap_info = next(file for file in info['files'] if file['name'].endswith('.hap'))
+        self.assertEqual(hap_info['source_path'], self.raw['hap'].relative_to(self.root).as_posix())
+        self.assertEqual(hap_info['sha256'], MODULE.digest(staged))
 
     def test_rejects_empty_package(self):
         self.raw['hap'].write_bytes(b'')
@@ -164,10 +185,29 @@ class StageDotPackageTest(unittest.TestCase):
         self.assert_rejected()
 
     def test_rejects_symlink_input(self):
-        source = self.root / 'dist/FlClash-0.8.94-ohos.hap'
+        source = self.raw['hap']
         source.unlink()
-        source.symlink_to(self.raw['hap'])
+        source.symlink_to(self.root / 'dist/FlClash-0.8.94-ohos.hap')
         self.assert_rejected()
+
+    def test_rejects_corrupt_raw_crc_despite_valid_distributor_copy(self):
+        raw = self.raw['hap']
+        data = raw.read_bytes()
+        self.assertIn(b'mock unsigned fixture', data)
+        raw.write_bytes(data.replace(b'mock unsigned fixture', b'bad! unsigned fixture', 1))
+        self.assert_rejected()
+
+    def test_rejects_invalid_final_app_despite_valid_distributor_copy(self):
+        self.raw['app'].write_bytes(b'not a valid final APP archive')
+        self.assert_rejected()
+
+    def test_rejects_missing_final_app_despite_valid_distributor_copy(self):
+        self.raw['app'].unlink()
+        self.assert_rejected()
+
+    def test_atomic_staging_removes_partial_output_after_copy_failure(self):
+        with mock.patch.object(MODULE.shutil, 'copyfile', side_effect=OSError('copy failed')):
+            self.assert_rejected()
 
     def test_refuses_to_overwrite_output(self):
         output = self.run_stage()
