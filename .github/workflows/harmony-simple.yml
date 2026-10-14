@@ -1,4 +1,4 @@
-name: Clash Harmony
+name: 小猫AI代理
 
 on:
   push:
@@ -193,9 +193,9 @@ jobs:
           SHORT="${GITHUB_SHA::7}"
           BRANCH="${{ github.head_ref || github.ref_name }}"
           if [[ "$BRANCH" == "cursor/zero-config-harmony-proxy-31c4" ]]; then
-            echo "name=Clash-Harmony-cursor-pr3-${SHORT}" >> "$GITHUB_OUTPUT"
+            echo "name=xiaomao-ai-proxy-cursor-pr3-${SHORT}" >> "$GITHUB_OUTPUT"
           else
-            echo "name=Clash-Harmony-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "name=xiaomao-ai-proxy-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload packages

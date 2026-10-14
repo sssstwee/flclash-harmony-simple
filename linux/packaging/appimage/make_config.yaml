@@ -1,14 +1,14 @@
-display_name: FlClash
+display_name: 小猫AI代理
 
 icon: ./assets/images/icon.png
 
 keywords:
-  - FlClash
+  - 小猫AI代理
   - Clash
   - ClashMeta
   - Proxy
 
-generic_name: FlClash
+generic_name: 小猫AI代理
 
 categories:
   - Network

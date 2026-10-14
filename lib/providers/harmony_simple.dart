@@ -842,7 +842,7 @@ class HarmonySimple extends _$HarmonySimple {
       await ref.read(coreActionProvider.notifier).tryStartCore();
       _ensureCurrent(op, session.token);
       final target =
-          _remoteProfiles().firstOrNull ??
+          _remoteProfiles().firstOrNull?.copyWith(label: appDisplayName) ??
           Profile.normal(label: appDisplayName);
       final install = (profile: target, done: Completer<void>());
       _profileInstalls.add(install);
@@ -940,7 +940,11 @@ class HarmonySimple extends _$HarmonySimple {
 
   List<Profile> _remoteProfiles() => ref
       .read(profilesProvider)
-      .where((p) => p.url.isEmpty && p.label == appDisplayName)
+      .where(
+        (p) =>
+            p.url.isEmpty &&
+            (p.label == appDisplayName || p.label == legacyAppDisplayName),
+      )
       .toList();
 
   Future<void> _deleteRemoteProfile(Profile profile) async {
@@ -994,9 +998,32 @@ class HarmonySimple extends _$HarmonySimple {
     if (!ref.mounted || operation != _operation) {
       return;
     }
-    final accepted = await _verifiedCachedProfile(metadata);
+    var accepted = await _verifiedCachedProfile(metadata);
     if (!ref.mounted || operation != _operation) {
       return;
+    }
+    final token = _api.session?.token;
+    if (accepted != null &&
+        accepted.label == legacyAppDisplayName &&
+        token != null) {
+      final renamed = accepted.copyWith(label: appDisplayName);
+      // Track label-only DB writes too: logout must join them before deleting
+      // managed profiles, so a delayed migration cannot resurrect access.
+      final migration = (profile: renamed, done: Completer<void>());
+      _profileInstalls.add(migration);
+      try {
+        await ref.read(profilesActionProvider.notifier).putProfile(renamed);
+        _ensureCurrent(operation, token);
+        accepted = renamed;
+      } on _SupersededHarmonyOperation {
+        rethrow;
+      } catch (_) {
+        // A cosmetic write failure must not invalidate a verified offline cache.
+        _ensureCurrent(operation, token);
+      } finally {
+        migration.done.complete();
+        _profileInstalls.remove(migration);
+      }
     }
     for (final profile in _remoteProfiles()) {
       if (!ref.mounted || operation != _operation) {

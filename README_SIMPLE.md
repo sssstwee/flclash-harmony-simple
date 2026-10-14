@@ -1,4 +1,4 @@
-# Clash Harmony
+# 小猫AI代理
 
 基于 [tljk/FlClash-ohos 的 v0.8.94-ohos 分支](https://github.com/tljk/FlClash-ohos/tree/v0.8.94-ohos)，上游基线 `017c08b8f842fef37ffb3220605b2477380a6dc4`。保留 GPL-3.0 许可和上游版权；本分支并非 FlClash 官方发行版。
 
@@ -30,7 +30,7 @@
 
 使用上游 CI 指定的鸿蒙 Flutter SDK：`CPF-Flutter/flutter_flutter` 的 `3.44.9+ohos-0.0.1-canary1`，以及仓库的 `.github/flutter_ohos.patch`。普通 Flutter SDK 不支持此项目的 `Platform.isOhos` 与 `TargetPlatform.ohos`。
 
-推送到 `main` 或手动运行 Actions 的 **Clash Harmony** 工作流，会检查服务端类型和认证测试，并依次安装应用依赖、静态检查、运行全部 Flutter 测试、编译鸿蒙 Go 内核并构建 HAP / APP。构建产物与 SHA-256 校验文件保存在对应运行的 Artifacts 中，保留 14 天。
+推送到 `main` 或手动运行 Actions 的 **小猫AI代理** 工作流，会检查服务端类型和认证测试，并依次安装应用依赖、静态检查、运行全部 Flutter 测试、编译鸿蒙 Go 内核并构建 HAP / APP。构建产物与 SHA-256 校验文件保存在对应运行的 Artifacts 中，保留 14 天。
 
 工作流沿用上游 CI 的 SDK 和工具链，输出未签名 HAP。安装前需要使用与 `com.follow.clash.simple` 对应、包含目标手机 UDID 的 HarmonyOS 调试证书和 profile 签名；证书、私钥和订阅链接不得提交进公开仓库。真机的 VPN 授权仍需设备所有者完成。
 

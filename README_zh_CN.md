@@ -1,4 +1,4 @@
-# FlClash 鸿蒙简洁版
+# 小猫AI代理
 
 导入订阅 → 自动选线 → 一键连接。基于 [tljk/FlClash-ohos](https://github.com/tljk/FlClash-ohos/tree/v0.8.94-ohos)，保留 GPL-3.0 许可与上游版权。这是独立二开版本，鸿蒙 7 兼容性待真机验证。
 
@@ -12,7 +12,7 @@
 
 </div>
 
-## FlClash
+## 上游 FlClash 参考资料
 
 [![Downloads](https://img.shields.io/github/downloads/tljk/FlClash-ohos/total?style=flat-square&logo=github)](https://github.com/tljk/FlClash-ohos/releases/)[![Last Version](https://img.shields.io/github/release/tljk/FlClash-ohos/all.svg?style=flat-square)](https://github.com/tljk/FlClash-ohos/releases/)[![License](https://img.shields.io/github/license/tljk/FlClash-ohos?style=flat-square)](LICENSE)
 

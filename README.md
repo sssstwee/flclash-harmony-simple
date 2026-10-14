@@ -1,4 +1,4 @@
-# Clash Harmony
+# 小猫AI代理
 
 Minimal HarmonyOS edition: sign in, fetch admin-managed Mihomo config from Cloudflare, auto-select a node, connect. Full product guide: **[README_SIMPLE.md](README_SIMPLE.md)** (简体中文).
 
@@ -66,10 +66,16 @@ Deploy steps: [backend/README.md](backend/README.md).
 
 ## Build & CI
 
-GitHub Actions workflow **Clash Harmony** (`.github/workflows/harmony-simple.yml`): secret pattern scan, backend tests, Flutter analyze/test, unsigned HAP on app changes. Uses pinned gitcode SHAs in [`.github/harmony-pinned-shas.env`](.github/harmony-pinned-shas.env).
+GitHub Actions workflow **小猫AI代理** (`.github/workflows/harmony-simple.yml`): secret pattern scan, backend tests, Flutter analyze/test, unsigned HAP on app changes. Uses pinned gitcode SHAs in [`.github/harmony-pinned-shas.env`](.github/harmony-pinned-shas.env).
 
 ## Repo layout note
 
 Platform trees (`android/`, `windows/`, `macos/`, `linux/`) remain from upstream FlClash for shared code and CI parity; the Harmony **simple** product path uses `ohos/` + slim dashboard only.
 
 Based on [tljk/FlClash-ohos](https://github.com/tljk/FlClash-ohos), GPL-3.0.
+
+## Naming and upgrade compatibility
+
+The app display name is **小猫AI代理** in both supported languages (Chinese and English); portable artifact filenames use `xiaomao-ai-proxy`. The GitHub repository slug is managed separately in repository settings. Existing repository links remain on the verified current URL until that rename is completed.
+
+Package IDs, signing identity, storage paths, launch/service IDs, URL schemes and the internal `fl_clash` / `FlClash` identifiers stay stable so existing configuration and update compatibility are preserved. Upstream project names and credits remain attribution. Already installed apps keep their old label until a new build is installed. This rename does not deploy a backend or restart a canceled package build.

@@ -29,7 +29,7 @@ export async function syncConfig(args, dependencies = {}) {
   let size = 0;
   try {
     const response = await (dependencies.fetch ?? fetch)(subscription, {
-      headers: { 'User-Agent': 'ClashHarmony/1.0' },
+      headers: { 'User-Agent': 'XiaomaoAIProxy/1.0' },
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`Subscription returned HTTP ${response.status}`);

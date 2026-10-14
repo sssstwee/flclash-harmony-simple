@@ -1,7 +1,7 @@
 {
   "name": "clash-harmony-api",
   "version": "1.0.0",
-  "description": "Cloudflare login and protected configuration service for Clash Harmony",
+  "description": "Cloudflare login and protected configuration service for 小猫AI代理",
   "private": true,
   "type": "module",
   "scripts": {

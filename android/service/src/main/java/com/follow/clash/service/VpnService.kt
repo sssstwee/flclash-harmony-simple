@@ -204,7 +204,7 @@ class VpnService : SystemVpnService(), IBaseService,
                     }
                 }
             }
-            setSession("FlClash")
+            setSession("小猫AI代理")
             setBlocking(false)
             if (Build.VERSION.SDK_INT >= 29) {
                 setMetered(false)
