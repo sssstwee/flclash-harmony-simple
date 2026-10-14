@@ -763,17 +763,20 @@ class HarmonySimple extends _$HarmonySimple {
       var download = await _api.downloadConfig(
         ifModifiedSince: skipConditionals
             ? null
-            : await _api.readConfigLastModified(),
-        ifNoneMatch: skipConditionals ? null : await _api.readConfigEtag(),
+            : cached != null
+            ? metadata?.lastModified ?? await _api.readConfigLastModified()
+            : null,
+        ifNoneMatch: skipConditionals
+            ? null
+            : cached != null
+            ? metadata?.etag
+            : null,
       );
       _ensureCurrent(op, session.token);
       if (download.notModified) {
-        final current =
-            await _verifiedCachedProfile(metadata) ??
-            state.remoteProfile ??
-            _findRemoteProfile();
+        final current = await _verifiedCachedProfile(metadata);
         _ensureCurrent(op, session.token);
-        if (current != null && (cached != null || metadata == null)) {
+        if (current != null && cached != null) {
           ref.read(currentProfileIdProvider.notifier).value = current.id;
           state = state.copyWith(
             remoteProfile: current,
@@ -784,13 +787,9 @@ class HarmonySimple extends _$HarmonySimple {
         }
         download = await _api.downloadConfig();
         _ensureCurrent(op, session.token);
-        if (download.notModified) {
-          await _markConfigUpToDate(checkedAt: DateTime.now());
-          return;
-        }
       }
       final bytes = download.bytes;
-      if (bytes == null || bytes.isEmpty) {
+      if (download.notModified || bytes == null || bytes.isEmpty) {
         throw HarmonyAccountError.config;
       }
       final yamlText = utf8.decode(bytes);
@@ -829,6 +828,12 @@ class HarmonySimple extends _$HarmonySimple {
           lastModified: download.lastModified,
         ),
         expectedToken: session.token,
+      );
+      await _api.persistInstalledConfigValidators(
+        expectedToken: session.token,
+        lastModified: download.lastModified,
+        etag: download.etag,
+        configVersion: download.configVersion,
       );
       _ensureCurrent(op, session.token);
       ref.read(currentProfileIdProvider.notifier).value = profile.id;

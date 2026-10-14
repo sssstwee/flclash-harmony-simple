@@ -399,6 +399,31 @@ class HarmonyAccountApi {
     return metadata?.username == current.username ? metadata : null;
   }
 
+  Future<void> persistInstalledConfigValidators({
+    required String expectedToken,
+    String? lastModified,
+    String? etag,
+    String? configVersion,
+  }) async {
+    final generation = _generation;
+    await _store(() async {
+      _checkGeneration(generation);
+      if (!isAuthorized || session?.token != expectedToken) {
+        throw HarmonyAccountError.expired;
+      }
+      if (lastModified != null && lastModified.isNotEmpty) {
+        await _storage.writeConfigLastModified(lastModified);
+      }
+      if (etag != null && etag.isNotEmpty) {
+        await _storage.writeConfigEtag(etag);
+      }
+      if (configVersion != null && configVersion.isNotEmpty) {
+        await _storage.writeConfigVersion(configVersion);
+      }
+      _checkGeneration(generation);
+    });
+  }
+
   Future<void> commitConfigCache(
     HarmonyConfigCacheMetadata metadata, {
     required String expectedToken,
@@ -612,22 +637,12 @@ class HarmonyAccountApi {
     if (response.statusCode == 304) {
       final etag = response.headers.value('etag');
       final version = response.headers.value('x-config-version');
-      await _store(() async {
-        if (etag != null && etag.isNotEmpty) {
-          await _storage.writeConfigEtag(etag);
-        }
-        if (version != null && version.isNotEmpty) {
-          await _storage.writeConfigVersion(version);
-        }
-      });
       return HarmonyConfigDownload(
         notModified: true,
-        etag: etag ?? ifNoneMatch ?? await readConfigEtag(),
+        etag: etag ?? ifNoneMatch,
         lastModified:
-            response.headers.value('last-modified') ??
-            ifModifiedSince ??
-            await readConfigLastModified(),
-        configVersion: version ?? await readConfigVersion(),
+            response.headers.value('last-modified') ?? ifModifiedSince,
+        configVersion: version,
         profileUpdateInterval: null,
       );
     }
@@ -663,17 +678,6 @@ class HarmonyAccountApi {
     final etag = response.headers.value('etag');
     final configVersion = response.headers.value('x-config-version');
     final headerInterval = response.headers.value('profile-update-interval');
-    await _store(() async {
-      if (lastModified != null && lastModified.isNotEmpty) {
-        await _storage.writeConfigLastModified(lastModified);
-      }
-      if (etag != null && etag.isNotEmpty) {
-        await _storage.writeConfigEtag(etag);
-      }
-      if (configVersion != null && configVersion.isNotEmpty) {
-        await _storage.writeConfigVersion(configVersion);
-      }
-    });
     return HarmonyConfigDownload(
       bytes: Uint8List.fromList(bytes),
       etag: etag,
@@ -758,6 +762,9 @@ class HarmonyAccountApi {
             : HarmonyAccountError.expired;
       }
       if (status == 429) throw HarmonyAccountError.rateLimited;
+      if (configPath && (status == null || status >= 500)) {
+        throw HarmonyAccountError.unavailable;
+      }
       if (configPath) throw HarmonyAccountError.config;
       throw HarmonyAccountError.unavailable;
     }
