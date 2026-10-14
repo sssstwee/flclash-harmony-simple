@@ -1,7 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/harmony_home_status.dart';
+import 'package:fl_clash/common/harmony_user_issue.dart';
+import 'package:fl_clash/views/dashboard/widgets/harmony_issue_copy.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:intl/intl.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +29,9 @@ class SimpleConnectionPanel extends ConsumerWidget {
   final bool usingCachedConfig;
   final String? nodeName;
   final int? nodeDelayMs;
+  final HarmonyHomeStatus homeStatus;
+  final bool showReconnectHint;
+  final HarmonyUserIssue? issue;
 
   const SimpleConnectionPanel({
     super.key,
@@ -38,6 +45,9 @@ class SimpleConnectionPanel extends ConsumerWidget {
     this.usingCachedConfig = false,
     this.nodeName,
     this.nodeDelayMs,
+    this.homeStatus = const HarmonyHomeStatus(),
+    this.showReconnectHint = true,
+    this.issue,
   });
 
   @override
@@ -47,14 +57,17 @@ class SimpleConnectionPanel extends ConsumerWidget {
         phase == ConnectionPhase.connecting ||
         phase == ConnectionPhase.disconnecting;
     final running = phase == ConnectionPhase.connected;
-    final hasError = phase == ConnectionPhase.error || error != null;
-    final status = switch (phase) {
-      ConnectionPhase.disconnected => texts.simpleReady,
-      ConnectionPhase.connecting => texts.harmonyConnecting,
-      ConnectionPhase.connected => texts.simpleRunning,
-      ConnectionPhase.disconnecting => texts.harmonyDisconnecting,
-      ConnectionPhase.error => texts.simpleErrorState,
-    };
+    final issueCopy = issue == null ? null : harmonyIssueCopy(texts, issue!);
+    final hasError =
+        phase == ConnectionPhase.error || error != null || issueCopy != null;
+    final status = issueCopy?.title ??
+        switch (phase) {
+          ConnectionPhase.disconnected => texts.simpleReady,
+          ConnectionPhase.connecting => texts.harmonyConnecting,
+          ConnectionPhase.connected => texts.simpleRunning,
+          ConnectionPhase.disconnecting => texts.harmonyDisconnecting,
+          ConnectionPhase.error => texts.simpleErrorState,
+        };
     final traffic = ref.watch(totalTrafficProvider);
     final live = ref.watch(
       trafficsProvider.select((state) => state.list.safeLast(const Traffic())),
@@ -80,27 +93,18 @@ class SimpleConnectionPanel extends ConsumerWidget {
             ),
           ),
         ),
-        if (usingCachedConfig) ...[
+        if (issueCopy != null) ...[
+          const SizedBox(height: 10),
+          _IssueExplanation(copy: issueCopy, emphasized: hasError),
+        ] else if (usingCachedConfig) ...[
           const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.cloud_off_outlined,
-                size: 16,
-                color: context.colorScheme.tertiary,
-              ),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  texts.harmonyOfflineConfig,
-                  textAlign: TextAlign.center,
-                  style: context.textTheme.bodySmall?.copyWith(
-                    color: context.colorScheme.tertiary,
-                  ),
-                ),
-              ),
-            ],
+          _IssueExplanation(
+            copy: (
+              title: texts.harmonyIssueTitleOfflineCached,
+              detail: texts.harmonyIssueDetailOfflineCached,
+              action: texts.harmonyIssueActionOfflineCached,
+            ),
+            emphasized: false,
           ),
         ],
         const SizedBox(height: 28),
@@ -108,6 +112,12 @@ class SimpleConnectionPanel extends ConsumerWidget {
           nodeName: nodeName ?? texts.simpleAutoRoute,
           delayMs: nodeDelayMs,
           onSwitch: busy ? null : onSwitchNode,
+        ),
+        const SizedBox(height: 12),
+        _HomeInsightCard(
+          homeStatus: homeStatus,
+          running: running,
+          showReconnectHint: showReconnectHint,
         ),
         const SizedBox(height: 16),
         _TrafficCard(
@@ -134,7 +144,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
         ),
-        if (hasError && error != null) ...[
+        if (hasError && issueCopy == null && error != null) ...[
           const SizedBox(height: 16),
           Material(
             color: context.colorScheme.errorContainer,
@@ -156,10 +166,156 @@ class SimpleConnectionPanel extends ConsumerWidget {
               ),
             ),
           ),
+        ] else if (hasError && issueCopy != null && onRetry != null) ...[
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(onPressed: onRetry, child: Text(texts.harmonyRetry)),
+          ),
         ],
         const SizedBox(height: 24),
         _AccountFooter(username: username, onLogout: busy ? null : onLogout),
       ],
+    );
+  }
+}
+
+class _IssueExplanation extends StatelessWidget {
+  final HarmonyIssueCopy copy;
+  final bool emphasized;
+
+  const _IssueExplanation({required this.copy, required this.emphasized});
+
+  @override
+  Widget build(BuildContext context) {
+    final detailColor = emphasized
+        ? context.colorScheme.onErrorContainer
+        : context.colorScheme.onSurfaceVariant;
+    final bg = emphasized
+        ? context.colorScheme.errorContainer.withValues(alpha: 0.45)
+        : context.colorScheme.surfaceContainerHighest;
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              copy.detail,
+              textAlign: TextAlign.start,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: detailColor,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              copy.action,
+              style: context.textTheme.labelLarge?.copyWith(
+                color: context.colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeInsightCard extends StatelessWidget {
+  final HarmonyHomeStatus homeStatus;
+  final bool running;
+  final bool showReconnectHint;
+
+  const _HomeInsightCard({
+    required this.homeStatus,
+    required this.running,
+    required this.showReconnectHint,
+  });
+
+  String _formatTime(DateTime time) {
+    return DateFormat('HH:mm').format(time.toLocal());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final texts = context.appLocalizations;
+    final lines = <String>[];
+    if (homeStatus.routeKind != null) {
+      lines.add(
+        switch (homeStatus.routeKind!) {
+          HarmonyRouteKind.automaticGroup => texts.harmonyRouteReasonAuto,
+          HarmonyRouteKind.tcpPreferred => texts.harmonyRouteReasonTcp,
+          HarmonyRouteKind.manual => texts.harmonyRouteReasonManual,
+        },
+      );
+    }
+    final aiGroup = homeStatus.aiGroupName;
+    if (aiGroup != null && aiGroup.isNotEmpty) {
+      lines.add(texts.harmonyAiRoutingHint(aiGroup));
+    }
+    lines.add(
+      switch (homeStatus.networkKind) {
+        HarmonyNetworkKind.wifi => texts.harmonyNetworkWifi,
+        HarmonyNetworkKind.cellular => texts.harmonyNetworkCellular,
+        HarmonyNetworkKind.other => texts.harmonyNetworkOther,
+        HarmonyNetworkKind.unknown => texts.harmonyNetworkUnknown,
+      },
+    );
+    if (running && homeStatus.lastHealthCheckAt != null) {
+      final time = _formatTime(homeStatus.lastHealthCheckAt!);
+      lines.add(
+        homeStatus.lastHealthCheckOk == true
+            ? texts.harmonyHealthCheckOk(time)
+            : texts.harmonyHealthCheckFailed(time),
+      );
+    }
+    if (showReconnectHint && !running) {
+      lines.add(
+        homeStatus.autoReconnectArmed
+            ? texts.harmonyAutoReconnectOn
+            : texts.harmonyAutoReconnectOff,
+      );
+    }
+    if (homeStatus.configSyncInProgress) {
+      lines.add(texts.harmonyConfigUpdating);
+    } else if (homeStatus.lastConfigSyncAt != null) {
+      lines.add(
+        texts.harmonyConfigSyncedAt(_formatTime(homeStatus.lastConfigSyncAt!)),
+      );
+    }
+    if (lines.isEmpty) return const SizedBox.shrink();
+    return Card(
+      elevation: 0,
+      color: context.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              texts.harmonyStatusSection,
+              style: context.textTheme.labelMedium?.copyWith(
+                color: context.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final line in lines)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  line,
+                  style: context.textTheme.bodySmall?.copyWith(
+                    color: context.colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

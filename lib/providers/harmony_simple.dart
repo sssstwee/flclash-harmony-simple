@@ -6,7 +6,10 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/common/harmony_connect.dart';
+import 'package:fl_clash/common/harmony_home_status.dart';
+import 'package:fl_clash/common/harmony_user_issue.dart';
 import 'package:fl_clash/common/proxy_transport.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -23,6 +26,8 @@ class HarmonySimpleState {
   final bool usingCachedConfig;
   final Profile? remoteProfile;
   final HarmonySession? session;
+  final HarmonyHomeStatus homeStatus;
+  final HarmonyUserIssue? issue;
 
   const HarmonySimpleState({
     this.bootstrapping = true,
@@ -32,6 +37,8 @@ class HarmonySimpleState {
     this.usingCachedConfig = false,
     this.remoteProfile,
     this.session,
+    this.homeStatus = const HarmonyHomeStatus(),
+    this.issue,
   });
 
   HarmonySimpleState copyWith({
@@ -45,6 +52,9 @@ class HarmonySimpleState {
     bool clearRemoteProfile = false,
     HarmonySession? session,
     bool clearSession = false,
+    HarmonyHomeStatus? homeStatus,
+    HarmonyUserIssue? issue,
+    bool clearIssue = false,
   }) {
     return HarmonySimpleState(
       bootstrapping: bootstrapping ?? this.bootstrapping,
@@ -56,6 +66,8 @@ class HarmonySimpleState {
           ? null
           : (remoteProfile ?? this.remoteProfile),
       session: clearSession ? null : (session ?? this.session),
+      homeStatus: homeStatus ?? this.homeStatus,
+      issue: clearIssue ? null : (issue ?? this.issue),
     );
   }
 }
@@ -80,7 +92,7 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> bootstrap() async {
-    state = state.copyWith(bootstrapping: true, clearError: true);
+    state = state.copyWith(bootstrapping: true, clearError: true, clearIssue: true);
     var shouldReconnect = false;
     try {
       final session = await _api.restore();
@@ -89,6 +101,11 @@ class HarmonySimple extends _$HarmonySimple {
         await _cleanupOrphanRemoteProfiles();
         await _syncRemoteProfile(fallbackOnNetworkError: true);
         shouldReconnect = await _api.readReconnectOnLaunch();
+        state = state.copyWith(
+          homeStatus: state.homeStatus.copyWith(
+            autoReconnectArmed: shouldReconnect,
+          ),
+        );
         _configRefreshInterval = await _api.readConfigRefreshInterval();
         _scheduleConfigRefresh();
       } else {
@@ -97,10 +114,16 @@ class HarmonySimple extends _$HarmonySimple {
       }
     } on HarmonyAccountError catch (error) {
       if (error != HarmonyAccountError.unavailable) {
-        state = state.copyWith(error: _message(error));
+        state = state.copyWith(
+          error: _message(error),
+          issue: harmonyUserIssueFromAccount(error),
+        );
       }
     } catch (error) {
-      state = state.copyWith(error: _message(error));
+      state = state.copyWith(
+        error: _message(error),
+        issue: HarmonyUserIssue.serviceUnreachable,
+      );
     } finally {
       state = state.copyWith(bootstrapping: false);
       if (shouldReconnect && _api.session != null && !ref.read(isStartProvider)) {
@@ -122,6 +145,15 @@ class HarmonySimple extends _$HarmonySimple {
     } catch (_) {}
   }
 
+  void reportNetworkConnectivity(List<ConnectivityResult> results) {
+    state = state.copyWith(
+      homeStatus: state.homeStatus.copyWith(
+        networkKind: HarmonyHomeStatus.networkKindFromConnectivity(results),
+      ),
+    );
+    unawaited(handleNetworkChange());
+  }
+
   Future<void> handleNetworkChange() async {
     if (!ref.read(isStartProvider) || state.busy) return;
     await reevaluateRoute();
@@ -132,28 +164,46 @@ class HarmonySimple extends _$HarmonySimple {
       return;
     }
     try {
-      await _applyBestRoute(showNoRouteError: false);
-    } catch (_) {}
+      final ok = await _applyBestRoute(showNoRouteError: false);
+      _recordHealthCheck(ok);
+    } catch (_) {
+      _recordHealthCheck(false);
+    }
+  }
+
+  void _recordHealthCheck(bool ok) {
+    state = state.copyWith(
+      homeStatus: state.homeStatus.copyWith(
+        lastHealthCheckAt: DateTime.now(),
+        lastHealthCheckOk: ok,
+      ),
+    );
   }
 
   Future<void> login(String username, String password) async {
     if (state.busy) return;
-    state = state.copyWith(busy: true, clearError: true);
+    state = state.copyWith(busy: true, clearError: true, clearIssue: true);
     try {
       final session = await _api.login(username, password);
       state = state.copyWith(session: session, clearError: true);
       await _syncRemoteProfile(fallbackOnNetworkError: false);
     } on HarmonyAccountError catch (error) {
-      state = state.copyWith(error: _message(error));
+      state = state.copyWith(
+        error: _message(error),
+        issue: harmonyUserIssueFromAccount(error),
+      );
     } catch (error) {
-      state = state.copyWith(error: _message(error));
+      state = state.copyWith(
+        error: _message(error),
+        issue: HarmonyUserIssue.serviceUnreachable,
+      );
     } finally {
       state = state.copyWith(busy: false);
     }
   }
 
   Future<void> logout({bool expired = false}) async {
-    state = state.copyWith(busy: true, clearError: true);
+    state = state.copyWith(busy: true, clearError: true, clearIssue: true);
     _stopBackgroundTasks();
     final profile = state.remoteProfile;
     state = state.copyWith(clearRemoteProfile: true, usingCachedConfig: false);
@@ -177,6 +227,7 @@ class HarmonySimple extends _$HarmonySimple {
       busy: false,
       clearSession: true,
       error: expired ? _message(HarmonyAccountError.expired) : null,
+      issue: expired ? HarmonyUserIssue.authExpired : null,
     );
   }
 
@@ -190,10 +241,14 @@ class HarmonySimple extends _$HarmonySimple {
       busy: true,
       disconnecting: running,
       clearError: true,
+      clearIssue: true,
     );
     try {
       if (running) {
         await _api.setReconnectOnLaunch(false);
+        state = state.copyWith(
+          homeStatus: state.homeStatus.copyWith(autoReconnectArmed: false),
+        );
         _stopBackgroundTasks();
         await setup.updateStatus(false);
         return;
@@ -204,11 +259,17 @@ class HarmonySimple extends _$HarmonySimple {
       if (error == HarmonyAccountError.expired) {
         await logout(expired: true);
       } else {
-        state = state.copyWith(error: _message(error));
+        state = state.copyWith(
+          error: _message(error),
+          issue: harmonyUserIssueFromAccount(error),
+        );
       }
     } catch (_) {
       await setup.updateStatus(false);
-      state = state.copyWith(error: currentAppLocalizations.simpleConnectFailed);
+      state = state.copyWith(
+        error: currentAppLocalizations.simpleConnectFailed,
+        issue: HarmonyUserIssue.vpnStartFailed,
+      );
     } finally {
       state = state.copyWith(busy: false, disconnecting: false);
     }
@@ -219,7 +280,10 @@ class HarmonySimple extends _$HarmonySimple {
     await _syncRemoteProfile(fallbackOnNetworkError: true);
     final profile = state.remoteProfile;
     if (profile == null) {
-      state = state.copyWith(error: _message(HarmonyAccountError.config));
+      state = state.copyWith(
+        error: _message(HarmonyAccountError.config),
+        issue: HarmonyUserIssue.subscriptionUnreachable,
+      );
       return;
     }
     if (profile.id != ref.read(currentProfileIdProvider)) return;
@@ -232,10 +296,18 @@ class HarmonySimple extends _$HarmonySimple {
     if (!applied) return;
     await setup.updateStatus(true, isInit: true);
     if (!ref.read(isStartProvider)) {
-      state = state.copyWith(error: currentAppLocalizations.simpleConnectFailed);
+      state = state.copyWith(
+        error: currentAppLocalizations.simpleConnectFailed,
+        issue: HarmonyUserIssue.vpnStartFailed,
+      );
       return;
     }
     await _api.setReconnectOnLaunch(true);
+    state = state.copyWith(
+      clearIssue: true,
+      clearError: true,
+      homeStatus: state.homeStatus.copyWith(autoReconnectArmed: true),
+    );
     _scheduleConfigRefresh();
     _scheduleHealthCheck();
   }
@@ -264,10 +336,24 @@ class HarmonySimple extends _$HarmonySimple {
           );
     if (selected == null) {
       if (showNoRouteError) {
-        state = state.copyWith(error: currentAppLocalizations.simpleNoRoute);
+        state = state.copyWith(
+          error: currentAppLocalizations.simpleNoRoute,
+          issue: HarmonyUserIssue.noRoute,
+        );
       }
       return false;
     }
+    final routeKind = selected.usedAutomaticGroup
+        ? HarmonyRouteKind.automaticGroup
+        : selected.preferTcpActive
+        ? HarmonyRouteKind.tcpPreferred
+        : HarmonyRouteKind.manual;
+    state = state.copyWith(
+      homeStatus: state.homeStatus.copyWith(
+        routeKind: routeKind,
+        aiGroupName: _aiGroupFromRules(rules),
+      ),
+    );
     for (final entry in selected.selections.entries.toList().reversed) {
       await ref
           .read(proxiesActionProvider.notifier)
@@ -280,7 +366,25 @@ class HarmonySimple extends _$HarmonySimple {
     return true;
   }
 
-  Future<void> _syncRemoteProfile({required bool fallbackOnNetworkError}) async {
+  String? _aiGroupFromRules(List<String> rules) {
+    for (final rule in rules) {
+      if (rule.startsWith('GEOSITE,category-ai')) {
+        final parts = rule.split(',');
+        if (parts.length >= 3) return parts[2].trim();
+      }
+    }
+    return null;
+  }
+
+  Future<void> _syncRemoteProfile({
+    required bool fallbackOnNetworkError,
+    bool background = false,
+  }) async {
+    if (background) {
+      state = state.copyWith(
+        homeStatus: state.homeStatus.copyWith(configSyncInProgress: true),
+      );
+    }
     try {
       final lastModified = await _api.readConfigLastModified();
       final download = await _api.downloadConfig(ifModifiedSince: lastModified);
@@ -290,6 +394,7 @@ class HarmonySimple extends _$HarmonySimple {
           state = state.copyWith(
             remoteProfile: existing,
             usingCachedConfig: true,
+            issue: state.issue ?? HarmonyUserIssue.offlineCached,
           );
           ref.read(currentProfileIdProvider.notifier).value = existing.id;
         }
@@ -313,7 +418,14 @@ class HarmonySimple extends _$HarmonySimple {
           .read(profilesActionProvider.notifier)
           .putProfile(profile.copyWith(autoUpdate: false));
       ref.read(currentProfileIdProvider.notifier).value = profile.id;
-      state = state.copyWith(remoteProfile: profile, usingCachedConfig: false);
+      state = state.copyWith(
+        remoteProfile: profile,
+        usingCachedConfig: false,
+        clearIssue: true,
+        homeStatus: state.homeStatus.copyWith(
+          lastConfigSyncAt: DateTime.now(),
+        ),
+      );
     } on HarmonyAccountError catch (error) {
       if (error == HarmonyAccountError.expired) rethrow;
       if (fallbackOnNetworkError) {
@@ -323,11 +435,22 @@ class HarmonySimple extends _$HarmonySimple {
           state = state.copyWith(
             remoteProfile: existing,
             usingCachedConfig: true,
+            issue: harmonyUserIssueFromAccount(error) ??
+                HarmonyUserIssue.offlineCached,
           );
           return;
         }
       }
       rethrow;
+    } finally {
+      if (background) {
+        state = state.copyWith(
+          homeStatus: state.homeStatus.copyWith(
+            configSyncInProgress: false,
+            lastConfigSyncAt: state.homeStatus.lastConfigSyncAt ?? DateTime.now(),
+          ),
+        );
+      }
     }
   }
 
@@ -336,7 +459,9 @@ class HarmonySimple extends _$HarmonySimple {
     if (_api.session == null) return;
     _configRefreshTimer = Timer.periodic(_configRefreshInterval, (_) {
       if (_api.session == null || state.busy) return;
-      unawaited(_syncRemoteProfile(fallbackOnNetworkError: true));
+      unawaited(
+        _syncRemoteProfile(fallbackOnNetworkError: true, background: true),
+      );
     });
   }
 

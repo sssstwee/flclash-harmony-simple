@@ -47,9 +47,9 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
         return;
       }
       _lastConnectivity = results;
-      unawaited(
-        ref.read(harmonySimpleProvider.notifier).handleNetworkChange(),
-      );
+      ref
+          .read(harmonySimpleProvider.notifier)
+          .reportNetworkConnectivity(results);
     });
   }
 
@@ -138,7 +138,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   }
 
   ConnectionPhase _phase(HarmonySimpleState ui, bool running) {
-    if (ui.error != null && !ui.busy && !running) {
+    if ((ui.error != null || ui.issue != null) && !ui.busy && !running) {
       return ConnectionPhase.error;
     }
     if (ui.busy) {
@@ -173,6 +173,9 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   usingCachedConfig: ui.usingCachedConfig,
                   nodeName: nodeName,
                   nodeDelayMs: nodeDelay,
+                  homeStatus: ui.homeStatus,
+                  issue: ui.issue,
+                  showReconnectHint: !running,
                   onToggle: ready && !ui.bootstrapping
                       ? () => ref.read(harmonySimpleProvider.notifier).toggleConnect()
                       : null,

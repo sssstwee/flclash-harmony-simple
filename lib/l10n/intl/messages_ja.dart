@@ -40,38 +40,47 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m9(name) => "${name}を更新中...";
 
-  static String m10(count) => "${count}時間前";
+  static String m10(groupName) => "AI sites use the “${groupName}” group";
 
-  static String m11(count) => "${count} 時間";
+  static String m11(time) => "Config synced at ${time}";
 
-  static String m12(target) => "${target} は無効なポリシーです";
+  static String m12(time) =>
+      "Route check failed (${time}); trying another node";
 
-  static String m13(proxyName) => "${proxyName} は無効なプロキシです";
+  static String m13(time) => "Route healthy (checked ${time})";
 
-  static String m14(providerName) => "${providerName} は無効なプロキシプロバイダーです";
+  static String m14(count) => "${count}時間前";
 
-  static String m15(subRule) => "${subRule} は無効なSUB_RULEです";
+  static String m15(count) => "${count} 時間";
 
-  static String m16(appName) =>
+  static String m16(target) => "${target} は無効なポリシーです";
+
+  static String m17(proxyName) => "${proxyName} は無効なプロキシです";
+
+  static String m18(providerName) => "${providerName} は無効なプロキシプロバイダーです";
+
+  static String m19(subRule) => "${subRule} は無効なSUB_RULEです";
+
+  static String m20(appName) =>
       "1. Open System Settings > Privacy & Security\n2. Choose Location Services\n3. Find and check ${appName} in the right list\n\nAfter completing the setup, return to the app and use it normally. Thank you for your cooperation.";
 
-  static String m17(count) => "${count}分前";
+  static String m21(count) => "${count}分前";
 
-  static String m18(count) => "${count}ヶ月前";
+  static String m22(count) => "${count}ヶ月前";
 
-  static String m19(label) => "まだ${label}はありません";
+  static String m23(label) => "まだ${label}はありません";
 
-  static String m20(label) => "${label}は数字でなければなりません";
+  static String m24(label) => "${label}は数字でなければなりません";
 
-  static String m21(label) => "${label} は 1024 から 49151 の間でなければなりません";
+  static String m25(label) => "${label} は 1024 から 49151 の間でなければなりません";
 
-  static String m22(count) => "${count} 秒";
+  static String m26(count) => "${count} 秒";
 
-  static String m23(count) => "${count} 項目が選択されています";
+  static String m27(count) => "${count} 項目が選択されています";
 
-  static String m24(label) => "${label}はURLである必要があります";
+  static String m28(label) => "${label}はURLである必要があります";
 
-  static String m25(count) => "${count}年前";
+  static String m29(count) => "${count}年前";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
@@ -343,32 +352,145 @@ class MessageLookup extends MessageLookupByLibrary {
     "go": MessageLookupByLibrary.simpleMessage("移動"),
     "goDownload": MessageLookupByLibrary.simpleMessage("ダウンロードへ"),
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage("スクリプト設定に移動"),
+    "harmonyAccount": MessageLookupByLibrary.simpleMessage("Account"),
+    "harmonyAiRoutingHint": m10,
+    "harmonyAutoReconnectOff": MessageLookupByLibrary.simpleMessage(
+      "Will stay disconnected after a manual disconnect",
+    ),
+    "harmonyAutoReconnectOn": MessageLookupByLibrary.simpleMessage(
+      "Will reconnect automatically next time you open the app",
+    ),
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
       "中国国内とローカルネットワークは直接接続し、海外は自動でプロキシを使用します。",
     ),
     "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
       "接続設定を取得できません。後でもう一度接続してください。",
     ),
+    "harmonyConfigSyncedAt": m11,
+    "harmonyConfigUpdating": MessageLookupByLibrary.simpleMessage(
+      "Updating config in the background…",
+    ),
     "harmonyConnecting": MessageLookupByLibrary.simpleMessage("接続中…"),
     "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
       "ユーザー名またはパスワードが違います。",
     ),
+    "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("Current node"),
     "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage("切断中…"),
+    "harmonyDownload": MessageLookupByLibrary.simpleMessage("Download"),
+    "harmonyHealthCheckFailed": m12,
+    "harmonyHealthCheckOk": m13,
+    "harmonyIssueActionAuthExpired": MessageLookupByLibrary.simpleMessage(
+      "Next: sign out, then log in again",
+    ),
+    "harmonyIssueActionNoRoute": MessageLookupByLibrary.simpleMessage(
+      "Next: try Connect again later",
+    ),
+    "harmonyIssueActionOfflineCached": MessageLookupByLibrary.simpleMessage(
+      "Next: tap Connect",
+    ),
+    "harmonyIssueActionRateLimit": MessageLookupByLibrary.simpleMessage(
+      "Next: wait, then retry",
+    ),
+    "harmonyIssueActionService": MessageLookupByLibrary.simpleMessage(
+      "Next: check network, then Connect",
+    ),
+    "harmonyIssueActionSubscription": MessageLookupByLibrary.simpleMessage(
+      "Next: tap Connect or retry later",
+    ),
+    "harmonyIssueActionVpnFailed": MessageLookupByLibrary.simpleMessage(
+      "Next: tap Connect and allow VPN",
+    ),
+    "harmonyIssueDetailAuthExpired": MessageLookupByLibrary.simpleMessage(
+      "Your session expired. Sign out and log in again to refresh the subscription.",
+    ),
+    "harmonyIssueDetailNoRoute": MessageLookupByLibrary.simpleMessage(
+      "None of the saved nodes responded. Try Connect again later or wait for a config refresh.",
+    ),
+    "harmonyIssueDetailOfflineCached": MessageLookupByLibrary.simpleMessage(
+      "The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.",
+    ),
+    "harmonyIssueDetailRateLimit": MessageLookupByLibrary.simpleMessage(
+      "Please wait about a minute before signing in or connecting again.",
+    ),
+    "harmonyIssueDetailService": MessageLookupByLibrary.simpleMessage(
+      "Cannot reach the account server. Check your network; you can still try Connect with a cached profile.",
+    ),
+    "harmonyIssueDetailSubscription": MessageLookupByLibrary.simpleMessage(
+      "The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.",
+    ),
+    "harmonyIssueDetailVpnFailed": MessageLookupByLibrary.simpleMessage(
+      "The system VPN failed to start. Allow the VPN permission, then tap Connect again.",
+    ),
+    "harmonyIssueTitleAuthExpired": MessageLookupByLibrary.simpleMessage(
+      "Sign-in expired",
+    ),
+    "harmonyIssueTitleNoRoute": MessageLookupByLibrary.simpleMessage(
+      "No working route",
+    ),
+    "harmonyIssueTitleOfflineCached": MessageLookupByLibrary.simpleMessage(
+      "Cannot refresh subscription",
+    ),
+    "harmonyIssueTitleRateLimit": MessageLookupByLibrary.simpleMessage(
+      "Too many attempts",
+    ),
+    "harmonyIssueTitleService": MessageLookupByLibrary.simpleMessage(
+      "Service unavailable",
+    ),
+    "harmonyIssueTitleSubscription": MessageLookupByLibrary.simpleMessage(
+      "Cannot fetch latest config",
+    ),
+    "harmonyIssueTitleVpnFailed": MessageLookupByLibrary.simpleMessage(
+      "VPN did not start",
+    ),
+    "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("ログイン"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
       "ログインすると接続設定を自動取得します。",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("ログアウト"),
+    "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage(
+      "Network: cellular",
+    ),
+    "harmonyNetworkOther": MessageLookupByLibrary.simpleMessage(
+      "Network: other",
+    ),
+    "harmonyNetworkUnknown": MessageLookupByLibrary.simpleMessage(
+      "Network: unknown",
+    ),
+    "harmonyNetworkWifi": MessageLookupByLibrary.simpleMessage(
+      "Network: Wi‑Fi",
+    ),
+    "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
+      "Using cached settings (offline)",
+    ),
     "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
       "試行回数が多すぎます。1分後に再試行してください。",
     ),
     "harmonyRequired": MessageLookupByLibrary.simpleMessage("この項目を入力してください。"),
+    "harmonyRetry": MessageLookupByLibrary.simpleMessage("Try again"),
+    "harmonyRouteReasonAuto": MessageLookupByLibrary.simpleMessage(
+      "Automatically picked the lowest-latency route",
+    ),
+    "harmonyRouteReasonManual": MessageLookupByLibrary.simpleMessage(
+      "Selected the best node from latency tests",
+    ),
+    "harmonyRouteReasonTcp": MessageLookupByLibrary.simpleMessage(
+      "UDP looks blocked; preferring TCP nodes",
+    ),
     "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
       "サービスに接続できません。ネットワークを確認してください。",
     ),
     "harmonySessionExpired": MessageLookupByLibrary.simpleMessage(
       "ログインの有効期限が切れました。再ログインしてください。",
     ),
+    "harmonySessionTraffic": MessageLookupByLibrary.simpleMessage(
+      "Session traffic",
+    ),
+    "harmonyStatusSection": MessageLookupByLibrary.simpleMessage(
+      "Connection details",
+    ),
+    "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("Switch node"),
+    "harmonyUpload": MessageLookupByLibrary.simpleMessage("Upload"),
     "harmonyUsername": MessageLookupByLibrary.simpleMessage("ユーザー名"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage("変更をキャッシュしますか？"),
     "hideFromList": MessageLookupByLibrary.simpleMessage("リストから隠す"),
@@ -380,8 +502,8 @@ class MessageLookup extends MessageLookupByLibrary {
       "キーボードでアプリを制御",
     ),
     "hours": MessageLookupByLibrary.simpleMessage("時間"),
-    "hoursAgo": m10,
-    "hoursCount": m11,
+    "hoursAgo": m14,
+    "hoursCount": m15,
     "icon": MessageLookupByLibrary.simpleMessage("アイコン"),
     "iconRecords": MessageLookupByLibrary.simpleMessage("アイコン履歴"),
     "iconStyle": MessageLookupByLibrary.simpleMessage("アイコンスタイル"),
@@ -413,10 +535,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "interval": MessageLookupByLibrary.simpleMessage("インターバル"),
     "intranetIP": MessageLookupByLibrary.simpleMessage("イントラネットIP"),
     "invalidBackupFile": MessageLookupByLibrary.simpleMessage("無効なバックアップファイル"),
-    "invalidPolicy": m12,
-    "invalidProxy": m13,
-    "invalidProxyProvider": m14,
-    "invalidSubRule": m15,
+    "invalidPolicy": m16,
+    "invalidProxy": m17,
+    "invalidProxyProvider": m18,
+    "invalidSubRule": m19,
     "ipcidr": MessageLookupByLibrary.simpleMessage("IPCIDR"),
     "ipv6Desc": MessageLookupByLibrary.simpleMessage("有効化するとIPv6トラフィックを受信可能"),
     "ipv6InboundDesc": MessageLookupByLibrary.simpleMessage("IPv6インバウンドを許可"),
@@ -448,7 +570,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "locationPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "According to system requirements, obtaining the Wi-Fi name requires you to grant location permission.",
     ),
-    "locationPermissionGuide": m16,
+    "locationPermissionGuide": m20,
     "locationPermissionRequired": MessageLookupByLibrary.simpleMessage(
       "Location Permission Required",
     ),
@@ -472,11 +594,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "minimizeOnExitDesc": MessageLookupByLibrary.simpleMessage(
       "システムの終了イベントを変更",
     ),
-    "minutesAgo": m17,
+    "minutesAgo": m21,
     "mixedPort": MessageLookupByLibrary.simpleMessage("混合ポート"),
     "mode": MessageLookupByLibrary.simpleMessage("モード"),
     "monochromeScheme": MessageLookupByLibrary.simpleMessage("モノクローム"),
-    "monthsAgo": m18,
+    "monthsAgo": m22,
     "more": MessageLookupByLibrary.simpleMessage("詳細"),
     "name": MessageLookupByLibrary.simpleMessage("名前"),
     "nameserver": MessageLookupByLibrary.simpleMessage("ネームサーバー"),
@@ -510,8 +632,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "nullProfileDesc": MessageLookupByLibrary.simpleMessage(
       "プロファイルがありません。追加してください",
     ),
-    "nullTip": m19,
-    "numberTip": m20,
+    "nullTip": m23,
+    "numberTip": m24,
     "onDemand": MessageLookupByLibrary.simpleMessage("On Demand"),
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "Configure the program running state for specific scenarios",
@@ -555,7 +677,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "port": MessageLookupByLibrary.simpleMessage("ポート"),
     "portConflictTip": MessageLookupByLibrary.simpleMessage("別のポートを入力してください"),
-    "portTip": m21,
+    "portTip": m25,
     "preferH3Desc": MessageLookupByLibrary.simpleMessage("DOHのHTTP/3を優先使用"),
     "prerequisites": MessageLookupByLibrary.simpleMessage("Prerequisites"),
     "pressKeyboard": MessageLookupByLibrary.simpleMessage("キーボードを押してください"),
@@ -774,7 +896,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("検索"),
     "seconds": MessageLookupByLibrary.simpleMessage("秒"),
-    "secondsCount": m22,
+    "secondsCount": m26,
     "selectAll": MessageLookupByLibrary.simpleMessage("すべて選択"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("プロキシを選択"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -786,7 +908,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "selectSubRule": MessageLookupByLibrary.simpleMessage("サブルールを選択してください"),
     "selected": MessageLookupByLibrary.simpleMessage("選択済み"),
-    "selectedCountTitle": m23,
+    "selectedCountTitle": m27,
     "settings": MessageLookupByLibrary.simpleMessage("設定"),
     "show": MessageLookupByLibrary.simpleMessage("表示"),
     "shrink": MessageLookupByLibrary.simpleMessage("縮小"),
@@ -798,6 +920,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "起動に失敗しました。VPN 権限を確認して再試行してください。",
     ),
     "simpleDisconnect": MessageLookupByLibrary.simpleMessage("切断"),
+    "simpleErrorState": MessageLookupByLibrary.simpleMessage(
+      "Connection error",
+    ),
     "simpleHome": MessageLookupByLibrary.simpleMessage("接続"),
     "simpleImport": MessageLookupByLibrary.simpleMessage("サブスクリプションを追加"),
     "simpleImportFailed": MessageLookupByLibrary.simpleMessage(
@@ -898,7 +1023,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "upload": MessageLookupByLibrary.simpleMessage("アップロード"),
     "url": MessageLookupByLibrary.simpleMessage("URL"),
     "urlDesc": MessageLookupByLibrary.simpleMessage("URL経由でプロファイルを取得"),
-    "urlTip": m24,
+    "urlTip": m28,
     "useHosts": MessageLookupByLibrary.simpleMessage("ホストを使用"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("システムホストを使用"),
     "userAgent": MessageLookupByLibrary.simpleMessage("ユーザーエージェント"),
@@ -914,7 +1039,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "vpnTip": MessageLookupByLibrary.simpleMessage("変更はVPN再起動後に有効"),
     "webDAVConfiguration": MessageLookupByLibrary.simpleMessage("WebDAV設定"),
     "whitelistMode": MessageLookupByLibrary.simpleMessage("ホワイトリストモード"),
-    "yearsAgo": m25,
+    "yearsAgo": m29,
     "zh_CN": MessageLookupByLibrary.simpleMessage("簡体字中国語"),
   };
 }

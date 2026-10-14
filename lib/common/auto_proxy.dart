@@ -28,7 +28,14 @@ Group? connectionGroup(List<Group> groups, List<String> rules) {
 
 /// Returns only selector changes along the chosen route. Automatic groups keep
 /// their own health checks; DIRECT/REJECT and cyclic routes are never candidates.
-Future<({String name, Map<String, String> selections})?> autoSelectProxy(
+typedef AutoSelectOutcome = ({
+  String name,
+  Map<String, String> selections,
+  bool usedAutomaticGroup,
+  bool preferTcpActive,
+});
+
+Future<AutoSelectOutcome?> autoSelectProxy(
   Group root,
   List<Group> groups,
   Future<int?> Function(String name) measure, {
@@ -109,7 +116,14 @@ Future<({String name, Map<String, String> selections})?> autoSelectProxy(
     await Future.wait(batch.map((candidate) => delay(candidate.name)));
     for (final candidate in batch) {
       final value = delays[candidate.name];
-      if (value != null && value > 0) return candidate;
+      if (value != null && value > 0) {
+        return (
+          name: candidate.name,
+          selections: candidate.selections,
+          usedAutomaticGroup: true,
+          preferTcpActive: preferTcp,
+        );
+      }
     }
   }
   var manual = candidates
@@ -133,7 +147,14 @@ Future<({String name, Map<String, String> selections})?> autoSelectProxy(
         bestDelay = value.toDouble();
       }
     }
-    if (best != null) return best;
+    if (best != null) {
+      return (
+        name: best.name,
+        selections: best.selections,
+        usedAutomaticGroup: false,
+        preferTcpActive: preferTcp,
+      );
+    }
     if (elapsed.elapsed >= const Duration(seconds: 24)) return null;
   }
   return null;

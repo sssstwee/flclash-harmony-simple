@@ -6,6 +6,8 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/harmony_simple.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/simple.dart';
+import 'package:fl_clash/common/harmony_home_status.dart';
+import 'package:fl_clash/common/harmony_user_issue.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -211,6 +213,57 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('offline cached issue explains next step in plain Chinese', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.error,
+            username: 'harmony',
+            issue: HarmonyUserIssue.offlineCached,
+            usingCachedConfig: true,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('暂时无法更新订阅'), findsOneWidget);
+    expect(find.textContaining('账号服务器暂时连不上'), findsOneWidget);
+    expect(find.textContaining('点「连接」'), findsWidgets);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('home insight card explains auto route and reconnect in Chinese', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          const SimpleConnectionPanel(
+            phase: ConnectionPhase.disconnected,
+            username: 'harmony',
+            homeStatus: HarmonyHomeStatus(
+              routeKind: HarmonyRouteKind.tcpPreferred,
+              aiGroupName: '🤖AI服务',
+              networkKind: HarmonyNetworkKind.wifi,
+              autoReconnectArmed: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('连接说明'), findsOneWidget);
+    expect(find.textContaining('TCP'), findsOneWidget);
+    expect(find.textContaining('AI 网站'), findsOneWidget);
+    expect(find.text('下次打开应用将自动连接'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('reduced motion avoids continuously running animations', (
     tester,

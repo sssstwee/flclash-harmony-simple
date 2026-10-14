@@ -42,42 +42,51 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m9(name) => "Обновление ${name}...";
 
-  static String m10(count) =>
+  static String m10(groupName) => "AI sites use the “${groupName}” group";
+
+  static String m11(time) => "Config synced at ${time}";
+
+  static String m12(time) =>
+      "Route check failed (${time}); trying another node";
+
+  static String m13(time) => "Route healthy (checked ${time})";
+
+  static String m14(count) =>
       "${Intl.plural(count, one: '${count} час назад', few: '${count} часа назад', many: '${count} часов назад', other: '${count} часа назад')}";
 
-  static String m11(count) => "${count} часов";
+  static String m15(count) => "${count} часов";
 
-  static String m12(target) => "${target} является недопустимой политикой";
+  static String m16(target) => "${target} является недопустимой политикой";
 
-  static String m13(proxyName) => "${proxyName} является недопустимым прокси";
+  static String m17(proxyName) => "${proxyName} является недопустимым прокси";
 
-  static String m14(providerName) =>
+  static String m18(providerName) =>
       "${providerName} является недопустимым провайдером прокси";
 
-  static String m15(subRule) => "${subRule} является недопустимым подправилом";
+  static String m19(subRule) => "${subRule} является недопустимым подправилом";
 
-  static String m16(appName) =>
+  static String m20(appName) =>
       "1. Open System Settings > Privacy & Security\n2. Choose Location Services\n3. Find and check ${appName} in the right list\n\nAfter completing the setup, return to the app and use it normally. Thank you for your cooperation.";
 
-  static String m17(count) =>
+  static String m21(count) =>
       "${Intl.plural(count, one: '${count} минута назад', few: '${count} минуты назад', many: '${count} минут назад', other: '${count} минуты назад')}";
 
-  static String m18(count) =>
+  static String m22(count) =>
       "${Intl.plural(count, one: '${count} месяц назад', few: '${count} месяца назад', many: '${count} месяцев назад', other: '${count} месяца назад')}";
 
-  static String m19(label) => "${label} пока отсутствуют";
+  static String m23(label) => "${label} пока отсутствуют";
 
-  static String m20(label) => "${label} должно быть числом";
+  static String m24(label) => "${label} должно быть числом";
 
-  static String m21(label) => "${label} должен быть числом от 1024 до 49151";
+  static String m25(label) => "${label} должен быть числом от 1024 до 49151";
 
-  static String m22(count) => "${count} секунд";
+  static String m26(count) => "${count} секунд";
 
-  static String m23(count) => "Выбрано ${count} элементов";
+  static String m27(count) => "Выбрано ${count} элементов";
 
-  static String m24(label) => "${label} должен быть URL";
+  static String m28(label) => "${label} должен быть URL";
 
-  static String m25(count) =>
+  static String m29(count) =>
       "${Intl.plural(count, one: '${count} год назад', few: '${count} года назад', many: '${count} лет назад', other: '${count} года назад')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -448,27 +457,132 @@ class MessageLookup extends MessageLookupByLibrary {
     "goToConfigureScript": MessageLookupByLibrary.simpleMessage(
       "Перейти к настройке скрипта",
     ),
+    "harmonyAccount": MessageLookupByLibrary.simpleMessage("Account"),
+    "harmonyAiRoutingHint": m10,
+    "harmonyAutoReconnectOff": MessageLookupByLibrary.simpleMessage(
+      "Will stay disconnected after a manual disconnect",
+    ),
+    "harmonyAutoReconnectOn": MessageLookupByLibrary.simpleMessage(
+      "Will reconnect automatically next time you open the app",
+    ),
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
       "Сети Китая и локальные сети подключаются напрямую, остальные — через прокси.",
     ),
     "harmonyConfigError": MessageLookupByLibrary.simpleMessage(
       "Не удалось загрузить настройки. Повторите подключение позже.",
     ),
+    "harmonyConfigSyncedAt": m11,
+    "harmonyConfigUpdating": MessageLookupByLibrary.simpleMessage(
+      "Updating config in the background…",
+    ),
     "harmonyConnecting": MessageLookupByLibrary.simpleMessage("Подключение…"),
     "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
       "Неверное имя пользователя или пароль.",
     ),
+    "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("Current node"),
     "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage("Отключение…"),
+    "harmonyDownload": MessageLookupByLibrary.simpleMessage("Download"),
+    "harmonyHealthCheckFailed": m12,
+    "harmonyHealthCheckOk": m13,
+    "harmonyIssueActionAuthExpired": MessageLookupByLibrary.simpleMessage(
+      "Next: sign out, then log in again",
+    ),
+    "harmonyIssueActionNoRoute": MessageLookupByLibrary.simpleMessage(
+      "Next: try Connect again later",
+    ),
+    "harmonyIssueActionOfflineCached": MessageLookupByLibrary.simpleMessage(
+      "Next: tap Connect",
+    ),
+    "harmonyIssueActionRateLimit": MessageLookupByLibrary.simpleMessage(
+      "Next: wait, then retry",
+    ),
+    "harmonyIssueActionService": MessageLookupByLibrary.simpleMessage(
+      "Next: check network, then Connect",
+    ),
+    "harmonyIssueActionSubscription": MessageLookupByLibrary.simpleMessage(
+      "Next: tap Connect or retry later",
+    ),
+    "harmonyIssueActionVpnFailed": MessageLookupByLibrary.simpleMessage(
+      "Next: tap Connect and allow VPN",
+    ),
+    "harmonyIssueDetailAuthExpired": MessageLookupByLibrary.simpleMessage(
+      "Your session expired. Sign out and log in again to refresh the subscription.",
+    ),
+    "harmonyIssueDetailNoRoute": MessageLookupByLibrary.simpleMessage(
+      "None of the saved nodes responded. Try Connect again later or wait for a config refresh.",
+    ),
+    "harmonyIssueDetailOfflineCached": MessageLookupByLibrary.simpleMessage(
+      "The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.",
+    ),
+    "harmonyIssueDetailRateLimit": MessageLookupByLibrary.simpleMessage(
+      "Please wait about a minute before signing in or connecting again.",
+    ),
+    "harmonyIssueDetailService": MessageLookupByLibrary.simpleMessage(
+      "Cannot reach the account server. Check your network; you can still try Connect with a cached profile.",
+    ),
+    "harmonyIssueDetailSubscription": MessageLookupByLibrary.simpleMessage(
+      "The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.",
+    ),
+    "harmonyIssueDetailVpnFailed": MessageLookupByLibrary.simpleMessage(
+      "The system VPN failed to start. Allow the VPN permission, then tap Connect again.",
+    ),
+    "harmonyIssueTitleAuthExpired": MessageLookupByLibrary.simpleMessage(
+      "Sign-in expired",
+    ),
+    "harmonyIssueTitleNoRoute": MessageLookupByLibrary.simpleMessage(
+      "No working route",
+    ),
+    "harmonyIssueTitleOfflineCached": MessageLookupByLibrary.simpleMessage(
+      "Cannot refresh subscription",
+    ),
+    "harmonyIssueTitleRateLimit": MessageLookupByLibrary.simpleMessage(
+      "Too many attempts",
+    ),
+    "harmonyIssueTitleService": MessageLookupByLibrary.simpleMessage(
+      "Service unavailable",
+    ),
+    "harmonyIssueTitleSubscription": MessageLookupByLibrary.simpleMessage(
+      "Cannot fetch latest config",
+    ),
+    "harmonyIssueTitleVpnFailed": MessageLookupByLibrary.simpleMessage(
+      "VPN did not start",
+    ),
+    "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("Войти"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
       "После входа настройки подключения загрузятся автоматически.",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("Выйти"),
+    "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage(
+      "Network: cellular",
+    ),
+    "harmonyNetworkOther": MessageLookupByLibrary.simpleMessage(
+      "Network: other",
+    ),
+    "harmonyNetworkUnknown": MessageLookupByLibrary.simpleMessage(
+      "Network: unknown",
+    ),
+    "harmonyNetworkWifi": MessageLookupByLibrary.simpleMessage(
+      "Network: Wi‑Fi",
+    ),
+    "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
+      "Using cached settings (offline)",
+    ),
     "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
       "Слишком много попыток. Повторите через минуту.",
     ),
     "harmonyRequired": MessageLookupByLibrary.simpleMessage(
       "Заполните это поле.",
+    ),
+    "harmonyRetry": MessageLookupByLibrary.simpleMessage("Try again"),
+    "harmonyRouteReasonAuto": MessageLookupByLibrary.simpleMessage(
+      "Automatically picked the lowest-latency route",
+    ),
+    "harmonyRouteReasonManual": MessageLookupByLibrary.simpleMessage(
+      "Selected the best node from latency tests",
+    ),
+    "harmonyRouteReasonTcp": MessageLookupByLibrary.simpleMessage(
+      "UDP looks blocked; preferring TCP nodes",
     ),
     "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
       "Сервис недоступен. Проверьте сеть и повторите попытку.",
@@ -476,6 +590,14 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonySessionExpired": MessageLookupByLibrary.simpleMessage(
       "Сеанс истёк. Войдите снова.",
     ),
+    "harmonySessionTraffic": MessageLookupByLibrary.simpleMessage(
+      "Session traffic",
+    ),
+    "harmonyStatusSection": MessageLookupByLibrary.simpleMessage(
+      "Connection details",
+    ),
+    "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("Switch node"),
+    "harmonyUpload": MessageLookupByLibrary.simpleMessage("Upload"),
     "harmonyUsername": MessageLookupByLibrary.simpleMessage("Имя пользователя"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage(
       "Хотите сохранить изменения в кэше?",
@@ -493,8 +615,8 @@ class MessageLookup extends MessageLookupByLibrary {
       "Использование клавиатуры для управления приложением",
     ),
     "hours": MessageLookupByLibrary.simpleMessage("часов"),
-    "hoursAgo": m10,
-    "hoursCount": m11,
+    "hoursAgo": m14,
+    "hoursCount": m15,
     "icon": MessageLookupByLibrary.simpleMessage("Иконка"),
     "iconRecords": MessageLookupByLibrary.simpleMessage("История иконок"),
     "iconStyle": MessageLookupByLibrary.simpleMessage("Стиль иконки"),
@@ -540,10 +662,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "invalidBackupFile": MessageLookupByLibrary.simpleMessage(
       "Неверный файл резервной копии",
     ),
-    "invalidPolicy": m12,
-    "invalidProxy": m13,
-    "invalidProxyProvider": m14,
-    "invalidSubRule": m15,
+    "invalidPolicy": m16,
+    "invalidProxy": m17,
+    "invalidProxyProvider": m18,
+    "invalidSubRule": m19,
     "ipcidr": MessageLookupByLibrary.simpleMessage("IPCIDR"),
     "ipv6Desc": MessageLookupByLibrary.simpleMessage(
       "При включении будет возможно получать IPv6 трафик",
@@ -581,7 +703,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "locationPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "According to system requirements, obtaining the Wi-Fi name requires you to grant location permission.",
     ),
-    "locationPermissionGuide": m16,
+    "locationPermissionGuide": m20,
     "locationPermissionRequired": MessageLookupByLibrary.simpleMessage(
       "Location Permission Required",
     ),
@@ -619,11 +741,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "minimizeOnExitDesc": MessageLookupByLibrary.simpleMessage(
       "Изменить стандартное событие выхода из системы",
     ),
-    "minutesAgo": m17,
+    "minutesAgo": m21,
     "mixedPort": MessageLookupByLibrary.simpleMessage("Смешанный порт"),
     "mode": MessageLookupByLibrary.simpleMessage("Режим"),
     "monochromeScheme": MessageLookupByLibrary.simpleMessage("Монохром"),
-    "monthsAgo": m18,
+    "monthsAgo": m22,
     "more": MessageLookupByLibrary.simpleMessage("Еще"),
     "name": MessageLookupByLibrary.simpleMessage("Имя"),
     "nameserver": MessageLookupByLibrary.simpleMessage("Сервер имен"),
@@ -669,8 +791,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "nullProfileDesc": MessageLookupByLibrary.simpleMessage(
       "Нет профиля, пожалуйста, добавьте профиль",
     ),
-    "nullTip": m19,
-    "numberTip": m20,
+    "nullTip": m23,
+    "numberTip": m24,
     "onDemand": MessageLookupByLibrary.simpleMessage("On Demand"),
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "Configure the program running state for specific scenarios",
@@ -728,7 +850,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "portConflictTip": MessageLookupByLibrary.simpleMessage(
       "Введите другой порт",
     ),
-    "portTip": m21,
+    "portTip": m25,
     "preferH3Desc": MessageLookupByLibrary.simpleMessage(
       "Приоритетное использование HTTP/3 для DOH",
     ),
@@ -997,7 +1119,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("Поиск"),
     "seconds": MessageLookupByLibrary.simpleMessage("Секунд"),
-    "secondsCount": m22,
+    "secondsCount": m26,
     "selectAll": MessageLookupByLibrary.simpleMessage("Выбрать все"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("Выбрать прокси"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1013,7 +1135,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Пожалуйста, выберите подправило",
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Выбрано"),
-    "selectedCountTitle": m23,
+    "selectedCountTitle": m27,
     "settings": MessageLookupByLibrary.simpleMessage("Настройки"),
     "show": MessageLookupByLibrary.simpleMessage("Показать"),
     "shrink": MessageLookupByLibrary.simpleMessage("Сжать"),
@@ -1029,6 +1151,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "Не удалось запустить прокси. Проверьте разрешение VPN и повторите попытку.",
     ),
     "simpleDisconnect": MessageLookupByLibrary.simpleMessage("Отключить"),
+    "simpleErrorState": MessageLookupByLibrary.simpleMessage(
+      "Connection error",
+    ),
     "simpleHome": MessageLookupByLibrary.simpleMessage("Подключение"),
     "simpleImport": MessageLookupByLibrary.simpleMessage("Добавить подписку"),
     "simpleImportFailed": MessageLookupByLibrary.simpleMessage(
@@ -1161,7 +1286,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "urlDesc": MessageLookupByLibrary.simpleMessage(
       "Получить профиль через URL",
     ),
-    "urlTip": m24,
+    "urlTip": m28,
     "useHosts": MessageLookupByLibrary.simpleMessage("Использовать hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage(
       "Использовать системные hosts",
@@ -1185,7 +1310,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "whitelistMode": MessageLookupByLibrary.simpleMessage(
       "Режим белого списка",
     ),
-    "yearsAgo": m25,
+    "yearsAgo": m29,
     "zh_CN": MessageLookupByLibrary.simpleMessage("Упрощенный китайский"),
   };
 }
