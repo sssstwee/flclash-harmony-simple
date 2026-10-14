@@ -64,7 +64,7 @@ Future<void> main() async {
     expect(background, contains('<rect width="512" height="512"'));
     expect(background, isNot(contains('rx=')));
     expect(background, isNot(contains('<path')));
-    expect(background, contains('fill="#FFFFFF"'));
+    expect(background, contains('fill="#000000"'));
     expect(foreground, isNot(contains('<rect')));
     final awake = File('assets/images/cat_awake.svg').readAsStringSync();
     final sleeping = File('assets/images/cat_sleeping.svg').readAsStringSync();
@@ -130,11 +130,11 @@ Future<void> main() async {
       for (final point in [(0, 0), (431, 0), (0, 431), (431, 431), (0, 216)]) {
         expect(_pixel(foregroundData, 432, point.$1, point.$2).last, 0);
       }
-      expect(_pixel(foregroundData, 432, 216, 216).last, 255);
-      expect(_pixel(backgroundData, 512, 256, 256), [255, 255, 255, 255]);
-      expect(_pixel(foregroundData, 432, 216, 297), [0, 0, 0, 255]);
+      expect(_pixel(foregroundData, 432, 216, 216), [255, 255, 255, 255]);
+      expect(_pixel(backgroundData, 512, 256, 256), [0, 0, 0, 255]);
+      expect(_pixel(foregroundData, 432, 170, 233), [0, 0, 0, 255]);
 
-      // Layering must leave the white background visible outside the cat.
+      // Layering must leave the black background visible outside the cat.
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
       canvas.drawImage(background, ui.Offset.zero, ui.Paint());

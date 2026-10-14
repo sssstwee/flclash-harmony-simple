@@ -845,7 +845,7 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                 height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white,
+                  color: Colors.black,
                   border: Border.all(color: ringColor, width: 1.5),
                 ),
                 child: Stack(
@@ -856,7 +856,7 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                         dimension: 56,
                         child: CircularProgressIndicator(
                           value: reducedMotion ? 0.65 : null,
-                          color: Colors.black,
+                          color: Colors.white,
                           strokeWidth: 3,
                         ),
                       ),
@@ -894,7 +894,7 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                           Icons.error_rounded,
                           key: Key('harmony_connection_error'),
                           size: 18,
-                          color: Colors.black,
+                          color: Colors.white,
                         ),
                       ),
                   ],

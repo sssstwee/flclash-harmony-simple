@@ -229,7 +229,17 @@ void main() {
             matching: find.byType(AnimatedContainer),
           ),
         );
-        expect((disc.decoration! as BoxDecoration).color, Colors.white);
+        expect((disc.decoration! as BoxDecoration).color, Colors.black);
+        if (busy) {
+          expect(
+            tester
+                .widget<CircularProgressIndicator>(
+                  find.byType(CircularProgressIndicator),
+                )
+                .color,
+            Colors.white,
+          );
+        }
         expect(tester.getSize(primaryConnectionControl), const Size(64, 64));
         await tester.tap(primaryConnectionControl);
         expect(toggles, busy ? 0 : 1);
