@@ -160,8 +160,7 @@ class _Api extends HarmonyAccountApi {
   @override
   Future<Duration> readConfigRefreshInterval({
     Duration fallback = const Duration(hours: 24),
-  }) async =>
-      fallback;
+  }) async => fallback;
 
   @override
   Future<Duration> readMinCheckInterval() async =>
