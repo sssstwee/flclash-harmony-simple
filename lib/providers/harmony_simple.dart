@@ -654,7 +654,8 @@ class HarmonySimple extends _$HarmonySimple {
     final profile = state.remoteProfile;
     if (profile == null) return false;
     final groups = ref.read(groupsProvider);
-    final config = await coreController.getConfig(profile.id);
+    final core = ref.read(harmonyCoreControllerProvider);
+    final config = await core.getConfig(profile.id);
     final rules = system.isOhos
         ? defaultRoutingRules(config)
         : List<String>.from(config['rules'] ?? const <String>[]);
@@ -665,7 +666,7 @@ class HarmonySimple extends _$HarmonySimple {
         : await autoSelectProxy(
             group,
             groups,
-            (name) async => (await coreController.getDelay(
+            (name) async => (await core.getDelay(
               group.testUrl ?? ref.read(appSettingProvider).testUrl,
               name,
             )).value,
