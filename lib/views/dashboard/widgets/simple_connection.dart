@@ -128,6 +128,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
         ),
         const SizedBox(height: 28),
         FilledButton(
+          key: const Key('harmony_primary_connect'),
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(72),
             shape: RoundedRectangleBorder(

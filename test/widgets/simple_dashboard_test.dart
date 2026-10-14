@@ -81,10 +81,7 @@ class IdleHarmonySimple extends HarmonySimple {
   }
 }
 
-Finder get primaryFilledButton => find.descendant(
-  of: find.byType(SimpleConnectionPanel),
-  matching: find.byType(FilledButton),
-);
+Finder get primaryFilledButton => find.byKey(const Key('harmony_primary_connect'));
 
 Widget app(Widget child) => MaterialApp(
   locale: const Locale('zh', 'CN'),
