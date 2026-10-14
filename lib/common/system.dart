@@ -439,3 +439,4 @@ class MacOS {
 }
 
 final macOS = system.isMacOS ? MacOS() : null;
+
