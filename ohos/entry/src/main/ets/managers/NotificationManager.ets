@@ -113,15 +113,31 @@ export default class NotificationManager {
     if (!params || globalState.runState !== RunState.start) {
       return Promise.resolve()
     }
-    return this.ensureWantAgents().then(() => {
+    return this.ensureWantAgents().then((): Promise<void> => {
+      const openAgent = this.openWantAgent
+      const disconnectAgent = this.disconnectWantAgent
+      const reswitchAgent = this.reswitchWantAgent
+      if (!openAgent) {
+        return Promise.resolve()
+      }
+      const actionButtons: notificationManager.NotificationActionButton[] = []
+      if (params.showActions && disconnectAgent && reswitchAgent) {
+        actionButtons.push({
+          title: '断开',
+          wantAgent: disconnectAgent as object,
+        })
+        actionButtons.push({
+          title: '切换线路',
+          wantAgent: reswitchAgent as object,
+        })
+      }
       const request: notificationManager.NotificationRequest = {
         id: VPN_NOTIFICATION_ID,
-        slotType: notificationManager.SlotType.SERVICE_INFORMATION,
         isOngoing: true,
         isUnremovable: true,
         tapDismissed: false,
         showDeliveryTime: false,
-        wantAgent: this.openWantAgent,
+        wantAgent: openAgent as object,
         content: {
           notificationContentType: notificationManager.ContentType.NOTIFICATION_CONTENT_BASIC_TEXT,
           normal: {
@@ -130,16 +146,7 @@ export default class NotificationManager {
             additionalText: params.configHint,
           },
         },
-        actionButtons: params.showActions ? [
-          {
-            title: '断开',
-            wantAgent: this.disconnectWantAgent,
-          },
-          {
-            title: '切换线路',
-            wantAgent: this.reswitchWantAgent,
-          },
-        ] : [],
+        actionButtons: actionButtons,
       }
       return new Promise<void>((resolve) => {
         notificationManager.publish(request, (err: Error) => {
@@ -206,8 +213,10 @@ export default class NotificationManager {
       requestCode: 0,
       actionFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
     }
-    return wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent) => {
-      backgroundTaskManager.on('continuousTaskCancel', () => { setTimeout(() => this.startContinuousTask(), 1000) })
+    return wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent): Promise<void> => {
+      backgroundTaskManager.on('continuousTaskCancel', (): void => {
+        setTimeout((): void => { void this.startContinuousTask() }, 1000)
+      })
       return backgroundTaskManager.startBackgroundRunning(
         this.context,
         backgroundTaskManager.BackgroundMode.TASK_KEEPING,
