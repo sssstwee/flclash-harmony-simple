@@ -113,7 +113,9 @@ class HarmonySession {
   };
 
   static HarmonySession? fromJson(String? raw, String tokenFallback) {
-    if (raw == null || raw.isEmpty || tokenFallback.isEmpty) return null;
+    if (raw == null || raw.isEmpty || tokenFallback.isEmpty) {
+      return null;
+    }
     try {
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final username = data['username'];
@@ -125,7 +127,9 @@ class HarmonySession {
         return null;
       }
       final expiresAt = DateTime.tryParse(expiry);
-      if (expiresAt == null) return null;
+      if (expiresAt == null) {
+        return null;
+      }
       return HarmonySession(tokenFallback, username, expiresAt);
     } catch (_) {
       return null;
@@ -159,7 +163,9 @@ class HarmonyConfigCacheMetadata {
   };
 
   static HarmonyConfigCacheMetadata? fromJson(String? raw) {
-    if (raw == null) return null;
+    if (raw == null) {
+      return null;
+    }
     try {
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final username = data['username'];
@@ -212,14 +218,16 @@ class HarmonyAccountApi {
   Future<void> _storageTail = Future<void>.value();
 
   HarmonyAccountApi({Dio? http, HarmonySessionStore? storage})
-    : _http = http ?? Dio(
-        BaseOptions(
-          baseUrl: harmonyApiUrl,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 40),
-          followRedirects: false,
-        ),
-      ),
+    : _http =
+          http ??
+          Dio(
+            BaseOptions(
+              baseUrl: harmonyApiUrl,
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 40),
+              followRedirects: false,
+            ),
+          ),
       _storage = storage ?? HarmonySessionStore();
 
   bool get isAuthorized => session?.expiresAt.isAfter(DateTime.now()) == true;
@@ -228,12 +236,17 @@ class HarmonyAccountApi {
   // so logout can invalidate an in-flight login/restore immediately.
   Future<T> _store<T>(Future<T> Function() action) {
     final result = _storageTail.then((_) => action());
-    _storageTail = result.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _storageTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
     return result;
   }
 
   void _checkGeneration(int generation) {
-    if (_generation != generation) throw HarmonyAccountError.expired;
+    if (_generation != generation) {
+      throw HarmonyAccountError.expired;
+    }
   }
 
   Future<String?> readConfigLastModified() =>
@@ -241,9 +254,13 @@ class HarmonyAccountApi {
 
   Future<HarmonyConfigCacheMetadata?> readConfigCache() async {
     final current = session;
-    if (current == null || !isAuthorized) return null;
+    if (current == null || !isAuthorized) {
+      return null;
+    }
     final raw = await _store(_storage.readConfigCache);
-    if (session?.token != current.token || !isAuthorized) return null;
+    if (session?.token != current.token || !isAuthorized) {
+      return null;
+    }
     final metadata = HarmonyConfigCacheMetadata.fromJson(raw);
     return metadata?.username == current.username ? metadata : null;
   }
@@ -274,7 +291,9 @@ class HarmonyAccountApi {
   });
 
   Future<HarmonySession?> restore() async {
-    if (_restoreBlocked) return null;
+    if (_restoreBlocked) {
+      return null;
+    }
     final generation = _generation;
     String? token;
     try {
@@ -343,14 +362,18 @@ class HarmonyAccountApi {
       );
       final token = issuedToken = response.headers.value('set-auth-token');
       _checkGeneration(generation);
-      if (token == null || token.isEmpty) throw HarmonyAccountError.unavailable;
+      if (token == null || token.isEmpty) {
+        throw HarmonyAccountError.unavailable;
+      }
       final value = await _validate(token);
       _checkGeneration(generation);
       await _store(() async {
         _checkGeneration(generation);
         await _storage.write(token);
         await _storage.writeMeta(jsonEncode(value.toJson()));
-        if (await _storage.read() != token) throw HarmonyAccountError.unavailable;
+        if (await _storage.read() != token) {
+          throw HarmonyAccountError.unavailable;
+        }
       });
       _checkGeneration(generation);
       _restoreBlocked = false;
@@ -371,7 +394,9 @@ class HarmonyAccountApi {
           );
         } catch (_) {}
       }
-      if (error is HarmonyAccountError) rethrow;
+      if (error is HarmonyAccountError) {
+        rethrow;
+      }
       throw HarmonyAccountError.unavailable;
     }
   }
@@ -397,7 +422,9 @@ class HarmonyAccountApi {
     String? ifNoneMatch,
     String? ifModifiedSince,
   }) async {
-    if (!isAuthorized) throw HarmonyAccountError.expired;
+    if (!isAuthorized) {
+      throw HarmonyAccountError.expired;
+    }
     final token = session!.token;
     final generation = _generation;
     final response = await _request(
@@ -410,23 +437,30 @@ class HarmonyAccountApi {
       },
     );
     _checkGeneration(generation);
-    if (session?.token != token || !isAuthorized) throw HarmonyAccountError.expired;
+    if (session?.token != token || !isAuthorized) {
+      throw HarmonyAccountError.expired;
+    }
     if (response.statusCode == 304) {
       return HarmonyConfigDownload(
         notModified: true,
         etag: response.headers.value('etag') ?? ifNoneMatch,
-        lastModified: response.headers.value('last-modified') ?? ifModifiedSince,
+        lastModified:
+            response.headers.value('last-modified') ?? ifModifiedSince,
       );
     }
     final stream = response.data;
-    if (stream is! ResponseBody) throw HarmonyAccountError.config;
+    if (stream is! ResponseBody) {
+      throw HarmonyAccountError.config;
+    }
     final builder = BytesBuilder(copy: false);
     var length = 0;
     try {
       await for (final chunk in stream.stream) {
         _checkGeneration(generation);
         length += chunk.length;
-        if (length > harmonyConfigMaxBytes) throw HarmonyAccountError.config;
+        if (length > harmonyConfigMaxBytes) {
+          throw HarmonyAccountError.config;
+        }
         builder.add(chunk);
       }
     } on HarmonyAccountError {
@@ -435,9 +469,13 @@ class HarmonyAccountApi {
       throw HarmonyAccountError.unavailable;
     }
     _checkGeneration(generation);
-    if (session?.token != token || !isAuthorized) throw HarmonyAccountError.expired;
+    if (session?.token != token || !isAuthorized) {
+      throw HarmonyAccountError.expired;
+    }
     final bytes = builder.takeBytes();
-    if (bytes.isEmpty) throw HarmonyAccountError.config;
+    if (bytes.isEmpty) {
+      throw HarmonyAccountError.config;
+    }
     return HarmonyConfigDownload(
       bytes: bytes,
       etag: response.headers.value('etag'),
@@ -457,7 +495,12 @@ class HarmonyAccountApi {
     }
     if (token != null) {
       try {
-        await _request('/api/auth/sign-out', method: 'POST', data: {}, token: token);
+        await _request(
+          '/api/auth/sign-out',
+          method: 'POST',
+          data: {},
+          token: token,
+        );
       } catch (_) {
         // The server session also expires automatically.
       }
@@ -497,8 +540,10 @@ class HarmonyAccountApi {
           method: method,
           responseType: responseType,
           followRedirects: false,
-          validateStatus: (status) => status != null &&
-              (status >= 200 && status < 300 || path == '/v1/config' && status == 304),
+          validateStatus: (status) =>
+              status != null &&
+              (status >= 200 && status < 300 ||
+                  path == '/v1/config' && status == 304),
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
             ...?headers,
@@ -508,11 +553,19 @@ class HarmonyAccountApi {
     } on DioException catch (error) {
       final status = error.response?.statusCode;
       if (status == 401 || status == 403) {
-        throw login ? HarmonyAccountError.credentials : HarmonyAccountError.expired;
+        throw login
+            ? HarmonyAccountError.credentials
+            : HarmonyAccountError.expired;
       }
-      if (status == 429) throw HarmonyAccountError.rateLimited;
-      if (status == null || status >= 500) throw HarmonyAccountError.unavailable;
-      if (path == '/v1/config') throw HarmonyAccountError.config;
+      if (status == 429) {
+        throw HarmonyAccountError.rateLimited;
+      }
+      if (status == null || status >= 500) {
+        throw HarmonyAccountError.unavailable;
+      }
+      if (path == '/v1/config') {
+        throw HarmonyAccountError.config;
+      }
       throw HarmonyAccountError.unavailable;
     }
   }

@@ -64,7 +64,7 @@ jobs:
   build:
     needs: [changes, backend, secrets-scan]
     if: |
-      always() &&
+      !cancelled() &&
       needs.changes.result == 'success' &&
       needs.secrets-scan.result == 'success' &&
       (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&

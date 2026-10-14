@@ -79,8 +79,9 @@ Future<({String name, Map<String, String> selections})?> autoSelectProxy(
     return probes.putIfAbsent(name, () async {
       try {
         return await Future.any<int?>([
-          Future<int?>.sync(() => measure(name))
-              .timeout(const Duration(seconds: 8)),
+          Future<int?>.sync(
+            () => measure(name),
+          ).timeout(const Duration(seconds: 8)),
           deadline.future.then<int?>((_) => null),
         ]);
       } catch (_) {

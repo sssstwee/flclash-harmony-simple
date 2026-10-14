@@ -57,9 +57,9 @@ class Profiles extends _$Profiles {
     final newProfile = previous.optimizeLabel(profile);
     state = previous.copyAndPut(newProfile, (item) => item.id == newProfile.id);
     await withRollback(
-        snapshot: previous,
-        action: () => database.profiles.put(newProfile.toCompanion()),
-        rollback: (v) => state = v,
+      snapshot: previous,
+      action: () => database.profiles.put(newProfile.toCompanion()),
+      rollback: (v) => state = v,
     );
   }
 
@@ -69,9 +69,9 @@ class Profiles extends _$Profiles {
     final previous = List<Profile>.from(state);
     state = previous.where((e) => e.id != id).toList();
     await withRollback(
-        snapshot: previous,
-        action: () => database.profiles.remove((t) => t.id.equals(id)),
-        rollback: (v) => state = v,
+      snapshot: previous,
+      action: () => database.profiles.remove((t) => t.id.equals(id)),
+      rollback: (v) => state = v,
     );
   }
 

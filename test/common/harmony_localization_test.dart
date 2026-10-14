@@ -70,17 +70,20 @@ void main() {
   });
 
   for (final locale in const [Locale('en'), Locale('zh', 'CN')]) {
-    test('$locale generated dashboard strings match their ARB source', () async {
-      final translations = _readArb(locale.toString());
-      final strings = await AppLocalizations.load(locale);
-      for (final entry in _dashboardStrings(strings).entries) {
-        expect(
-          entry.value,
-          translations[entry.key],
-          reason: '$locale: ${entry.key}; run dart run intl_utils:generate',
-        );
-      }
-    });
+    test(
+      '$locale generated dashboard strings match their ARB source',
+      () async {
+        final translations = _readArb(locale.toString());
+        final strings = await AppLocalizations.load(locale);
+        for (final entry in _dashboardStrings(strings).entries) {
+          expect(
+            entry.value,
+            translations[entry.key],
+            reason: '$locale: ${entry.key}; run dart run intl_utils:generate',
+          );
+        }
+      },
+    );
   }
 
   test('unsupported or empty preferred locales fall back to English', () {

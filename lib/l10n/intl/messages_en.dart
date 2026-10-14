@@ -441,41 +441,41 @@ class MessageLookup extends MessageLookupByLibrary {
       "Unable to download valid connection settings. Try connecting again later.",
     ),
     "harmonyConnecting": MessageLookupByLibrary.simpleMessage("Connecting…"),
-    "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("Current node"),
-    "harmonyDownload": MessageLookupByLibrary.simpleMessage("Download"),
-    "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
-    "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
-      "Using cached settings (offline)",
-    ),
-    "harmonyRetry": MessageLookupByLibrary.simpleMessage("Try again"),
-    "harmonySessionTraffic": MessageLookupByLibrary.simpleMessage(
-      "Session traffic",
-    ),
-    "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("Switch node"),
-    "harmonyUpload": MessageLookupByLibrary.simpleMessage("Upload"),
     "harmonyCredentialsError": MessageLookupByLibrary.simpleMessage(
       "Incorrect username or password.",
     ),
+    "harmonyCurrentNode": MessageLookupByLibrary.simpleMessage("Current node"),
     "harmonyDisconnecting": MessageLookupByLibrary.simpleMessage(
       "Disconnecting…",
     ),
+    "harmonyDownload": MessageLookupByLibrary.simpleMessage("Download"),
+    "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("Sign in"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
       "Sign in to download your connection settings automatically.",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
+    "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
+      "Using cached settings (offline)",
+    ),
     "harmonyRateLimited": MessageLookupByLibrary.simpleMessage(
       "Too many attempts. Try again in one minute.",
     ),
     "harmonyRequired": MessageLookupByLibrary.simpleMessage(
       "Please fill in this field.",
     ),
+    "harmonyRetry": MessageLookupByLibrary.simpleMessage("Try again"),
     "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
       "Unable to reach the service. Check your network and try again.",
     ),
     "harmonySessionExpired": MessageLookupByLibrary.simpleMessage(
       "Your session expired. Please sign in again.",
     ),
+    "harmonySessionTraffic": MessageLookupByLibrary.simpleMessage(
+      "Session traffic",
+    ),
+    "harmonySwitchNode": MessageLookupByLibrary.simpleMessage("Switch node"),
+    "harmonyUpload": MessageLookupByLibrary.simpleMessage("Upload"),
     "harmonyUsername": MessageLookupByLibrary.simpleMessage("Username"),
     "hasCacheChange": MessageLookupByLibrary.simpleMessage(
       "Do you want to cache the changes?",
@@ -547,7 +547,6 @@ class MessageLookup extends MessageLookupByLibrary {
     "ipv6InboundDesc": MessageLookupByLibrary.simpleMessage(
       "Allow IPv6 inbound",
     ),
-    "ja": MessageLookupByLibrary.simpleMessage("Japanese"),
     "justNow": MessageLookupByLibrary.simpleMessage("Just now"),
     "keep": MessageLookupByLibrary.simpleMessage("Remove from recents"),
     "keepAliveIntervalDesc": MessageLookupByLibrary.simpleMessage(
@@ -851,7 +850,6 @@ class MessageLookup extends MessageLookupByLibrary {
       "Bypass private route address",
     ),
     "routeMode_config": MessageLookupByLibrary.simpleMessage("Use config"),
-    "ru": MessageLookupByLibrary.simpleMessage("Russian"),
     "rule": MessageLookupByLibrary.simpleMessage("Rule"),
     "ruleActionAndDesc": MessageLookupByLibrary.simpleMessage(
       "Logical rule AND",
@@ -996,8 +994,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "simpleConnectFailed": MessageLookupByLibrary.simpleMessage(
       "Could not start the proxy. Check VPN permission and try again.",
     ),
-    "simpleErrorState": MessageLookupByLibrary.simpleMessage("Connection error"),
     "simpleDisconnect": MessageLookupByLibrary.simpleMessage("Disconnect"),
+    "simpleErrorState": MessageLookupByLibrary.simpleMessage(
+      "Connection error",
+    ),
     "simpleHome": MessageLookupByLibrary.simpleMessage("Connect"),
     "simpleImport": MessageLookupByLibrary.simpleMessage("Import subscription"),
     "simpleImportFailed": MessageLookupByLibrary.simpleMessage(

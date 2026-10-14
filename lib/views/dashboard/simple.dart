@@ -163,10 +163,14 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   nodeName: nodeName,
                   nodeDelayMs: nodeDelay,
                   onToggle: ready && !ui.bootstrapping
-                      ? () => ref.read(harmonySimpleProvider.notifier).toggleConnect()
+                      ? () => ref
+                            .read(harmonySimpleProvider.notifier)
+                            .toggleConnect()
                       : null,
-                  onLogout: () => ref.read(harmonySimpleProvider.notifier).logout(),
-                  onRetry: () => ref.read(harmonySimpleProvider.notifier).retryConnect(),
+                  onLogout: () =>
+                      ref.read(harmonySimpleProvider.notifier).logout(),
+                  onRetry: () =>
+                      ref.read(harmonySimpleProvider.notifier).retryConnect(),
                   onSwitchNode: running ? _showNodeSwitcher : null,
                 )
               : AutofillGroup(

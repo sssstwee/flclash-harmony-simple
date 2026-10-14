@@ -132,142 +132,185 @@ void main() {
     },
   );
 
-  test('manual-only probes finish at 24 seconds and never start a fourth batch', () {
-    fakeAsync((async) {
-      final root = Group(
-        name: 'Main',
-        type: GroupType.Selector,
-        all: List.generate(30, (index) => Proxy(name: 'Node$index', type: 'Trojan')),
-      );
-      final measured = <String>[];
-      var completed = false;
-      Object? result = 'not completed';
-      autoSelectProxy(root, [root], (name) {
-        measured.add(name);
-        return Completer<int?>().future;
-      }).then((value) {
-        completed = true;
-        result = value;
+  test(
+    'manual-only probes finish at 24 seconds and never start a fourth batch',
+    () {
+      fakeAsync((async) {
+        final root = Group(
+          name: 'Main',
+          type: GroupType.Selector,
+          all: List.generate(
+            30,
+            (index) => Proxy(name: 'Node$index', type: 'Trojan'),
+          ),
+        );
+        final measured = <String>[];
+        var completed = false;
+        Object? result = 'not completed';
+        autoSelectProxy(root, [root], (name) {
+          measured.add(name);
+          return Completer<int?>().future;
+        }).then((value) {
+          completed = true;
+          result = value;
+        });
+        async.flushMicrotasks();
+        expect(measured, hasLength(6));
+        async.elapse(const Duration(seconds: 8));
+        expect(measured, hasLength(12));
+        async.elapse(const Duration(seconds: 8));
+        expect(measured, hasLength(18));
+        async.elapse(const Duration(milliseconds: 7999));
+        expect(completed, isFalse);
+        async.elapse(const Duration(milliseconds: 1));
+        expect(completed, isTrue);
+        expect(result, isNull);
+        expect(measured, hasLength(18));
+        async.elapse(const Duration(minutes: 1));
+        expect(measured, hasLength(18));
       });
-      async.flushMicrotasks();
-      expect(measured, hasLength(6));
-      async.elapse(const Duration(seconds: 8));
-      expect(measured, hasLength(12));
-      async.elapse(const Duration(seconds: 8));
-      expect(measured, hasLength(18));
-      async.elapse(const Duration(milliseconds: 7999));
-      expect(completed, isFalse);
-      async.elapse(const Duration(milliseconds: 1));
-      expect(completed, isTrue);
-      expect(result, isNull);
-      expect(measured, hasLength(18));
-      async.elapse(const Duration(minutes: 1));
-      expect(measured, hasLength(18));
-    });
-  });
+    },
+  );
 
-  test('automatic and manual probes share one deadline, including partial batches', () {
-    fakeAsync((async) {
-      final automatic = List.generate(
-        13,
-        (index) => Group(name: 'Auto$index', type: GroupType.URLTest, all: [fast]),
-      );
-      final root = Group(
+  test(
+    'automatic and manual probes share one deadline, including partial batches',
+    () {
+      fakeAsync((async) {
+        final automatic = List.generate(
+          13,
+          (index) =>
+              Group(name: 'Auto$index', type: GroupType.URLTest, all: [fast]),
+        );
+        final root = Group(
+          name: 'Main',
+          type: GroupType.Selector,
+          all: [
+            for (final group in automatic)
+              Proxy(name: group.name, type: 'URLTest'),
+            for (var index = 0; index < 20; index++)
+              Proxy(name: 'Manual$index', type: 'Trojan'),
+          ],
+        );
+        final measured = <String>[];
+        final lateManual = Completer<int?>();
+        var completed = false;
+        Object? result = 'not completed';
+        autoSelectProxy(root, [root, ...automatic], (name) {
+          measured.add(name);
+          if (name.startsWith('Auto')) {
+            return Future<int?>.delayed(const Duration(seconds: 7), () => null);
+          }
+          return lateManual.future;
+        }).then((value) {
+          completed = true;
+          result = value;
+        });
+        async.elapse(const Duration(seconds: 21));
+        expect(
+          measured.where((name) => name.startsWith('Auto')),
+          hasLength(13),
+        );
+        expect(
+          measured.where((name) => name.startsWith('Manual')),
+          hasLength(6),
+        );
+        async.elapse(const Duration(milliseconds: 2999));
+        expect(completed, isFalse);
+        async.elapse(const Duration(milliseconds: 1));
+        expect(completed, isTrue);
+        expect(result, isNull);
+        lateManual.complete(1);
+        async.flushMicrotasks();
+        expect(result, isNull);
+        expect(measured, hasLength(19));
+        async.elapse(const Duration(minutes: 1));
+        expect(measured, hasLength(19));
+      });
+    },
+  );
+
+  test(
+    'automatic-only probes also finish rather than leaving a pending future',
+    () {
+      fakeAsync((async) {
+        final automatic = List.generate(
+          30,
+          (index) =>
+              Group(name: 'Auto$index', type: GroupType.URLTest, all: [fast]),
+        );
+        final root = Group(
+          name: 'Main',
+          type: GroupType.Selector,
+          all: [
+            for (final group in automatic)
+              Proxy(name: group.name, type: 'URLTest'),
+          ],
+        );
+        var completed = false;
+        final measured = <String>[];
+        autoSelectProxy(root, [root, ...automatic], (name) {
+          measured.add(name);
+          return Completer<int?>().future;
+        }).then((value) {
+          expect(value, isNull);
+          completed = true;
+        });
+        async.elapse(const Duration(seconds: 24));
+        expect(completed, isTrue);
+        expect(measured, hasLength(18));
+      });
+    },
+  );
+
+  test(
+    'the same node on two selector routes has only one in-flight probe',
+    () async {
+      const root = Group(
         name: 'Main',
         type: GroupType.Selector,
         all: [
-          for (final group in automatic) Proxy(name: group.name, type: 'URLTest'),
-          for (var index = 0; index < 20; index++) Proxy(name: 'Manual$index', type: 'Trojan'),
+          fast,
+          Proxy(name: 'Region', type: 'Selector'),
         ],
       );
-      final measured = <String>[];
-      final lateManual = Completer<int?>();
-      var completed = false;
-      Object? result = 'not completed';
-      autoSelectProxy(root, [root, ...automatic], (name) {
-        measured.add(name);
-        if (name.startsWith('Auto')) {
-          return Future<int?>.delayed(const Duration(seconds: 7), () => null);
-        }
-        return lateManual.future;
-      }).then((value) {
-        completed = true;
-        result = value;
-      });
-      async.elapse(const Duration(seconds: 21));
-      expect(measured.where((name) => name.startsWith('Auto')), hasLength(13));
-      expect(measured.where((name) => name.startsWith('Manual')), hasLength(6));
-      async.elapse(const Duration(milliseconds: 2999));
-      expect(completed, isFalse);
-      async.elapse(const Duration(milliseconds: 1));
-      expect(completed, isTrue);
-      expect(result, isNull);
-      lateManual.complete(1);
-      async.flushMicrotasks();
-      expect(result, isNull);
-      expect(measured, hasLength(19));
-      async.elapse(const Duration(minutes: 1));
-      expect(measured, hasLength(19));
-    });
-  });
-
-  test('automatic-only probes also finish rather than leaving a pending future', () {
-    fakeAsync((async) {
-      final automatic = List.generate(
-        30,
-        (index) => Group(name: 'Auto$index', type: GroupType.URLTest, all: [fast]),
+      const region = Group(
+        name: 'Region',
+        type: GroupType.Selector,
+        all: [fast],
       );
-      final root = Group(
+      var probes = 0;
+      final pending = Completer<int?>();
+      final selecting = autoSelectProxy(root, [root, region], (_) {
+        probes++;
+        return pending.future;
+      });
+      expect(probes, 1);
+      pending.complete(10);
+      final selected = await selecting;
+      expect(selected?.name, 'fast');
+      expect(selected?.selections, {'Main': 'fast'});
+      expect(probes, 1);
+    },
+  );
+
+  test(
+    'DIRECT, REJECT, relay-only and cyclic routes cannot become a connection',
+    () async {
+      const root = Group(
         name: 'Main',
         type: GroupType.Selector,
-        all: [for (final group in automatic) Proxy(name: group.name, type: 'URLTest')],
+        all: [
+          direct,
+          reject,
+          Proxy(name: 'Relay', type: 'Relay'),
+          Proxy(name: 'Main', type: 'Selector'),
+        ],
       );
-      var completed = false;
-      final measured = <String>[];
-      autoSelectProxy(root, [root, ...automatic], (name) {
-        measured.add(name);
-        return Completer<int?>().future;
-      }).then((value) {
-        expect(value, isNull);
-        completed = true;
+      const relay = Group(name: 'Relay', type: GroupType.Relay, all: [fast]);
+      final selected = await autoSelectProxy(root, [root, relay], (_) {
+        fail('Non-proxy routes must never be probed');
       });
-      async.elapse(const Duration(seconds: 24));
-      expect(completed, isTrue);
-      expect(measured, hasLength(18));
-    });
-  });
-
-  test('the same node on two selector routes has only one in-flight probe', () async {
-    const root = Group(
-      name: 'Main',
-      type: GroupType.Selector,
-      all: [fast, Proxy(name: 'Region', type: 'Selector')],
-    );
-    const region = Group(name: 'Region', type: GroupType.Selector, all: [fast]);
-    var probes = 0;
-    final pending = Completer<int?>();
-    final selecting = autoSelectProxy(root, [root, region], (_) {
-      probes++;
-      return pending.future;
-    });
-    expect(probes, 1);
-    pending.complete(10);
-    final selected = await selecting;
-    expect(selected?.name, 'fast');
-    expect(selected?.selections, {'Main': 'fast'});
-    expect(probes, 1);
-  });
-
-  test('DIRECT, REJECT, relay-only and cyclic routes cannot become a connection', () async {
-    const root = Group(
-      name: 'Main',
-      type: GroupType.Selector,
-      all: [direct, reject, Proxy(name: 'Relay', type: 'Relay'), Proxy(name: 'Main', type: 'Selector')],
-    );
-    const relay = Group(name: 'Relay', type: GroupType.Relay, all: [fast]);
-    final selected = await autoSelectProxy(root, [root, relay], (_) {
-      fail('Non-proxy routes must never be probed');
-    });
-    expect(selected, isNull);
-  });
+      expect(selected, isNull);
+    },
+  );
 }

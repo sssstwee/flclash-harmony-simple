@@ -53,10 +53,11 @@ Future<void> main() async {
         size: 256,
       ),
     ]);
-    expect(
-      {icons.source, icons.backgroundSource, icons.foregroundSource},
-      hasLength(3),
-    );
+    expect({
+      icons.source,
+      icons.backgroundSource,
+      icons.foregroundSource,
+    }, hasLength(3));
     final full = File(icons.source).readAsStringSync();
     final background = File(icons.backgroundSource).readAsStringSync();
     final foreground = File(icons.foregroundSource).readAsStringSync();
@@ -83,7 +84,9 @@ Future<void> main() async {
   test(
     'generated foreground is transparent over an opaque background',
     () async {
-      final destination = await Directory.systemTemp.createTemp('harmony-icon-');
+      final destination = await Directory.systemTemp.createTemp(
+        'harmony-icon-',
+      );
       addTearDown(() => destination.delete(recursive: true));
       await icons.generateAppIcons(
         renderer: 'rsvg-convert',
@@ -103,17 +106,16 @@ Future<void> main() async {
           images['ohos/AppScope/resources/base/media/background.png']!;
       final foreground =
           images['ohos/AppScope/resources/base/media/foreground.png']!;
-      final backgroundData =
-          (await background.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-      final foregroundData =
-          (await foreground.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-      expect(
-        [
-          for (var i = 3; i < backgroundData.lengthInBytes; i += 4)
-            backgroundData.getUint8(i),
-        ],
-        everyElement(255),
-      );
+      final backgroundData = (await background.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      final foregroundData = (await foreground.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      expect([
+        for (var i = 3; i < backgroundData.lengthInBytes; i += 4)
+          backgroundData.getUint8(i),
+      ], everyElement(255));
       for (final point in [(0, 0), (431, 0), (0, 431), (431, 431), (0, 216)]) {
         expect(_pixel(foregroundData, 432, point.$1, point.$2).last, 0);
       }
@@ -132,8 +134,9 @@ Future<void> main() async {
       addTearDown(picture.dispose);
       final composite = await picture.toImage(512, 512);
       addTearDown(composite.dispose);
-      final compositeData =
-          (await composite.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+      final compositeData = (await composite.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
       for (final point in [(0, 0), (40, 40), (40, 256), (511, 511)]) {
         expect(
           _pixel(compositeData, 512, point.$1, point.$2),
@@ -145,6 +148,8 @@ Future<void> main() async {
         _pixel(foregroundData, 432, 216, 216),
       );
     },
-    skip: hasRenderer ? false : 'Install librsvg2-bin to verify rendered icons.',
+    skip: hasRenderer
+        ? false
+        : 'Install librsvg2-bin to verify rendered icons.',
   );
 }

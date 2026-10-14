@@ -66,11 +66,14 @@ class HarmonySimpleState {
 class HarmonyProfileStore {
   Future<Uint8List?> read(Profile profile) async {
     final file = File(await appPath.getProfilePath(profile.id.toString()));
-    if (!await file.exists()) return null;
+    if (!await file.exists()) {
+      return null;
+    }
     return file.readAsBytes();
   }
 
-  Future<Profile> save(Profile profile, Uint8List bytes) => profile.saveFile(bytes);
+  Future<Profile> save(Profile profile, Uint8List bytes) =>
+      profile.saveFile(bytes);
 
   Future<void> delete(Profile profile) async {
     final file = File(await appPath.getProfilePath(profile.id.toString()));
@@ -100,7 +103,9 @@ class HarmonySimple extends _$HarmonySimple {
   final _profileInstalls = <({Profile profile, Completer<void> done})>[];
 
   void _ensureCurrent(int operation, String token) {
-    if (!ref.mounted || operation != _operation || _api.session?.token != token) {
+    if (!ref.mounted ||
+        operation != _operation ||
+        _api.session?.token != token) {
       throw _SupersededHarmonyOperation();
     }
   }
@@ -117,17 +122,24 @@ class HarmonySimple extends _$HarmonySimple {
   HarmonySimpleState build() => const HarmonySimpleState();
 
   Future<void> bootstrap() async {
-    if (_restoring || state.busy) return;
+    if (_restoring || state.busy) {
+      return;
+    }
     _restoring = true;
     final operation = ++_operation;
     state = state.copyWith(bootstrapping: true, clearError: true);
     try {
       final session = await _api.restore();
-      if (!ref.mounted || operation != _operation) return;
+      if (!ref.mounted || operation != _operation) {
+        return;
+      }
       state = state.copyWith(session: session, clearSession: session == null);
       await _cleanupOrphanRemoteProfiles(operation);
       if (session != null) {
-        await _syncRemoteProfile(fallbackOnNetworkError: true, operation: operation);
+        await _syncRemoteProfile(
+          fallbackOnNetworkError: true,
+          operation: operation,
+        );
       }
     } on _SupersededHarmonyOperation {
       // A newer login/logout owns the state now.
@@ -152,18 +164,23 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> checkSession() async {
-    if (state.bootstrapping || state.busy || _api.session == null) return;
+    if (state.bootstrapping || state.busy || _restoring || _api.session == null) {
+      return;
+    }
     final operation = _operation;
     try {
       final restored = await _api.restore();
-      if (!ref.mounted || operation != _operation) return;
+      if (!ref.mounted || operation != _operation) {
+        return;
+      }
       if (restored == null) {
         await logout(expired: true);
       } else {
         state = state.copyWith(session: restored);
       }
     } on HarmonyAccountError catch (error) {
-      if (ref.mounted && operation == _operation &&
+      if (ref.mounted &&
+          operation == _operation &&
           error == HarmonyAccountError.expired) {
         await logout(expired: true);
       }
@@ -171,7 +188,9 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> login(String username, String password) async {
-    if (state.busy || _restoring) return;
+    if (state.busy || _restoring) {
+      return;
+    }
     final operation = ++_operation;
     state = state.copyWith(busy: true, clearError: true);
     try {
@@ -179,7 +198,10 @@ class HarmonySimple extends _$HarmonySimple {
       _ensureCurrent(operation, session.token);
       state = state.copyWith(session: session, clearError: true);
       await _cleanupOrphanRemoteProfiles(operation);
-      await _syncRemoteProfile(fallbackOnNetworkError: false, operation: operation);
+      await _syncRemoteProfile(
+        fallbackOnNetworkError: false,
+        operation: operation,
+      );
     } on _SupersededHarmonyOperation {
       // A newer logout owns the state now.
     } catch (error) {
@@ -246,7 +268,9 @@ class HarmonySimple extends _$HarmonySimple {
   Future<void> retryConnect() => toggleConnect();
 
   Future<void> toggleConnect() async {
-    if (state.busy || _api.session == null) return;
+    if (state.busy || _restoring || _api.session == null) {
+      return;
+    }
     final operation = ++_operation;
     final token = _api.session!.token;
     final setup = ref.read(setupActionProvider.notifier);
@@ -261,14 +285,19 @@ class HarmonySimple extends _$HarmonySimple {
         await setup.updateStatus(false);
         return;
       }
-      await _syncRemoteProfile(fallbackOnNetworkError: true, operation: operation);
+      await _syncRemoteProfile(
+        fallbackOnNetworkError: true,
+        operation: operation,
+      );
       _ensureCurrent(operation, token);
       final profile = state.remoteProfile;
       if (profile == null) {
         state = state.copyWith(error: _message(HarmonyAccountError.config));
         return;
       }
-      if (profile.id != ref.read(currentProfileIdProvider)) return;
+      if (profile.id != ref.read(currentProfileIdProvider)) {
+        return;
+      }
       ref
           .read(patchClashConfigProvider.notifier)
           .update((s) => s.copyWith(mode: Mode.rule));
@@ -278,7 +307,9 @@ class HarmonySimple extends _$HarmonySimple {
       await setup.applyProfile(force: true);
       _ensureCurrent(operation, token);
       final groups = ref.read(groupsProvider);
-      final config = await ref.read(harmonyCoreControllerProvider).getConfig(profile.id);
+      final config = await ref
+          .read(harmonyCoreControllerProvider)
+          .getConfig(profile.id);
       final group = connectionGroup(
         groups,
         system.isOhos
@@ -290,10 +321,15 @@ class HarmonySimple extends _$HarmonySimple {
           : await autoSelectProxy(
               group,
               groups,
-              (name) async => (await ref.read(harmonyCoreControllerProvider).getDelay(
-                group.testUrl ?? ref.read(appSettingProvider).testUrl,
-                name,
-              )).value,
+              (name) async =>
+                  (await ref
+                          .read(harmonyCoreControllerProvider)
+                          .getDelay(
+                            group.testUrl ??
+                                ref.read(appSettingProvider).testUrl,
+                            name,
+                          ))
+                      .value,
             );
       _ensureCurrent(operation, token);
       if (selected == null) {
@@ -316,7 +352,9 @@ class HarmonySimple extends _$HarmonySimple {
       await setup.updateStatus(true, isInit: true, profileApplied: true);
       _ensureCurrent(operation, token);
       if (!ref.read(isStartProvider)) {
-        state = state.copyWith(error: currentAppLocalizations.simpleConnectFailed);
+        state = state.copyWith(
+          error: currentAppLocalizations.simpleConnectFailed,
+        );
       }
     } on _SupersededHarmonyOperation {
       // Do not let an old probe/connect completion revive a signed-out session.
@@ -332,7 +370,9 @@ class HarmonySimple extends _$HarmonySimple {
     } catch (_) {
       if (ref.mounted && operation == _operation) {
         await _stopSafely();
-        state = state.copyWith(error: currentAppLocalizations.simpleConnectFailed);
+        state = state.copyWith(
+          error: currentAppLocalizations.simpleConnectFailed,
+        );
       }
     } finally {
       if (ref.mounted && operation == _operation) {
@@ -345,16 +385,25 @@ class HarmonySimple extends _$HarmonySimple {
     HarmonyConfigCacheMetadata? metadata,
   ) async {
     final token = _api.session?.token;
-    if (metadata == null || metadata.username != _api.session?.username) return null;
+    if (metadata == null || metadata.username != _api.session?.username) {
+      return null;
+    }
     final profile = _remoteProfiles()
         .where((profile) => profile.id == metadata.profileId)
         .firstOrNull;
-    if (profile == null) return null;
+    if (profile == null) {
+      return null;
+    }
     try {
       final bytes = await _files.read(profile);
-      if (_api.session?.token != token || !ref.mounted ||
-          bytes == null || bytes.isEmpty || bytes.length > harmonyConfigMaxBytes ||
-          sha256.convert(bytes).toString() != metadata.contentHash) return null;
+      if (_api.session?.token != token ||
+          !ref.mounted ||
+          bytes == null ||
+          bytes.isEmpty ||
+          bytes.length > harmonyConfigMaxBytes ||
+          sha256.convert(bytes).toString() != metadata.contentHash) {
+        return null;
+      }
       return profile;
     } catch (_) {
       return null;
@@ -366,12 +415,17 @@ class HarmonySimple extends _$HarmonySimple {
     required int operation,
   }) async {
     final session = _api.session;
-    if (session == null) throw HarmonyAccountError.expired;
+    if (session == null) {
+      throw HarmonyAccountError.expired;
+    }
     final metadata = await _api.readConfigCache();
     final cached = await _verifiedCachedProfile(metadata);
     _ensureCurrent(operation, session.token);
     if (cached == null) {
-      state = state.copyWith(clearRemoteProfile: true, usingCachedConfig: false);
+      state = state.copyWith(
+        clearRemoteProfile: true,
+        usingCachedConfig: false,
+      );
     }
     try {
       var download = await _api.downloadConfig(
@@ -385,7 +439,10 @@ class HarmonySimple extends _$HarmonySimple {
         _ensureCurrent(operation, session.token);
         if (current != null && cached != null) {
           ref.read(currentProfileIdProvider.notifier).value = current.id;
-          state = state.copyWith(remoteProfile: current, usingCachedConfig: false);
+          state = state.copyWith(
+            remoteProfile: current,
+            usingCachedConfig: false,
+          );
           return;
         }
         download = await _api.downloadConfig();
@@ -397,14 +454,17 @@ class HarmonySimple extends _$HarmonySimple {
       }
       await ref.read(coreActionProvider.notifier).tryStartCore();
       _ensureCurrent(operation, session.token);
-      final target = _remoteProfiles().firstOrNull ?? Profile.normal(label: appDisplayName);
+      final target =
+          _remoteProfiles().firstOrNull ??
+          Profile.normal(label: appDisplayName);
       final install = (profile: target, done: Completer<void>());
       _profileInstalls.add(install);
       late final Profile profile;
       try {
         profile = await _files.save(target, bytes);
         _ensureCurrent(operation, session.token);
-        await ref.read(profilesActionProvider.notifier)
+        await ref
+            .read(profilesActionProvider.notifier)
             .putProfile(profile.copyWith(autoUpdate: false));
         _ensureCurrent(operation, session.token);
       } finally {
@@ -433,7 +493,10 @@ class HarmonySimple extends _$HarmonySimple {
         _ensureCurrent(operation, session.token);
         if (existing != null) {
           ref.read(currentProfileIdProvider.notifier).value = existing.id;
-          state = state.copyWith(remoteProfile: existing, usingCachedConfig: true);
+          state = state.copyWith(
+            remoteProfile: existing,
+            usingCachedConfig: true,
+          );
           return;
         }
       }
@@ -441,8 +504,10 @@ class HarmonySimple extends _$HarmonySimple {
     }
   }
 
-  List<Profile> _remoteProfiles() => ref.read(profilesProvider)
-      .where((p) => p.url.isEmpty && p.label == appDisplayName).toList();
+  List<Profile> _remoteProfiles() => ref
+      .read(profilesProvider)
+      .where((p) => p.url.isEmpty && p.label == appDisplayName)
+      .toList();
 
   Future<void> _deleteRemoteProfile(Profile profile) async {
     try {
@@ -455,11 +520,17 @@ class HarmonySimple extends _$HarmonySimple {
 
   Future<void> _cleanupOrphanRemoteProfiles(int operation) async {
     final metadata = await _api.readConfigCache();
-    if (!ref.mounted || operation != _operation) return;
+    if (!ref.mounted || operation != _operation) {
+      return;
+    }
     final accepted = await _verifiedCachedProfile(metadata);
-    if (!ref.mounted || operation != _operation) return;
+    if (!ref.mounted || operation != _operation) {
+      return;
+    }
     for (final profile in _remoteProfiles()) {
-      if (!ref.mounted || operation != _operation) return;
+      if (!ref.mounted || operation != _operation) {
+        return;
+      }
       if (profile.id != accepted?.id) await _deleteRemoteProfile(profile);
     }
     if (ref.mounted && operation == _operation) {

@@ -553,7 +553,9 @@ void main() {
         signInStarted.complete();
         return signIn.future;
       }
-      if (request.path == '/api/auth/sign-out') return jsonBody({'success': true});
+      if (request.path == '/api/auth/sign-out') {
+        return jsonBody({'success': true});
+      }
       validations++;
       return jsonBody({
         'session': {'expiresAt': DateTime.now().add(const Duration(days: 1)).toIso8601String()},

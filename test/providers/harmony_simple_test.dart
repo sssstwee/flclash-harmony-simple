@@ -8,7 +8,6 @@ import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/providers/harmony_simple.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -63,20 +62,28 @@ class _Api extends HarmonyAccountApi {
 
   @override
   Future<HarmonySession?> restore() async {
-    if (restoreHook != null) return restoreHook!();
-    if (restoreFailure != null) throw restoreFailure!;
+    if (restoreHook != null) {
+      return restoreHook!();
+    }
+    if (restoreFailure != null) {
+      throw restoreFailure!;
+    }
     return session;
   }
 
   @override
   Future<HarmonySession> login(String username, String password) async {
-    if (loginFailure != null) throw loginFailure!;
+    if (loginFailure != null) {
+      throw loginFailure!;
+    }
     return session = _session(username);
   }
 
   @override
   Future<HarmonyConfigCacheMetadata?> readConfigCache() async {
-    if (cacheHook != null) return cacheHook!();
+    if (cacheHook != null) {
+      return cacheHook!();
+    }
     return metadata?.username == session?.username ? metadata : null;
   }
 
@@ -88,10 +95,16 @@ class _Api extends HarmonyAccountApi {
     requests.add((etag: ifNoneMatch, lastModified: ifModifiedSince));
     events.add('download');
     downloadStarted?.call();
-    if (downloads.isEmpty) throw StateError('Unexpected config request');
+    if (downloads.isEmpty) {
+      throw StateError('Unexpected config request');
+    }
     final next = downloads.removeAt(0);
-    if (next is Future<HarmonyConfigDownload>) return next;
-    if (next is HarmonyConfigDownload) return next;
+    if (next is Future<HarmonyConfigDownload>) {
+      return next;
+    }
+    if (next is HarmonyConfigDownload) {
+      return next;
+    }
     throw next;
   }
 
@@ -100,7 +113,9 @@ class _Api extends HarmonyAccountApi {
     HarmonyConfigCacheMetadata value, {
     required String expectedToken,
   }) async {
-    if (commitFailure != null) throw commitFailure!;
+    if (commitFailure != null) {
+      throw commitFailure!;
+    }
     if (session?.token != expectedToken || session?.username != value.username) {
       throw HarmonyAccountError.expired;
     }
@@ -120,14 +135,18 @@ class _Api extends HarmonyAccountApi {
     events.add('logout');
     session = null;
     metadata = null;
-    if (logoutFailure != null) throw logoutFailure!;
+    if (logoutFailure != null) {
+      throw logoutFailure!;
+    }
   }
 
   @override
   Future<void> clear() async {
     session = null;
     metadata = null;
-    if (logoutFailure != null) throw logoutFailure!;
+    if (logoutFailure != null) {
+      throw logoutFailure!;
+    }
   }
 }
 
@@ -144,13 +163,17 @@ class _Files extends HarmonyProfileStore {
 
   @override
   Future<Uint8List?> read(Profile profile) async {
-    if (readHook != null) return readHook!(profile);
+    if (readHook != null) {
+      return readHook!(profile);
+    }
     return bytes[profile.id];
   }
 
   @override
   Future<Profile> save(Profile profile, Uint8List value) async {
-    if (saveFailure != null) throw saveFailure!;
+    if (saveFailure != null) {
+      throw saveFailure!;
+    }
     await saveHook?.call(profile, value);
     bytes[profile.id] = Uint8List.fromList(value);
     events.add('save');
@@ -162,7 +185,9 @@ class _Files extends HarmonyProfileStore {
     deleted.add(profile.id);
     bytes.remove(profile.id);
     events.add('delete-file');
-    if (deleteFailure != null) throw deleteFailure!;
+    if (deleteFailure != null) {
+      throw deleteFailure!;
+    }
   }
 }
 
@@ -201,7 +226,9 @@ class _ProfileActions extends ProfilesAction {
 
   @override
   Future<void> putProfile(Profile profile) async {
-    if (putFailure != null) throw putFailure!;
+    if (putFailure != null) {
+      throw putFailure!;
+    }
     await putHook?.call(profile);
     events.add('put');
     ref.read(profilesProvider.notifier).put(profile);
@@ -214,7 +241,9 @@ class _ProfileActions extends ProfilesAction {
     if (ref.read(currentProfileIdProvider) == id) {
       ref.read(currentProfileIdProvider.notifier).value = null;
     }
-    if (deleteFailure != null) throw deleteFailure!;
+    if (deleteFailure != null) {
+      throw deleteFailure!;
+    }
   }
 
   @override
@@ -250,7 +279,9 @@ class _Setup extends SetupAction {
     bool profileApplied = false,
   }) async {
     events.add(isStart ? 'start' : 'stop');
-    if (!isStart && stopFailure != null) throw stopFailure!;
+    if (!isStart && stopFailure != null) {
+      throw stopFailure!;
+    }
     if (isStart) starts.add((isInit: isInit, profileApplied: profileApplied));
     ref.read(runTimeProvider.notifier).value = isStart ? 0 : null;
   }
@@ -333,15 +364,28 @@ class _Harness {
     const group = Group(
       name: 'Main',
       type: GroupType.Selector,
+      testUrl: 'https://example.test',
       all: [Proxy(name: 'fast', type: 'Trojan')],
     );
     container.read(groupsProvider.notifier).value = [group];
-    when(() => controller.getConfig(any())).thenAnswer(
-      (_) async => <String, dynamic>{'rules': ['MATCH,Main']},
-    );
-    when(() => controller.getDelay(any(), any())).thenAnswer(
-      (_) async => const Delay(name: 'fast', value: 10, url: 'https://example.test'),
-    );
+    when(() => controller.getConfig(any())).thenAnswer((_) async {
+      events.add('read-config');
+      // Include the same raw subscription structure consumed by the OHOS
+      // routing policy, not only the derived desktop rules list.
+      return <String, dynamic>{
+        'rules': ['MATCH,Main'],
+        'proxies': [
+          {'name': 'fast', 'type': 'trojan'},
+        ],
+        'proxy-groups': [
+          {'name': 'Main', 'type': 'select', 'proxies': ['fast']},
+        ],
+      };
+    });
+    when(() => controller.getDelay(any(), any())).thenAnswer((_) async {
+      events.add('probe');
+      return const Delay(name: 'fast', value: 10, url: 'https://example.test');
+    });
   }
 }
 
@@ -655,6 +699,7 @@ void main() {
 
     await harness.notifier.toggleConnect();
 
+    expect(harness.state.error, isNull, reason: 'Connection events: ${harness.events}');
     expect(harness.setup.applies, 1);
     expect(harness.setup.starts, [(isInit: true, profileApplied: true)]);
     expect(harness.proxies.changes, {'Main': 'fast'});
@@ -680,7 +725,14 @@ void main() {
       return probe.future;
     });
     final connecting = harness.notifier.toggleConnect();
-    await probing.future;
+    await Future.any([
+      probing.future,
+      connecting.then((_) {
+        if (!probing.isCompleted) {
+          fail('Connection ended before probing: ${harness.state.error}; events: ${harness.events}');
+        }
+      }),
+    ]);
     await harness.notifier.logout();
     probe.complete(const Delay(name: 'fast', value: 1, url: 'https://example.test'));
     await connecting;
