@@ -64,11 +64,22 @@ Future<void> main() async {
     expect(background, contains('<rect width="512" height="512"'));
     expect(background, isNot(contains('rx=')));
     expect(background, isNot(contains('<path')));
+    expect(background, contains('fill="#FFFFFF"'));
     expect(foreground, isNot(contains('<rect')));
-    final paths = RegExp(r'<path\b[^>]*>').allMatches(full);
-    expect(paths, hasLength(3));
-    for (final path in paths) {
-      expect(foreground, contains(path.group(0)!));
+    final awake = File('assets/images/cat_awake.svg').readAsStringSync();
+    final sleeping = File('assets/images/cat_sleeping.svg').readAsStringSync();
+    final artwork = RegExp(r'<g id="cat">[\s\S]*?</g>');
+    final awakeArtwork = artwork.firstMatch(awake)?.group(0);
+    expect(awakeArtwork, isNotNull);
+    expect(artwork.firstMatch(full)?.group(0), awakeArtwork);
+    expect(artwork.firstMatch(foreground)?.group(0), awakeArtwork);
+    for (final source in [awake, sleeping, full, foreground, background]) {
+      expect(source, isNot(contains('currentColor')));
+      expect(source, isNot(contains('linearGradient')));
+      expect(
+        RegExp(r'#[0-9a-fA-F]{6}').allMatches(source).map((m) => m.group(0)),
+        everyElement(isIn(['#FFFFFF', '#000000'])),
+      );
     }
     final layeredImage = jsonDecode(
       File(
@@ -120,12 +131,10 @@ Future<void> main() async {
         expect(_pixel(foregroundData, 432, point.$1, point.$2).last, 0);
       }
       expect(_pixel(foregroundData, 432, 216, 216).last, 255);
-      expect(
-        _pixel(foregroundData, 432, 216, 216),
-        isNot(_pixel(backgroundData, 512, 256, 256)),
-      );
+      expect(_pixel(backgroundData, 512, 256, 256), [255, 255, 255, 255]);
+      expect(_pixel(foregroundData, 432, 216, 297), [0, 0, 0, 255]);
 
-      // Layering must leave the gradient visible outside the shield.
+      // Layering must leave the white background visible outside the cat.
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
       canvas.drawImage(background, ui.Offset.zero, ui.Paint());
@@ -147,6 +156,19 @@ Future<void> main() async {
         _pixel(compositeData, 512, 256, 256),
         _pixel(foregroundData, 432, 216, 216),
       );
+
+      final full = images['assets/images/icon.png']!;
+      final fullData = (await full.toByteData(
+        format: ui.ImageByteFormat.rawRgba,
+      ))!;
+      // The complete badge and launcher layers use the same artwork and scale.
+      for (final point in [(128, 128), (180, 290), (256, 256), (350, 350)]) {
+        expect(
+          _pixel(compositeData, 512, point.$1, point.$2),
+          _pixel(fullData, 512, point.$1, point.$2),
+        );
+      }
+      expect(_pixel(fullData, 512, 0, 0).last, 0);
     },
     skip: hasRenderer
         ? false

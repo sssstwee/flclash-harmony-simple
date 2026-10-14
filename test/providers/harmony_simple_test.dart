@@ -56,6 +56,9 @@ class _Api extends HarmonyAccountApi {
   Object? restoreFailure;
   int logouts = 0;
   int commits = 0;
+  bool reconnectOnLaunch = false;
+  int reconnectReads = 0;
+  final reconnectWrites = <bool>[];
   void Function()? downloadStarted;
   Future<HarmonySession?> Function()? restoreHook;
   Future<HarmonyConfigCacheMetadata?> Function()? cacheHook;
@@ -173,10 +176,15 @@ class _Api extends HarmonyAccountApi {
   Future<void> saveMinCheckInterval(Duration interval) async {}
 
   @override
-  Future<bool> readReconnectOnLaunch() async => false;
+  Future<bool> readReconnectOnLaunch() async {
+    reconnectReads++;
+    return reconnectOnLaunch;
+  }
 
   @override
-  Future<void> setReconnectOnLaunch(bool value) async {}
+  Future<void> setReconnectOnLaunch(bool value) async {
+    reconnectWrites.add(value);
+  }
 
   @override
   Future<void> logout() async {
@@ -600,6 +608,53 @@ void main() {
     },
   );
 
+  for (final previousLabel in legacyAppDisplayNames) {
+    test(
+      'renaming $previousLabel preserves a verified offline cache',
+      () async {
+        final harness = _Harness(
+          initial: [_profile().copyWith(label: previousLabel)],
+        );
+        harness.cache();
+        harness.api.downloads.add(HarmonyAccountError.unavailable);
+
+        await harness.notifier.bootstrap();
+
+        expect(harness.state.remoteProfile?.id, 7);
+        expect(harness.state.remoteProfile?.label, appDisplayName);
+        expect(harness.container.read(currentProfileIdProvider), 7);
+        expect(
+          harness.container.read(profilesProvider).single.label,
+          appDisplayName,
+        );
+        expect(harness.state.usingCachedConfig, isTrue);
+        expect(harness.files.bytes[7], _config);
+        expect(harness.api.metadata?.profileId, 7);
+        expect(harness.events, isNot(contains('save')));
+      },
+    );
+  }
+
+  test(
+    'opening the app ignores a previous automatic-connect preference',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.reconnectOnLaunch = true;
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+
+      await harness.notifier.bootstrap();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(harness.state.session?.username, 'alice');
+      expect(harness.state.remoteProfile?.id, 7);
+      expect(harness.setup.starts, isEmpty);
+      expect(harness.state.homeStatus.autoReconnectArmed, isFalse);
+      expect(harness.api.reconnectReads, 0);
+      expect(harness.api.reconnectWrites, isEmpty);
+    },
+  );
+
   test(
     'missing cache retries an unsolicited 304 once without validators',
     () async {
@@ -907,6 +962,13 @@ void main() {
       expect(harness.container.read(isStartProvider), isTrue);
       expect(harness.state.error, isNull);
       expect(harness.state.busy, isFalse);
+      expect(harness.api.reconnectWrites, isEmpty);
+
+      await harness.notifier.toggleConnect();
+
+      expect(harness.container.read(isStartProvider), isFalse);
+      expect(harness.state.homeStatus.autoReconnectArmed, isFalse);
+      expect(harness.api.reconnectWrites, isEmpty);
     },
   );
 

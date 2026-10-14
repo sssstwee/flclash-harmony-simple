@@ -6,7 +6,9 @@ import unittest
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
-BRAND = '小猫AI代理'
+BRAND = '小猫AI加速'
+# This change is scoped to the shared Flutter UI and HarmonyOS client.
+OTHER_PLATFORM_BRAND = '小猫AI代理'
 
 
 def read(path):
@@ -44,32 +46,34 @@ class BrandingTest(unittest.TestCase):
             labels = [node.get(namespace + 'label') for node in manifest.iter()
                       if node.get(namespace + 'label') is not None]
             self.assertTrue(labels)
-            self.assertTrue(all(label.startswith(BRAND) for label in labels))
-        self.assertIn(f'setSession("{BRAND}")',
+            self.assertTrue(all(label.startswith(OTHER_PLATFORM_BRAND) for label in labels))
+        self.assertIn(f'setSession("{OTHER_PLATFORM_BRAND}")',
                       read('android/service/src/main/java/com/follow/clash/service/VpnService.kt'))
 
     def test_desktop_display_preserves_executable_identity(self):
         info = plistlib.loads((ROOT / 'macos/Runner/Info.plist').read_bytes())
-        self.assertEqual(info['CFBundleDisplayName'], BRAND)
-        self.assertEqual(info['CFBundleName'], BRAND)
+        self.assertEqual(info['CFBundleDisplayName'], OTHER_PLATFORM_BRAND)
+        self.assertEqual(info['CFBundleName'], OTHER_PLATFORM_BRAND)
         self.assertEqual(info['CFBundleIdentifier'], '$(PRODUCT_BUNDLE_IDENTIFIER)')
         self.assertIn('PRODUCT_NAME = FlClash', read('macos/Runner/Configs/AppInfo.xcconfig'))
-        self.assertIn(f'VALUE "FileDescription", "{BRAND}"', read('windows/runner/Runner.rc'))
+        self.assertIn(f'VALUE "FileDescription", "{OTHER_PLATFORM_BRAND}"', read('windows/runner/Runner.rc'))
         self.assertIn('VALUE "ProductName", "clash"', read('windows/runner/Runner.rc'))
         self.assertIn('/utf-8', read('windows/CMakeLists.txt'))
         self.assertIn('OriginalFilename", "FlClash.exe"', read('windows/runner/Runner.rc'))
-        self.assertIn(f'window.Create(L"{BRAND}"', read('windows/runner/main.cpp'))
-        self.assertIn(f'gtk_window_set_title(window, "{BRAND}")', read('linux/runner/my_application.cc'))
+        self.assertIn(f'window.Create(L"{OTHER_PLATFORM_BRAND}"', read('windows/runner/main.cpp'))
+        self.assertIn(f'gtk_window_set_title(window, "{OTHER_PLATFORM_BRAND}")', read('linux/runner/my_application.cc'))
         for platform in ['appimage', 'deb', 'rpm']:
-            self.assertIn(f'display_name: {BRAND}', read(f'linux/packaging/{platform}/make_config.yaml'))
+            self.assertIn(f'display_name: {OTHER_PLATFORM_BRAND}', read(f'linux/packaging/{platform}/make_config.yaml'))
         self.assertIn('package_name: FlClash', read('linux/packaging/deb/make_config.yaml'))
         self.assertIn('app_id: 728B3532-C74B-4870-9068-BE70FE12A3E6',
                       read('windows/packaging/exe/make_config.yaml'))
 
     def test_current_docs_and_artifact_brand(self):
-        for path in ['README.md', 'README_SIMPLE.md', 'README_zh_CN.md', 'backend/README.md']:
-            self.assertTrue(read(path).startswith(f'# {BRAND}'))
-        self.assertTrue(read('.github/workflows/harmony-simple.yml').startswith(f'name: {BRAND}\n'))
+        for path in ['README_SIMPLE.md', 'README_zh_CN.md']:
+            self.assertTrue(read(path).startswith(f'# {OTHER_PLATFORM_BRAND}'))
+        for path in ['README.md', 'backend/README.md']:
+            self.assertTrue(read(path).startswith('# Xiaomao AI Proxy'))
+        self.assertTrue(read('.github/workflows/harmony-simple.yml').startswith(f'name: {OTHER_PLATFORM_BRAND} HarmonyOS\n'))
         self.assertIn("app_name: 'FlClash'", read('distribute_options.yaml'))
         self.assertIn("'--artifact-name',\n      artifactNameTemplate", read('setup.dart'))
         self.assertIn('xiaomao-ai-proxy-{{build_name}}-{{platform}}', read('setup.dart'))

@@ -43,57 +43,54 @@ class MessageLookup extends MessageLookupByLibrary {
 
   static String m9(name) => "Updating ${name}...";
 
-  static String m10(groupName) => "AI sites use the “${groupName}” group";
-
-  static String m11(reason) =>
+  static String m10(reason) =>
       "Cannot check for updates; using cached config (${reason})";
 
-  static String m12(version, time) =>
+  static String m11(version, time) =>
       "Config is up to date (v ${version}, checked ${time})";
 
-  static String m13(time) => "Config synced at ${time}";
+  static String m12(time) => "Config synced at ${time}";
 
-  static String m14(time) =>
-      "Route check failed (${time}); trying another node";
+  static String m13(time) => "Failed · ${time}";
 
-  static String m15(time) => "Route healthy (checked ${time})";
+  static String m14(time) => "Healthy · ${time}";
 
-  static String m16(count) =>
+  static String m15(count) =>
       "${Intl.plural(count, one: '1 hour ago', other: '${count} hours ago')}";
 
-  static String m17(count) => "${count} hours";
+  static String m16(count) => "${count} hours";
 
-  static String m18(target) => "${target} is an invalid policy";
+  static String m17(target) => "${target} is an invalid policy";
 
-  static String m19(proxyName) => "${proxyName} is an invalid proxy";
+  static String m18(proxyName) => "${proxyName} is an invalid proxy";
 
-  static String m20(providerName) =>
+  static String m19(providerName) =>
       "${providerName} is an invalid proxy provider";
 
-  static String m21(subRule) => "${subRule} is an invalid SUB_RULE";
+  static String m20(subRule) => "${subRule} is an invalid SUB_RULE";
 
-  static String m22(appName) =>
+  static String m21(appName) =>
       "1. Open System Settings > Privacy & Security\n2. Choose Location Services\n3. Find and check ${appName} in the right list\n\nAfter completing the setup, return to the app and use it normally. Thank you for your cooperation.";
 
-  static String m23(count) =>
+  static String m22(count) =>
       "${Intl.plural(count, one: '1 minute ago', other: '${count} minutes ago')}";
 
-  static String m24(count) =>
+  static String m23(count) =>
       "${Intl.plural(count, one: '1 month ago', other: '${count} months ago')}";
 
-  static String m25(label) => "No ${label} yet";
+  static String m24(label) => "No ${label} yet";
 
-  static String m26(label) => "${label} must be a number";
+  static String m25(label) => "${label} must be a number";
 
-  static String m27(label) => "${label} must be between 1024 and 49151";
+  static String m26(label) => "${label} must be between 1024 and 49151";
 
-  static String m28(count) => "${count} seconds";
+  static String m27(count) => "${count} seconds";
 
-  static String m29(count) => "${count} items have been selected";
+  static String m28(count) => "${count} items have been selected";
 
-  static String m30(label) => "${label} must be a url";
+  static String m29(label) => "${label} must be a url";
 
-  static String m31(count) =>
+  static String m30(count) =>
       "${Intl.plural(count, one: '1 year ago', other: '${count} years ago')}";
 
   final messages = _notInlinedMessages(_notInlinedMessages);
@@ -449,13 +446,10 @@ class MessageLookup extends MessageLookupByLibrary {
       "Go to configure script",
     ),
     "harmonyAccount": MessageLookupByLibrary.simpleMessage("Account"),
-    "harmonyAiRoutingHint": m10,
-    "harmonyAutoReconnectOff": MessageLookupByLibrary.simpleMessage(
-      "Will stay disconnected after a manual disconnect",
+    "harmonyAiRoutingHint": MessageLookupByLibrary.simpleMessage(
+      "Route acceleration",
     ),
-    "harmonyAutoReconnectOn": MessageLookupByLibrary.simpleMessage(
-      "Will reconnect automatically next time you open the app",
-    ),
+    "harmonyAiRoutingLabel": MessageLookupByLibrary.simpleMessage("AI"),
     "harmonyAutomaticHint": MessageLookupByLibrary.simpleMessage(
       "Domestic and local networks connect directly. Overseas networks use the proxy automatically.",
     ),
@@ -474,8 +468,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyConfigFreshAutoUpdated": MessageLookupByLibrary.simpleMessage(
       "Config updated automatically",
     ),
-    "harmonyConfigFreshCheckFailed": m11,
-    "harmonyConfigFreshUpToDate": m12,
+    "harmonyConfigFreshCheckFailed": m10,
+    "harmonyConfigFreshUpToDate": m11,
     "harmonyConfigFreshUpdating": MessageLookupByLibrary.simpleMessage(
       "New config found, updating…",
     ),
@@ -491,7 +485,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyConfigRefreshTooltip": MessageLookupByLibrary.simpleMessage(
       "Refresh config",
     ),
-    "harmonyConfigSyncedAt": m13,
+    "harmonyConfigSyncedAt": m12,
     "harmonyConfigUpdating": MessageLookupByLibrary.simpleMessage(
       "Updating config in the background…",
     ),
@@ -504,49 +498,50 @@ class MessageLookup extends MessageLookupByLibrary {
       "Disconnecting…",
     ),
     "harmonyDownload": MessageLookupByLibrary.simpleMessage("Download"),
-    "harmonyHealthCheckFailed": m14,
-    "harmonyHealthCheckOk": m15,
+    "harmonyHealthCheckFailed": m13,
+    "harmonyHealthCheckOk": m14,
+    "harmonyHealthLabel": MessageLookupByLibrary.simpleMessage("Health check"),
     "harmonyIssueActionAuthExpired": MessageLookupByLibrary.simpleMessage(
       "Next: sign out, then log in again",
     ),
     "harmonyIssueActionNoRoute": MessageLookupByLibrary.simpleMessage(
-      "Next: try Connect again later",
+      "Next: tap the icon above to reconnect later",
     ),
     "harmonyIssueActionOfflineCached": MessageLookupByLibrary.simpleMessage(
-      "Next: tap Connect",
+      "Next: tap the icon above to connect",
     ),
     "harmonyIssueActionRateLimit": MessageLookupByLibrary.simpleMessage(
       "Next: wait, then retry",
     ),
     "harmonyIssueActionService": MessageLookupByLibrary.simpleMessage(
-      "Next: check network, then Connect",
+      "Next: check your network, then tap the icon above to connect",
     ),
     "harmonyIssueActionSubscription": MessageLookupByLibrary.simpleMessage(
-      "Next: tap Connect or retry later",
+      "Next: tap the icon above to connect or retry later",
     ),
     "harmonyIssueActionVpnFailed": MessageLookupByLibrary.simpleMessage(
-      "Next: tap Connect and allow VPN",
+      "Next: tap the icon above to connect and allow VPN",
     ),
     "harmonyIssueDetailAuthExpired": MessageLookupByLibrary.simpleMessage(
       "Your session expired. Sign out and log in again to refresh the subscription.",
     ),
     "harmonyIssueDetailNoRoute": MessageLookupByLibrary.simpleMessage(
-      "None of the saved nodes responded. Try Connect again later or wait for a config refresh.",
+      "None of the saved nodes responded. Tap the icon above to reconnect later or wait for a config refresh.",
     ),
     "harmonyIssueDetailOfflineCached": MessageLookupByLibrary.simpleMessage(
-      "The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.",
+      "The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.",
     ),
     "harmonyIssueDetailRateLimit": MessageLookupByLibrary.simpleMessage(
       "Please wait about a minute before signing in or connecting again.",
     ),
     "harmonyIssueDetailService": MessageLookupByLibrary.simpleMessage(
-      "Cannot reach the account server. Check your network; you can still try Connect with a cached profile.",
+      "Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.",
     ),
     "harmonyIssueDetailSubscription": MessageLookupByLibrary.simpleMessage(
-      "The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.",
+      "The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.",
     ),
     "harmonyIssueDetailVpnFailed": MessageLookupByLibrary.simpleMessage(
-      "The system VPN failed to start. Allow the VPN permission, then tap Connect again.",
+      "The system VPN failed to start. Allow the VPN permission, then tap the icon above to reconnect.",
     ),
     "harmonyIssueTitleAuthExpired": MessageLookupByLibrary.simpleMessage(
       "Sign-in expired",
@@ -575,18 +570,14 @@ class MessageLookup extends MessageLookupByLibrary {
       "Sign in to download your connection settings automatically.",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
-    "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage(
-      "Network: cellular",
-    ),
+    "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage("Cellular"),
     "harmonyNetworkOther": MessageLookupByLibrary.simpleMessage(
-      "Network: other",
+      "Other connection",
     ),
     "harmonyNetworkUnknown": MessageLookupByLibrary.simpleMessage(
-      "Network: unknown",
+      "Not identified",
     ),
-    "harmonyNetworkWifi": MessageLookupByLibrary.simpleMessage(
-      "Network: Wi‑Fi",
-    ),
+    "harmonyNetworkWifi": MessageLookupByLibrary.simpleMessage("Wi-Fi"),
     "harmonyOfflineConfig": MessageLookupByLibrary.simpleMessage(
       "Using cached settings (offline)",
     ),
@@ -597,14 +588,15 @@ class MessageLookup extends MessageLookupByLibrary {
       "Please fill in this field.",
     ),
     "harmonyRetry": MessageLookupByLibrary.simpleMessage("Try again"),
+    "harmonyRouteLabel": MessageLookupByLibrary.simpleMessage("Route"),
     "harmonyRouteReasonAuto": MessageLookupByLibrary.simpleMessage(
-      "Automatically picked the lowest-latency route",
+      "Automatic · lowest latency first",
     ),
     "harmonyRouteReasonManual": MessageLookupByLibrary.simpleMessage(
-      "Selected the best node from latency tests",
+      "Selected by latency tests",
     ),
     "harmonyRouteReasonTcp": MessageLookupByLibrary.simpleMessage(
-      "UDP looks blocked; preferring TCP nodes",
+      "Stable connection first",
     ),
     "harmonyServiceError": MessageLookupByLibrary.simpleMessage(
       "Unable to reach the service. Check your network and try again.",
@@ -635,8 +627,8 @@ class MessageLookup extends MessageLookupByLibrary {
       "Use keyboard to control applications",
     ),
     "hours": MessageLookupByLibrary.simpleMessage("hours"),
-    "hoursAgo": m16,
-    "hoursCount": m17,
+    "hoursAgo": m15,
+    "hoursCount": m16,
     "icon": MessageLookupByLibrary.simpleMessage("Icon"),
     "iconRecords": MessageLookupByLibrary.simpleMessage("Icon records"),
     "iconStyle": MessageLookupByLibrary.simpleMessage("Icon style"),
@@ -680,10 +672,10 @@ class MessageLookup extends MessageLookupByLibrary {
     "invalidBackupFile": MessageLookupByLibrary.simpleMessage(
       "Invalid backup file",
     ),
-    "invalidPolicy": m18,
-    "invalidProxy": m19,
-    "invalidProxyProvider": m20,
-    "invalidSubRule": m21,
+    "invalidPolicy": m17,
+    "invalidProxy": m18,
+    "invalidProxyProvider": m19,
+    "invalidSubRule": m20,
     "ipcidr": MessageLookupByLibrary.simpleMessage("Ipcidr"),
     "ipv6Desc": MessageLookupByLibrary.simpleMessage(
       "When turned on it will be able to receive IPv6 traffic",
@@ -720,7 +712,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "locationPermissionDesc": MessageLookupByLibrary.simpleMessage(
       "According to system requirements, obtaining the Wi-Fi name requires you to grant location permission.",
     ),
-    "locationPermissionGuide": m22,
+    "locationPermissionGuide": m21,
     "locationPermissionRequired": MessageLookupByLibrary.simpleMessage(
       "Location Permission Required",
     ),
@@ -750,11 +742,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "minimizeOnExitDesc": MessageLookupByLibrary.simpleMessage(
       "Modify the default system exit event",
     ),
-    "minutesAgo": m23,
+    "minutesAgo": m22,
     "mixedPort": MessageLookupByLibrary.simpleMessage("Mixed Port"),
     "mode": MessageLookupByLibrary.simpleMessage("Mode"),
     "monochromeScheme": MessageLookupByLibrary.simpleMessage("Monochrome"),
-    "monthsAgo": m24,
+    "monthsAgo": m23,
     "more": MessageLookupByLibrary.simpleMessage("More"),
     "name": MessageLookupByLibrary.simpleMessage("Name"),
     "nameserver": MessageLookupByLibrary.simpleMessage("Nameserver"),
@@ -800,8 +792,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "nullProfileDesc": MessageLookupByLibrary.simpleMessage(
       "No profile, Please add a profile",
     ),
-    "nullTip": m25,
-    "numberTip": m26,
+    "nullTip": m24,
+    "numberTip": m25,
     "onDemand": MessageLookupByLibrary.simpleMessage("On Demand"),
     "onDemandDesc": MessageLookupByLibrary.simpleMessage(
       "Configure the program running state for specific scenarios",
@@ -851,7 +843,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "portConflictTip": MessageLookupByLibrary.simpleMessage(
       "Please enter a different port",
     ),
-    "portTip": m27,
+    "portTip": m26,
     "preferH3Desc": MessageLookupByLibrary.simpleMessage(
       "Prioritize the use of DOH\'s http/3",
     ),
@@ -1107,7 +1099,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "search": MessageLookupByLibrary.simpleMessage("Search"),
     "seconds": MessageLookupByLibrary.simpleMessage("Seconds"),
-    "secondsCount": m28,
+    "secondsCount": m27,
     "selectAll": MessageLookupByLibrary.simpleMessage("Select all"),
     "selectProxies": MessageLookupByLibrary.simpleMessage("Select proxies"),
     "selectProxyProviders": MessageLookupByLibrary.simpleMessage(
@@ -1123,7 +1115,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Please select sub rule",
     ),
     "selected": MessageLookupByLibrary.simpleMessage("Selected"),
-    "selectedCountTitle": m29,
+    "selectedCountTitle": m28,
     "settings": MessageLookupByLibrary.simpleMessage("Settings"),
     "show": MessageLookupByLibrary.simpleMessage("Show"),
     "shrink": MessageLookupByLibrary.simpleMessage("Shrink"),
@@ -1260,7 +1252,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "urlDesc": MessageLookupByLibrary.simpleMessage(
       "Obtain profile through URL",
     ),
-    "urlTip": m30,
+    "urlTip": m29,
     "useHosts": MessageLookupByLibrary.simpleMessage("Use hosts"),
     "useSystemHosts": MessageLookupByLibrary.simpleMessage("Use system hosts"),
     "userAgent": MessageLookupByLibrary.simpleMessage("User-Agent"),
@@ -1280,7 +1272,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "WebDAV configuration",
     ),
     "whitelistMode": MessageLookupByLibrary.simpleMessage("Whitelist mode"),
-    "yearsAgo": m31,
+    "yearsAgo": m30,
     "zh_CN": MessageLookupByLibrary.simpleMessage("Simplified Chinese"),
   };
 }

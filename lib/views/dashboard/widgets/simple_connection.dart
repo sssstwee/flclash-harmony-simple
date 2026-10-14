@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/svg.dart';
 
 enum ConnectionPhase {
   disconnected,
@@ -27,14 +28,12 @@ class SimpleConnectionPanel extends ConsumerWidget {
   final VoidCallback? onToggle;
   final VoidCallback? onLogout;
   final VoidCallback? onRetry;
-  final VoidCallback? onSwitchNode;
   final String username;
   final String? error;
   final bool usingCachedConfig;
   final String? nodeName;
   final int? nodeDelayMs;
   final HarmonyHomeStatus homeStatus;
-  final bool showReconnectHint;
   final HarmonyUserIssue? issue;
   final HarmonyConfigFreshness configFreshness;
   final VoidCallback? onConfigRefresh;
@@ -46,13 +45,11 @@ class SimpleConnectionPanel extends ConsumerWidget {
     this.onToggle,
     this.onLogout,
     this.onRetry,
-    this.onSwitchNode,
     this.error,
     this.usingCachedConfig = false,
     this.nodeName,
     this.nodeDelayMs,
     this.homeStatus = const HarmonyHomeStatus(),
-    this.showReconnectHint = true,
     this.issue,
     this.configFreshness = const HarmonyConfigFreshness(),
     this.onConfigRefresh,
@@ -109,10 +106,14 @@ class SimpleConnectionPanel extends ConsumerWidget {
       trafficsProvider.select((state) => state.list.safeLast(const Traffic())),
     );
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final actionLabel = busy
+        ? status
+        : running
+        ? remoteHarmonyText(ref, 'simpleDisconnect', texts.simpleDisconnect)
+        : remoteHarmonyText(ref, 'simpleConnect', texts.simpleConnect);
 
     return ListView(
-      shrinkWrap: true,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       children: [
         if (runtime['announcement'] case final String announcement)
           if (announcement.isNotEmpty)
@@ -122,26 +123,38 @@ class SimpleConnectionPanel extends ConsumerWidget {
                 child: Text(announcement),
               ),
             ),
-        ConnectionIndicator(phase: phase),
+        Column(
+          children: [
+            IconButton(
+              key: const Key('harmony_primary_connect'),
+              tooltip: actionLabel,
+              padding: EdgeInsets.zero,
+              iconSize: 64,
+              constraints: const BoxConstraints.tightFor(width: 64, height: 64),
+              onPressed: busy ? null : onToggle,
+              icon: ConnectionIndicator(phase: phase),
+            ),
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: reducedMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 240),
+              child: Text(
+                status,
+                key: ValueKey(status),
+                textAlign: TextAlign.center,
+                style: context.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         _ConfigFreshnessRow(
           freshness: configFreshness,
           configSyncInProgress: homeStatus.configSyncInProgress,
           onRefresh: onConfigRefresh,
-        ),
-        const SizedBox(height: 12),
-        AnimatedSwitcher(
-          duration: reducedMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 240),
-          child: Text(
-            status,
-            key: ValueKey(status),
-            textAlign: TextAlign.center,
-            style: context.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
         ),
         if (issueCopy != null) ...[
           const SizedBox(height: 10),
@@ -169,49 +182,41 @@ class SimpleConnectionPanel extends ConsumerWidget {
             emphasized: false,
           ),
         ],
-        const SizedBox(height: 28),
-        _NodeCard(
-          nodeName:
-              nodeName ??
-              remoteHarmonyText(ref, 'simpleAutoRoute', texts.simpleAutoRoute),
-          delayMs: nodeDelayMs,
-          onSwitch: busy ? null : onSwitchNode,
+        const SizedBox(height: 12),
+        Material(
+          color: context.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _NodeSection(
+                nodeName:
+                    nodeName ??
+                    remoteHarmonyText(
+                      ref,
+                      'simpleAutoRoute',
+                      texts.simpleAutoRoute,
+                    ),
+                delayMs: nodeDelayMs,
+              ),
+              Divider(
+                height: 1,
+                indent: 14,
+                endIndent: 14,
+                color: context.colorScheme.outlineVariant.withValues(
+                  alpha: 0.5,
+                ),
+              ),
+              _HomeInsightSection(homeStatus: homeStatus, running: running),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        _HomeInsightCard(
-          homeStatus: homeStatus,
-          running: running,
-          showReconnectHint: showReconnectHint,
-        ),
-        const SizedBox(height: 16),
         _TrafficCard(
           uploadTotal: traffic.up.traffic.show,
           downloadTotal: traffic.down.traffic.show,
           uploadSpeed: '${live.up.traffic.show}/s',
           downloadSpeed: '${live.down.traffic.show}/s',
-        ),
-        const SizedBox(height: 28),
-        FilledButton(
-          key: const Key('harmony_primary_connect'),
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(72),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          ),
-          onPressed: busy ? null : onToggle,
-          child: Text(
-            busy
-                ? status
-                : running
-                ? remoteHarmonyText(
-                    ref,
-                    'simpleDisconnect',
-                    texts.simpleDisconnect,
-                  )
-                : remoteHarmonyText(ref, 'simpleConnect', texts.simpleConnect),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
         ),
         if (hasError && issueCopy == null && error != null) ...[
           const SizedBox(height: 16),
@@ -257,7 +262,7 @@ class SimpleConnectionPanel extends ConsumerWidget {
             ),
           ),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: 8),
         _AccountFooter(username: username, onLogout: busy ? null : onLogout),
       ],
     );
@@ -327,12 +332,12 @@ class _ConfigFreshnessRow extends ConsumerWidget {
         ? context.colorScheme.error
         : context.colorScheme.onSurfaceVariant;
     return Material(
-      color: context.colorScheme.surfaceContainerHighest,
+      color: context.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        padding: const EdgeInsets.fromLTRB(12, 0, 4, 0),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Text(
@@ -413,16 +418,11 @@ class _IssueExplanation extends StatelessWidget {
   }
 }
 
-class _HomeInsightCard extends ConsumerWidget {
+class _HomeInsightSection extends ConsumerWidget {
   final HarmonyHomeStatus homeStatus;
   final bool running;
-  final bool showReconnectHint;
 
-  const _HomeInsightCard({
-    required this.homeStatus,
-    required this.running,
-    required this.showReconnectHint,
-  });
+  const _HomeInsightSection({required this.homeStatus, required this.running});
 
   String _formatTime(DateTime time) {
     return DateFormat('HH:mm').format(time.toLocal());
@@ -431,62 +431,69 @@ class _HomeInsightCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
-    final lines = <String>[];
+    final details = <({String label, String value, bool warning})>[];
     if (homeStatus.routeKind != null) {
-      lines.add(switch (homeStatus.routeKind!) {
-        HarmonyRouteKind.automaticGroup => remoteHarmonyText(
-          ref,
-          'harmonyRouteReasonAuto',
-          texts.harmonyRouteReasonAuto,
-        ),
-        HarmonyRouteKind.tcpPreferred => remoteHarmonyText(
-          ref,
-          'harmonyRouteReasonTcp',
-          texts.harmonyRouteReasonTcp,
-        ),
-        HarmonyRouteKind.manual => remoteHarmonyText(
-          ref,
-          'harmonyRouteReasonManual',
-          texts.harmonyRouteReasonManual,
-        ),
-      });
+      details.add((
+        label: texts.harmonyRouteLabel,
+        value: switch (homeStatus.routeKind!) {
+          HarmonyRouteKind.automaticGroup => remoteHarmonyText(
+            ref,
+            'harmonyRouteReasonAuto',
+            texts.harmonyRouteReasonAuto,
+          ),
+          HarmonyRouteKind.tcpPreferred => remoteHarmonyText(
+            ref,
+            'harmonyRouteReasonTcp',
+            texts.harmonyRouteReasonTcp,
+          ),
+          HarmonyRouteKind.manual => remoteHarmonyText(
+            ref,
+            'harmonyRouteReasonManual',
+            texts.harmonyRouteReasonManual,
+          ),
+        },
+        warning: false,
+      ));
     }
     final aiGroup = homeStatus.aiGroupName;
     if (aiGroup != null && aiGroup.isNotEmpty) {
-      lines.add(
-        remoteHarmonyText(
-          ref,
-          'harmonyAiRoutingHint',
-          texts.harmonyAiRoutingHint(aiGroup),
-        ),
-      );
+      details.add((
+        label: texts.harmonyAiRoutingLabel,
+        value: texts.harmonyAiRoutingHint,
+        warning: false,
+      ));
     }
-    lines.add(switch (homeStatus.networkKind) {
-      HarmonyNetworkKind.wifi => remoteHarmonyText(
-        ref,
-        'harmonyNetworkWifi',
-        texts.harmonyNetworkWifi,
-      ),
-      HarmonyNetworkKind.cellular => remoteHarmonyText(
-        ref,
-        'harmonyNetworkCellular',
-        texts.harmonyNetworkCellular,
-      ),
-      HarmonyNetworkKind.other => remoteHarmonyText(
-        ref,
-        'harmonyNetworkOther',
-        texts.harmonyNetworkOther,
-      ),
-      HarmonyNetworkKind.unknown => remoteHarmonyText(
-        ref,
-        'harmonyNetworkUnknown',
-        texts.harmonyNetworkUnknown,
-      ),
-    });
+    details.add((
+      label: texts.network,
+      value: switch (homeStatus.networkKind) {
+        HarmonyNetworkKind.wifi => remoteHarmonyText(
+          ref,
+          'harmonyNetworkWifi',
+          texts.harmonyNetworkWifi,
+        ),
+        HarmonyNetworkKind.cellular => remoteHarmonyText(
+          ref,
+          'harmonyNetworkCellular',
+          texts.harmonyNetworkCellular,
+        ),
+        HarmonyNetworkKind.other => remoteHarmonyText(
+          ref,
+          'harmonyNetworkOther',
+          texts.harmonyNetworkOther,
+        ),
+        HarmonyNetworkKind.unknown => remoteHarmonyText(
+          ref,
+          'harmonyNetworkUnknown',
+          texts.harmonyNetworkUnknown,
+        ),
+      },
+      warning: false,
+    ));
     if (running && homeStatus.lastHealthCheckAt != null) {
       final time = _formatTime(homeStatus.lastHealthCheckAt!);
-      lines.add(
-        homeStatus.lastHealthCheckOk == true
+      details.add((
+        label: texts.harmonyHealthLabel,
+        value: homeStatus.lastHealthCheckOk == true
             ? remoteHarmonyText(
                 ref,
                 'harmonyHealthCheckOk',
@@ -497,139 +504,98 @@ class _HomeInsightCard extends ConsumerWidget {
                 'harmonyHealthCheckFailed',
                 texts.harmonyHealthCheckFailed(time),
               ),
-      );
+        warning: homeStatus.lastHealthCheckOk != true,
+      ));
     }
-    if (showReconnectHint && !running) {
-      lines.add(
-        homeStatus.autoReconnectArmed
-            ? remoteHarmonyText(
-                ref,
-                'harmonyAutoReconnectOn',
-                texts.harmonyAutoReconnectOn,
-              )
-            : remoteHarmonyText(
-                ref,
-                'harmonyAutoReconnectOff',
-                texts.harmonyAutoReconnectOff,
-              ),
-      );
-    }
-    if (homeStatus.configFreshness.displayKind ==
-        HarmonyConfigFreshnessKind.autoUpdated) {
-      lines.add(
-        remoteHarmonyText(
-          ref,
-          'harmonyConfigFreshAutoUpdated',
-          texts.harmonyConfigFreshAutoUpdated,
-        ),
-      );
-    } else if (homeStatus.lastConfigSyncAt != null) {
-      lines.add(
-        remoteHarmonyText(
-          ref,
-          'harmonyConfigSyncedAt',
-          texts.harmonyConfigSyncedAt(
-            _formatTime(homeStatus.lastConfigSyncAt!),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            remoteHarmonyText(
+              ref,
+              'harmonyStatusSection',
+              texts.harmonyStatusSection,
+            ),
+            style: context.textTheme.labelMedium?.copyWith(
+              color: context.colorScheme.onSurfaceVariant,
+            ),
           ),
-        ),
-      );
-    }
-    if (lines.isEmpty) return const SizedBox.shrink();
-    return Card(
-      elevation: 0,
-      color: context.colorScheme.surfaceContainerLow,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              remoteHarmonyText(
-                ref,
-                'harmonyStatusSection',
-                texts.harmonyStatusSection,
-              ),
-              style: context.textTheme.labelMedium?.copyWith(
-                color: context.colorScheme.primary,
+          const SizedBox(height: 8),
+          for (final detail in details)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 72,
+                    child: Text(
+                      detail.label,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: context.colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      detail.value,
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: detail.warning
+                            ? context.colorScheme.error
+                            : context.colorScheme.onSurface,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            for (final line in lines)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  line,
-                  style: context.textTheme.bodySmall?.copyWith(
-                    color: context.colorScheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
-                ),
-              ),
-          ],
-        ),
+        ],
       ),
     );
   }
 }
 
-class _NodeCard extends ConsumerWidget {
+class _NodeSection extends ConsumerWidget {
   final String nodeName;
   final int? delayMs;
-  final VoidCallback? onSwitch;
 
-  const _NodeCard({required this.nodeName, this.delayMs, this.onSwitch});
+  const _NodeSection({required this.nodeName, this.delayMs});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
-    return Card(
-      elevation: 0,
-      color: context.colorScheme.surfaceContainerHighest,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    remoteHarmonyText(
-                      ref,
-                      'harmonyCurrentNode',
-                      texts.harmonyCurrentNode,
-                    ),
-                    style: context.textTheme.labelMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    nodeName,
-                    style: context.textTheme.titleMedium,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (delayMs != null && delayMs! > 0) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      '${remoteHarmonyText(ref, 'harmonyLatency', texts.harmonyLatency)}: $delayMs ms',
-                      style: context.textTheme.bodySmall,
-                    ),
-                  ],
-                ],
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            remoteHarmonyText(
+              ref,
+              'harmonyCurrentNode',
+              texts.harmonyCurrentNode,
             ),
-            if (onSwitch != null)
-              IconButton.filledTonal(
-                onPressed: onSwitch,
-                icon: const Icon(Icons.swap_horiz_rounded),
-                tooltip: remoteHarmonyText(
-                  ref,
-                  'harmonySwitchNode',
-                  texts.harmonySwitchNode,
-                ),
-              ),
+            style: context.textTheme.labelMedium,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            nodeName,
+            style: context.textTheme.titleMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (delayMs != null && delayMs! > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${remoteHarmonyText(ref, 'harmonyLatency', texts.harmonyLatency)}: $delayMs ms',
+              style: context.textTheme.bodySmall,
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -652,10 +618,12 @@ class _TrafficCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
     return Card(
+      margin: EdgeInsets.zero,
       elevation: 0,
-      color: context.colorScheme.surfaceContainerHighest,
+      color: context.colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -667,7 +635,7 @@ class _TrafficCard extends ConsumerWidget {
               ),
               style: context.textTheme.labelMedium,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -682,7 +650,15 @@ class _TrafficCard extends ConsumerWidget {
                     icon: Icons.arrow_upward_rounded,
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(
+                  height: 58,
+                  child: VerticalDivider(
+                    width: 24,
+                    color: context.colorScheme.outlineVariant.withValues(
+                      alpha: 0.5,
+                    ),
+                  ),
+                ),
                 Expanded(
                   child: _TrafficStat(
                     label: remoteHarmonyText(
@@ -730,7 +706,12 @@ class _TrafficStat extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 4),
-        Text(speed, style: context.textTheme.titleSmall),
+        Text(
+          speed,
+          style: context.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         Text(total, style: context.textTheme.bodySmall),
       ],
     );
@@ -746,15 +727,26 @@ class _AccountFooter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final texts = context.appLocalizations;
-    return Column(
+    return Row(
       children: [
-        Text(
-          '${remoteHarmonyText(ref, 'harmonyAccount', texts.harmonyAccount)}: $username',
-          style: context.textTheme.bodySmall?.copyWith(
-            color: context.colorScheme.onSurfaceVariant,
+        Icon(
+          Icons.person_outline_rounded,
+          size: 18,
+          color: context.colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            '${remoteHarmonyText(ref, 'harmonyAccount', texts.harmonyAccount)}: $username',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.textTheme.bodySmall?.copyWith(
+              color: context.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         TextButton(
+          style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
           onPressed: onLogout,
           child: Text(
             remoteHarmonyText(ref, 'harmonyLogout', texts.harmonyLogout),
@@ -777,14 +769,12 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
     with SingleTickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1400),
+    duration: const Duration(milliseconds: 2400),
   );
 
   void _syncAnimation() {
-    final busy =
-        widget.phase == ConnectionPhase.connecting ||
-        widget.phase == ConnectionPhase.disconnecting;
-    if (busy && !MediaQuery.disableAnimationsOf(context)) {
+    if (widget.phase != ConnectionPhase.error &&
+        !MediaQuery.disableAnimationsOf(context)) {
       if (!_pulse.isAnimating) _pulse.repeat();
     } else {
       _pulse.stop();
@@ -814,87 +804,105 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
     final connected = widget.phase == ConnectionPhase.connected;
+    final awake = connected || widget.phase == ConnectionPhase.connecting;
     final errored = widget.phase == ConnectionPhase.error;
     final busy =
         widget.phase == ConnectionPhase.connecting ||
         widget.phase == ConnectionPhase.disconnecting;
     final reducedMotion = MediaQuery.disableAnimationsOf(context);
-    final ringColor = errored
-        ? scheme.error
-        : connected || busy
-        ? scheme.primary
-        : scheme.outlineVariant;
+    const ringColor = Color(0xffb0b0b0);
     return Center(
       child: AnimatedBuilder(
         animation: _pulse,
-        builder: (context, child) => Transform.scale(
-          scale: busy ? 1 + math.sin(_pulse.value * math.pi * 2) * 0.04 : 1,
-          child: AnimatedContainer(
-            duration: reducedMotion
-                ? Duration.zero
-                : const Duration(milliseconds: 360),
-            curve: Curves.easeOutCubic,
-            width: 168,
-            height: 168,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: connected
-                  ? LinearGradient(
-                      colors: [scheme.primary, scheme.tertiary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    )
-                  : null,
-              color: connected
-                  ? null
-                  : errored
-                  ? scheme.errorContainer
-                  : scheme.surfaceContainerHighest,
-              border: Border.all(color: ringColor, width: 3),
-              boxShadow: connected
-                  ? [
-                      BoxShadow(
-                        color: scheme.primary.withValues(alpha: 0.35),
-                        blurRadius: 24,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (busy)
-                  SizedBox.square(
-                    dimension: 152,
-                    child: CircularProgressIndicator(
-                      value: reducedMotion ? 0.65 : null,
-                      strokeWidth: 3,
-                    ),
-                  ),
-                AnimatedSwitcher(
-                  duration: reducedMotion
-                      ? Duration.zero
-                      : const Duration(milliseconds: 220),
-                  child: Icon(
-                    errored
-                        ? Icons.error_outline_rounded
-                        : connected
-                        ? Icons.shield_rounded
-                        : Icons.power_settings_new_rounded,
-                    key: ValueKey('${connected}_$errored'),
-                    size: 64,
-                    color: connected
-                        ? scheme.onPrimary
-                        : errored
-                        ? scheme.onErrorContainer
-                        : scheme.primary,
-                  ),
+        builder: (context, child) {
+          final pulse = (1 - math.cos(_pulse.value * math.pi * 2)) / 2;
+          return Transform.scale(
+            scale: reducedMotion || errored
+                ? 1
+                : 1 + pulse * (busy ? 0.025 : 0.015),
+            child: DecoratedBox(
+              key: const Key('harmony_connection_glow'),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: reducedMotion || errored
+                    ? const []
+                    : [
+                        BoxShadow(
+                          color: scheme.primary.withValues(
+                            alpha: (connected ? 0.12 : 0.06) + pulse * 0.08,
+                          ),
+                          blurRadius: 10 + pulse * 8,
+                          spreadRadius: 1 + pulse * 2,
+                        ),
+                      ],
+              ),
+              child: AnimatedContainer(
+                duration: reducedMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 360),
+                curve: Curves.easeOutCubic,
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: ringColor, width: 1.5),
                 ),
-              ],
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (busy)
+                      SizedBox.square(
+                        dimension: 56,
+                        child: CircularProgressIndicator(
+                          value: reducedMotion ? 0.65 : null,
+                          color: Colors.black,
+                          strokeWidth: 3,
+                        ),
+                      ),
+                    AnimatedSwitcher(
+                      duration: reducedMotion
+                          ? Duration.zero
+                          : const Duration(milliseconds: 220),
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        child: ScaleTransition(
+                          scale: Tween<double>(
+                            begin: 0.85,
+                            end: 1,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      ),
+                      child: SvgPicture.asset(
+                        awake
+                            ? 'assets/images/cat_awake.svg'
+                            : 'assets/images/cat_sleeping.svg',
+                        key: ValueKey(
+                          awake ? 'harmony_cat_awake' : 'harmony_cat_sleeping',
+                        ),
+                        width: 44,
+                        height: 44,
+                        excludeFromSemantics: true,
+                      ),
+                    ),
+                    if (errored)
+                      const Positioned(
+                        right: 3,
+                        bottom: 3,
+                        child: Icon(
+                          Icons.error_rounded,
+                          key: Key('harmony_connection_error'),
+                          size: 18,
+                          color: Colors.black,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }

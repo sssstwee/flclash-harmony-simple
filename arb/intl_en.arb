@@ -592,22 +592,18 @@
   "harmonyLatency": "Latency",
   "harmonyAccount": "Account",
   "simpleErrorState": "Connection error",
-  "harmonyRouteReasonAuto": "Automatically picked the lowest-latency route",
-  "harmonyRouteReasonTcp": "UDP looks blocked; preferring TCP nodes",
-  "harmonyRouteReasonManual": "Selected the best node from latency tests",
-  "harmonyAiRoutingHint": "AI sites use the “{groupName}” group",
-  "@harmonyAiRoutingHint": {
-    "placeholders": {
-      "groupName": {
-        "type": "String"
-      }
-    }
-  },
-  "harmonyNetworkWifi": "Network: Wi‑Fi",
-  "harmonyNetworkCellular": "Network: cellular",
-  "harmonyNetworkOther": "Network: other",
-  "harmonyNetworkUnknown": "Network: unknown",
-  "harmonyHealthCheckOk": "Route healthy (checked {time})",
+  "harmonyRouteLabel": "Route",
+  "harmonyAiRoutingLabel": "AI",
+  "harmonyHealthLabel": "Health check",
+  "harmonyRouteReasonAuto": "Automatic · lowest latency first",
+  "harmonyRouteReasonTcp": "Stable connection first",
+  "harmonyRouteReasonManual": "Selected by latency tests",
+  "harmonyAiRoutingHint": "Route acceleration",
+  "harmonyNetworkWifi": "Wi-Fi",
+  "harmonyNetworkCellular": "Cellular",
+  "harmonyNetworkOther": "Other connection",
+  "harmonyNetworkUnknown": "Not identified",
+  "harmonyHealthCheckOk": "Healthy · {time}",
   "@harmonyHealthCheckOk": {
     "placeholders": {
       "time": {
@@ -615,7 +611,7 @@
       }
     }
   },
-  "harmonyHealthCheckFailed": "Route check failed ({time}); trying another node",
+  "harmonyHealthCheckFailed": "Failed · {time}",
   "@harmonyHealthCheckFailed": {
     "placeholders": {
       "time": {
@@ -623,8 +619,6 @@
       }
     }
   },
-  "harmonyAutoReconnectOn": "Will reconnect automatically next time you open the app",
-  "harmonyAutoReconnectOff": "Will stay disconnected after a manual disconnect",
   "harmonyConfigUpdating": "Updating config in the background…",
   "harmonyConfigSyncedAt": "Config synced at {time}",
   "@harmonyConfigSyncedAt": {
@@ -658,23 +652,23 @@
   "harmonyConfigCheckReasonServer": "Service temporarily unavailable",
   "harmonyStatusSection": "Connection details",
   "harmonyIssueTitleOfflineCached": "Cannot refresh subscription",
-  "harmonyIssueDetailOfflineCached": "The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.",
-  "harmonyIssueActionOfflineCached": "Next: tap Connect",
+  "harmonyIssueDetailOfflineCached": "The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.",
+  "harmonyIssueActionOfflineCached": "Next: tap the icon above to connect",
   "harmonyIssueTitleSubscription": "Cannot fetch latest config",
-  "harmonyIssueDetailSubscription": "The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.",
-  "harmonyIssueActionSubscription": "Next: tap Connect or retry later",
+  "harmonyIssueDetailSubscription": "The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.",
+  "harmonyIssueActionSubscription": "Next: tap the icon above to connect or retry later",
   "harmonyIssueTitleAuthExpired": "Sign-in expired",
   "harmonyIssueDetailAuthExpired": "Your session expired. Sign out and log in again to refresh the subscription.",
   "harmonyIssueActionAuthExpired": "Next: sign out, then log in again",
   "harmonyIssueTitleVpnFailed": "VPN did not start",
-  "harmonyIssueDetailVpnFailed": "The system VPN failed to start. Allow the VPN permission, then tap Connect again.",
-  "harmonyIssueActionVpnFailed": "Next: tap Connect and allow VPN",
+  "harmonyIssueDetailVpnFailed": "The system VPN failed to start. Allow the VPN permission, then tap the icon above to reconnect.",
+  "harmonyIssueActionVpnFailed": "Next: tap the icon above to connect and allow VPN",
   "harmonyIssueTitleNoRoute": "No working route",
-  "harmonyIssueDetailNoRoute": "None of the saved nodes responded. Try Connect again later or wait for a config refresh.",
-  "harmonyIssueActionNoRoute": "Next: try Connect again later",
+  "harmonyIssueDetailNoRoute": "None of the saved nodes responded. Tap the icon above to reconnect later or wait for a config refresh.",
+  "harmonyIssueActionNoRoute": "Next: tap the icon above to reconnect later",
   "harmonyIssueTitleService": "Service unavailable",
-  "harmonyIssueDetailService": "Cannot reach the account server. Check your network; you can still try Connect with a cached profile.",
-  "harmonyIssueActionService": "Next: check network, then Connect",
+  "harmonyIssueDetailService": "Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.",
+  "harmonyIssueActionService": "Next: check your network, then tap the icon above to connect",
   "harmonyIssueTitleRateLimit": "Too many attempts",
   "harmonyIssueDetailRateLimit": "Please wait about a minute before signing in or connecting again.",
   "harmonyIssueActionRateLimit": "Next: wait, then retry"
