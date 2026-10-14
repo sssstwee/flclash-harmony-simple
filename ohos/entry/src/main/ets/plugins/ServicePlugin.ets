@@ -8,6 +8,7 @@ import {
 } from '@ohos/flutter_ohos';
 import { CallbackStub, ResultStub } from '../entryability/EntryAbility'
 import { State, VpnOptions } from '../models/State'
+import { commonEventManager } from '@kit.BasicServicesKit'
 import { publishEvent } from '../utils/Event'
 import { globalState, RunState } from '../GlobalState';
 import EntryAbility from '../entryability/EntryAbility';
@@ -15,6 +16,7 @@ import EntryAbility from '../entryability/EntryAbility';
 export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
   private parent: EntryAbility
   private channel: MethodChannel | undefined
+  private notificationActionSubscriber: commonEventManager.CommonEventSubscriber | undefined
 
   constructor(entryAbility: EntryAbility) {
     this.parent = entryAbility
@@ -27,9 +29,20 @@ export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
   onAttachedToEngine(binding: FlutterPluginBinding): void {
     this.channel = new MethodChannel(binding.getBinaryMessenger(), "com.follow.clash/service")
     this.channel.setMethodCallHandler(this)
+    this.notificationActionSubscriber = commonEventManager.createSubscriberSync({
+      events: ['HARMONY_NOTIF_ACTION'],
+    } as commonEventManager.CommonEventSubscribeInfo)
+    commonEventManager.subscribe(this.notificationActionSubscriber, (event: commonEventManager.CommonEventData) => {
+      const action = event.data ?? ''
+      if (action) this.channel?.invokeMethod('notificationAction', action)
+    })
   }
 
   onDetachedFromEngine(binding: FlutterPluginBinding): void {
+    if (this.notificationActionSubscriber) {
+      commonEventManager.unsubscribe(this.notificationActionSubscriber)
+      this.notificationActionSubscriber = undefined
+    }
     if (this.channel != null) {
       this.channel.setMethodCallHandler(null)
     }
@@ -50,6 +63,12 @@ export default class ServicePlugin implements FlutterPlugin, MethodCallHandler {
       this.handleStop(result)
     } else if (call.method === "getRunTime") {
       this.handleGetRunTime(result)
+    } else if (call.method === "updateVpnNotification") {
+      this.parent.handleVpnNotification(`${call.args}`)
+      result.success('')
+    } else if (call.method === "clearVpnNotification") {
+      this.parent.handleClearVpnNotification()
+      result.success('')
     } else {
       result.notImplemented()
     }

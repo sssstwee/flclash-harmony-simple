@@ -100,7 +100,11 @@ class ApplicationState extends ConsumerState<Application> {
         ),
       );
     }
-    return AndroidManager(child: TileManager(child: child));
+    return AndroidManager(
+      child: HarmonyNotificationManager(
+        child: TileManager(child: child),
+      ),
+    );
   }
 
   Widget _buildState({required Widget child}) {
