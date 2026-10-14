@@ -508,8 +508,8 @@ class HarmonyAccountApi {
     required bool configPath,
   }) async {
     try {
-      return await _performRequest(
-        path,
+      return await _dioRequest(
+        path: path,
         method: method,
         data: data,
         token: token,
@@ -524,6 +524,39 @@ class HarmonyAccountApi {
         rethrow;
       }
     }
+    return _dioRequest(
+      path: path,
+      method: method,
+      data: data,
+      token: token,
+      responseType: responseType,
+      headers: headers,
+      viaLocalProxy: true,
+    );
+  }
+
+  Future<Response<dynamic>> _dioRequest({
+    required String path,
+    required String method,
+    Object? data,
+    String? token,
+    required ResponseType responseType,
+    Map<String, String>? headers,
+    required bool viaLocalProxy,
+  }) async {
+    final options = Options(
+      method: method,
+      responseType: responseType,
+      validateStatus: (status) =>
+          status != null && (status >= 200 && status < 300 || status == 304),
+      headers: {
+        if (token != null) 'Authorization': 'Bearer $token',
+        ...?headers,
+      },
+    );
+    if (_http.httpClientAdapter is! IOHttpClientAdapter) {
+      return _http.request<dynamic>(path, data: data, options: options);
+    }
     return _performRequest(
       path,
       method: method,
@@ -531,7 +564,7 @@ class HarmonyAccountApi {
       token: token,
       responseType: responseType,
       headers: headers,
-      viaLocalProxy: true,
+      viaLocalProxy: viaLocalProxy,
     );
   }
 

@@ -282,20 +282,23 @@ void main() {
       scoped(
         api: SignedOutApi(),
         child: app(
-          SimpleConnectionPanel(
-            phase: ConnectionPhase.connected,
-            username: 'harmony',
-            configFreshness: const HarmonyConfigFreshness(
-              kind: HarmonyConfigFreshnessKind.discoveringUpdate,
-              refreshInProgress: true,
+          const MediaQuery(
+            data: MediaQueryData(disableAnimations: true),
+            child: SimpleConnectionPanel(
+              phase: ConnectionPhase.disconnected,
+              username: 'harmony',
+              configFreshness: HarmonyConfigFreshness(
+                kind: HarmonyConfigFreshnessKind.discoveringUpdate,
+                refreshInProgress: true,
+              ),
+              homeStatus: HarmonyHomeStatus(configSyncInProgress: true),
+              onConfigRefresh: () {},
             ),
-            homeStatus: const HarmonyHomeStatus(configSyncInProgress: true),
-            onConfigRefresh: () {},
           ),
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(find.text('发现新配置，正在更新…'), findsOneWidget);
     expect(
       tester.widget<IconButton>(find.byKey(const Key('harmony_config_refresh'))).onPressed,
