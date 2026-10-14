@@ -404,6 +404,7 @@ class HarmonySimple extends _$HarmonySimple {
       await _connectVpn(operation: operation, token: token);
     } on _SupersededHarmonyOperation {
       // Do not let an old probe/connect completion revive a signed-out session.
+      return;
     } on HarmonyAccountError catch (error) {
       if (ref.mounted && operation == _operation) {
         await _stopSafely();
@@ -458,7 +459,11 @@ class HarmonySimple extends _$HarmonySimple {
         .update((s) => s.copyWith(enable: true));
     await setup.applyProfile(force: true);
     _ensureCurrent(operation, token);
-    final applied = await _applyBestRoute(showNoRouteError: true);
+    final applied = await _applyBestRoute(
+      showNoRouteError: true,
+      operation: operation,
+      token: token,
+    );
     _ensureCurrent(operation, token);
     if (!applied) return;
     await setup.updateStatus(true, isInit: true, profileApplied: true);
@@ -650,12 +655,19 @@ class HarmonySimple extends _$HarmonySimple {
     );
   }
 
-  Future<bool> _applyBestRoute({required bool showNoRouteError}) async {
+  Future<bool> _applyBestRoute({
+    required bool showNoRouteError,
+    int? operation,
+    String? token,
+  }) async {
     final profile = state.remoteProfile;
     if (profile == null) return false;
     final groups = ref.read(groupsProvider);
     final core = ref.read(harmonyCoreControllerProvider);
     final config = await core.getConfig(profile.id);
+    if (operation != null && token != null) {
+      _ensureCurrent(operation, token);
+    }
     final rules = system.isOhos
         ? defaultRoutingRules(config)
         : List<String>.from(config['rules'] ?? const <String>[]);
@@ -666,13 +678,22 @@ class HarmonySimple extends _$HarmonySimple {
         : await autoSelectProxy(
             group,
             groups,
-            (name) async => (await core.getDelay(
-              group.testUrl ?? ref.read(appSettingProvider).testUrl,
-              name,
-            )).value,
+            (name) async {
+              final value = (await core.getDelay(
+                group.testUrl ?? ref.read(appSettingProvider).testUrl,
+                name,
+              )).value;
+              if (operation != null && token != null) {
+                _ensureCurrent(operation, token);
+              }
+              return value;
+            },
             transportKinds: transportKinds,
             preferTcpFirst: system.isOhos,
           );
+    if (operation != null && token != null) {
+      _ensureCurrent(operation, token);
+    }
     if (selected == null) {
       if (showNoRouteError) {
         state = state.copyWith(
@@ -694,6 +715,9 @@ class HarmonySimple extends _$HarmonySimple {
       ),
     );
     for (final entry in selected.selections.entries.toList().reversed) {
+      if (operation != null && token != null) {
+        _ensureCurrent(operation, token);
+      }
       await ref
           .read(proxiesActionProvider.notifier)
           .changeProxy(groupName: entry.key, proxyName: entry.value);

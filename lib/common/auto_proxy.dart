@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/common/proxy_transport.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -87,76 +89,100 @@ Future<AutoSelectOutcome?> autoSelectProxy(
   }
 
   collect(root, {}, {});
-  final delays = <String, int?>{};
-  final elapsed = Stopwatch()..start();
+  final probes = <String, Future<int?>>{};
+  final deadline = Completer<void>();
+  var timedOut = false;
+  final timer = Timer(const Duration(seconds: 24), () {
+    timedOut = true;
+    deadline.complete();
+  });
   var preferTcp = preferTcpFirst;
+  final delays = <String, int?>{};
 
-  Future<int?> delay(String name) async {
-    if (delays.containsKey(name)) return delays[name];
-    final timeout = probeTimeoutFor(kindFor(name), preferTcp: preferTcp);
-    try {
-      delays[name] = await measure(name).timeout(timeout);
-    } catch (_) {
-      delays[name] = null;
-    }
-    if (!preferTcp &&
-        inferPreferTcpFromDelays(delays, {
-          for (final key in delays.keys) key: kindFor(key),
-        })) {
-      preferTcp = true;
-    }
-    return delays[name];
+  Future<int?> delay(String name) {
+    if (timedOut) return Future<int?>.value();
+    return probes.putIfAbsent(name, () async {
+      try {
+        final timeout = probeTimeoutFor(kindFor(name), preferTcp: preferTcp);
+        final value = await Future.any<int?>([
+          measure(name).timeout(timeout),
+          deadline.future.then<int?>((_) => null),
+        ]);
+        delays[name] = value;
+        if (!preferTcp &&
+            inferPreferTcpFromDelays(delays, {
+              for (final key in delays.keys) key: kindFor(key),
+            })) {
+          preferTcp = true;
+        }
+        return value;
+      } on TimeoutException {
+        delays[name] = null;
+        return null;
+      } catch (error) {
+        delays[name] = null;
+        rethrow;
+      }
+    });
   }
 
-  final automaticCandidates = candidates
-      .where((item) => automatic.contains(item.name))
-      .toList();
-  for (var offset = 0; offset < automaticCandidates.length; offset += 6) {
-    if (elapsed.elapsed >= const Duration(seconds: 24)) return null;
-    final batch = automaticCandidates.skip(offset).take(6).toList();
-    await Future.wait(batch.map((candidate) => delay(candidate.name)));
-    for (final candidate in batch) {
-      final value = delays[candidate.name];
-      if (value != null && value > 0) {
-        return (
-          name: candidate.name,
-          selections: candidate.selections,
-          usedAutomaticGroup: true,
-          preferTcpActive: preferTcp,
+  Future<AutoSelectOutcome?> select() async {
+    final automaticCandidates = candidates
+        .where((item) => automatic.contains(item.name))
+        .toList();
+    var manual = candidates
+        .where((item) => !automatic.contains(item.name))
+        .toList();
+    manual = sortByTransportPreference(
+      manual,
+      (item) => kindFor(item.name),
+      preferTcp: preferTcp,
+    );
+    for (final candidateSet in [automaticCandidates, manual]) {
+      for (var offset = 0; offset < candidateSet.length; offset += 6) {
+        if (timedOut) return null;
+        final batch = candidateSet.skip(offset).take(6).toList();
+        final values = await Future.wait(
+          batch.map((candidate) => delay(candidate.name)),
         );
+        if (timedOut) return null;
+        ({String name, Map<String, String> selections})? best;
+        var bestDelay = double.infinity;
+        for (var index = 0; index < batch.length; index++) {
+          final value = values[index];
+          if (value == null || value <= 0) continue;
+          if (automatic.contains(batch[index].name)) {
+            return (
+              name: batch[index].name,
+              selections: batch[index].selections,
+              usedAutomaticGroup: true,
+              preferTcpActive: preferTcp,
+            );
+          }
+          if (value < bestDelay) {
+            best = batch[index];
+            bestDelay = value.toDouble();
+          }
+        }
+        if (best != null) {
+          return (
+            name: best.name,
+            selections: best.selections,
+            usedAutomaticGroup: false,
+            preferTcpActive: preferTcp,
+          );
+        }
       }
     }
+    return null;
   }
-  var manual = candidates
-      .where((item) => !automatic.contains(item.name))
-      .toList();
-  manual = sortByTransportPreference(
-    manual,
-    (item) => kindFor(item.name),
-    preferTcp: preferTcp,
-  );
-  // Bound concurrent probes on a phone, including subscriptions with many nodes.
-  for (var offset = 0; offset < manual.length; offset += 6) {
-    final batch = manual.skip(offset).take(6).toList();
-    await Future.wait(batch.map((candidate) => delay(candidate.name)));
-    ({String name, Map<String, String> selections})? best;
-    var bestDelay = double.infinity;
-    for (final candidate in batch) {
-      final value = delays[candidate.name];
-      if (value != null && value > 0 && value < bestDelay) {
-        best = candidate;
-        bestDelay = value.toDouble();
-      }
-    }
-    if (best != null) {
-      return (
-        name: best.name,
-        selections: best.selections,
-        usedAutomaticGroup: false,
-        preferTcpActive: preferTcp,
-      );
-    }
-    if (elapsed.elapsed >= const Duration(seconds: 24)) return null;
+
+  try {
+    return await Future.any([
+      select(),
+      deadline.future.then<AutoSelectOutcome?>((_) => null),
+    ]);
+  } finally {
+    timer.cancel();
   }
-  return null;
 }
