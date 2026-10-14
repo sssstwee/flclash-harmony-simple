@@ -227,8 +227,12 @@ Future<VM2<String, String>> _makeRealProfileTask(
   if (isOhos || data.rules.isEmpty) {
     if (isOhos) {
       excludeDirectFromAutomaticGroups(rawConfig);
-      rules = defaultRoutingRules(rawConfig);
-      applyDefaultDns(rawConfig);
+      if (rawConfig.containsKey('harmony-runtime')) {
+        rules = List<String>.from(rawConfig['rules'] as List);
+      } else {
+        rules = defaultRoutingRules(rawConfig);
+        applyDefaultDns(rawConfig);
+      }
     } else if (rawConfig['rules'] != null) {
       rules = List<String>.from(rawConfig['rules']);
     }

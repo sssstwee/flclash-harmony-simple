@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/harmony_remote_ui.dart';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -97,7 +99,11 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  texts.harmonySwitchNode,
+                  remoteHarmonyText(
+                    ref,
+                    'harmonySwitchNode',
+                    texts.harmonySwitchNode,
+                  ),
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -162,6 +168,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     final nodeName = _activeNodeName();
     final nodeDelay = _activeDelay(nodeName);
     final phase = _phase(ui, running);
+    final features = ui.remoteRuntime['features'] as Map? ?? {};
+    final defaults = ui.remoteRuntime['defaults'] as Map? ?? {};
 
     return CommonScaffold(
       title: appDisplayName,
@@ -178,7 +186,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   nodeDelayMs: nodeDelay,
                   homeStatus: ui.homeStatus,
                   issue: ui.issue,
-                  showReconnectHint: !running,
+                  showReconnectHint:
+                      !running && defaults['showReconnectHint'] != false,
                   onToggle: ready && !ui.bootstrapping
                       ? () => ref
                             .read(harmonySimpleProvider.notifier)
@@ -188,11 +197,15 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                       ref.read(harmonySimpleProvider.notifier).logout(),
                   onRetry: () =>
                       ref.read(harmonySimpleProvider.notifier).retryConnect(),
-                  onSwitchNode: running ? _showNodeSwitcher : null,
+                  onSwitchNode: running && features['nodeSwitcher'] != false
+                      ? _showNodeSwitcher
+                      : null,
                   configFreshness: ui.homeStatus.configFreshness,
-                  onConfigRefresh: () => ref
-                      .read(harmonySimpleProvider.notifier)
-                      .forceRefreshConfig(),
+                  onConfigRefresh: features['manualRefresh'] == false
+                      ? null
+                      : () => ref
+                            .read(harmonySimpleProvider.notifier)
+                            .forceRefreshConfig(),
                 )
               : AutofillGroup(
                   child: Form(
@@ -208,13 +221,21 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                         ),
                         const SizedBox(height: 24),
                         Text(
-                          texts.harmonyLogin,
+                          remoteHarmonyText(
+                            ref,
+                            'harmonyLogin',
+                            texts.harmonyLogin,
+                          ),
                           textAlign: TextAlign.center,
                           style: context.textTheme.headlineSmall,
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          texts.harmonyLoginHint,
+                          remoteHarmonyText(
+                            ref,
+                            'harmonyLoginHint',
+                            texts.harmonyLoginHint,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 32),
@@ -225,11 +246,19 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                           textInputAction: TextInputAction.next,
                           autocorrect: false,
                           decoration: InputDecoration(
-                            labelText: texts.harmonyUsername,
+                            labelText: remoteHarmonyText(
+                              ref,
+                              'harmonyUsername',
+                              texts.harmonyUsername,
+                            ),
                           ),
                           validator: (value) => value?.trim().isNotEmpty == true
                               ? null
-                              : texts.harmonyRequired,
+                              : remoteHarmonyText(
+                                  ref,
+                                  'harmonyRequired',
+                                  texts.harmonyRequired,
+                                ),
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -241,11 +270,19 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                           autocorrect: false,
                           enableSuggestions: false,
                           decoration: InputDecoration(
-                            labelText: texts.password,
+                            labelText: remoteHarmonyText(
+                              ref,
+                              'password',
+                              texts.password,
+                            ),
                           ),
                           validator: (value) => value?.isNotEmpty == true
                               ? null
-                              : texts.harmonyRequired,
+                              : remoteHarmonyText(
+                                  ref,
+                                  'harmonyRequired',
+                                  texts.harmonyRequired,
+                                ),
                           onFieldSubmitted: (_) => _login(),
                         ),
                         const SizedBox(height: 24),
@@ -263,7 +300,13 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : Text(texts.harmonyLogin),
+                              : Text(
+                                  remoteHarmonyText(
+                                    ref,
+                                    'harmonyLogin',
+                                    texts.harmonyLogin,
+                                  ),
+                                ),
                         ),
                         if (ui.error != null) ...[
                           const SizedBox(height: 16),

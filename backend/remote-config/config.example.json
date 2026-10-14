@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "version": "2026-10-14.1",
+  "minClientVersion": "0.8.94+2026101206",
+  "sha256": "c6e3086a708dcda168a195cc6795bf0972091cddc10ff3b24a6573bb1be3df3b",
+  "payload": "{\"profile\":{\"proxies\":[{\"name\":\"example\",\"type\":\"trojan\",\"server\":\"proxy.example.com\",\"port\":443,\"password\":\"REPLACE_ME\",\"sni\":\"proxy.example.com\"}],\"proxy-groups\":[{\"name\":\"Auto\",\"type\":\"select\",\"proxies\":[\"example\"]}],\"dns\":{\"enable\":true,\"enhanced-mode\":\"fake-ip\",\"nameserver\":[\"https://dns.alidns.com/dns-query\"]},\"rules\":[\"GEOSITE,cn,DIRECT\",\"GEOIP,CN,DIRECT\",\"MATCH,Auto\"]},\"runtime\":{\"announcement\":\"服务公告示例\",\"texts\":{\"ready\":\"点击连接\",\"running\":\"已连接\",\"login\":\"登录\"},\"defaults\":{\"showReconnectHint\":true},\"features\":{\"nodeSwitcher\":true,\"manualRefresh\":true},\"parameters\":{\"checkSeconds\":300,\"refreshSeconds\":86400}}}"
+}

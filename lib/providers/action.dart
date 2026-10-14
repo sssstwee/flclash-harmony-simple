@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/harmony_account.dart';
@@ -426,25 +427,32 @@ class SetupAction extends _$SetupAction {
     final yamlString = vm2.a;
     final yamlMd5 = vm2.b;
     if (yamlMd5 == globalState.lastConfigMd5 && force == false) return;
+    Object? applyError;
     await globalState.loadingRun(
       () async {
-        final configFilePath = await appPath.configFilePath;
-        await File(configFilePath).safeWriteAsString(yamlString);
-        globalState.lastConfigMd5 = yamlMd5;
-        final message = await coreController.setupConfig(
-          setupState: setupState,
-          params: _setupParams,
-          preloadInvoke: preloadInvoke,
-        );
-        if (message.isNotEmpty && !message.endsWith('is empty')) {
-          throw message;
+        try {
+          final configFilePath = await appPath.configFilePath;
+          await File(configFilePath).safeWriteAsString(yamlString);
+          globalState.lastConfigMd5 = yamlMd5;
+          final message = await coreController.setupConfig(
+            setupState: setupState,
+            params: _setupParams,
+            preloadInvoke: preloadInvoke,
+          );
+          if (message.isNotEmpty && !message.endsWith('is empty')) {
+            throw message;
+          }
+          ref.read(checkIpNumProvider.notifier).add();
+          await onUpdated?.call();
+        } catch (error) {
+          applyError = error;
+          rethrow;
         }
-        ref.read(checkIpNumProvider.notifier).add();
-        await onUpdated?.call();
       },
       silence: true,
       tag: !silence ? LoadingTag.proxies : null,
     );
+    if (applyError != null) throw applyError!;
   }
 }
 
@@ -920,22 +928,35 @@ class ProfilesAction extends _$ProfilesAction {
     }
   }
 
-  Future<void> updateProfile(
+  Future<Profile> updateProfile(
     Profile profile, {
     bool showLoading = false,
+    Uint8List? bytes,
+    Future<Profile> Function(Profile, Uint8List)? save,
+    bool apply = true,
   }) async {
     try {
       if (showLoading) {
         ref.read(isUpdatingProvider(profile.updatingKey).notifier).value = true;
       }
-      ref.read(profilesProvider.notifier).put(profile);
-      final newProfile = await profile.update();
-      ref.read(profilesProvider.notifier).put(newProfile);
-      if (profile.id == ref.read(currentProfileIdProvider)) {
+      if (bytes == null) ref.read(profilesProvider.notifier).put(profile);
+      final newProfile = bytes == null
+          ? await profile.update()
+          : await (save ?? ((profile, bytes) => profile.saveFile(bytes)))(
+              profile,
+              bytes,
+            );
+      if (bytes == null) {
+        ref.read(profilesProvider.notifier).put(newProfile);
+      } else {
+        await putProfile(newProfile);
+      }
+      if (apply && profile.id == ref.read(currentProfileIdProvider)) {
         ref
             .read(setupActionProvider.notifier)
             .applyProfileDebounce(silence: true);
       }
+      return newProfile;
     } finally {
       ref.read(isUpdatingProvider(profile.updatingKey).notifier).value = false;
     }

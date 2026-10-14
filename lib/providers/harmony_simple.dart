@@ -9,6 +9,7 @@ import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
+import 'package:fl_clash/common/harmony_remote_config.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
 import 'package:fl_clash/common/harmony_config_freshness.dart';
 import 'package:fl_clash/common/harmony_connect.dart';
@@ -56,6 +57,7 @@ final harmonyCoreControllerProvider = Provider<CoreController>(
 class _SupersededHarmonyOperation implements Exception {}
 
 class HarmonySimpleState {
+  final Map<String, dynamic> remoteRuntime;
   final bool bootstrapping;
   final bool busy;
   final bool disconnecting;
@@ -67,6 +69,7 @@ class HarmonySimpleState {
   final HarmonyUserIssue? issue;
 
   const HarmonySimpleState({
+    this.remoteRuntime = const {},
     this.bootstrapping = true,
     this.busy = false,
     this.disconnecting = false,
@@ -79,6 +82,7 @@ class HarmonySimpleState {
   });
 
   HarmonySimpleState copyWith({
+    Map<String, dynamic>? remoteRuntime,
     bool? bootstrapping,
     bool? busy,
     bool? disconnecting,
@@ -94,6 +98,7 @@ class HarmonySimpleState {
     bool clearIssue = false,
   }) {
     return HarmonySimpleState(
+      remoteRuntime: remoteRuntime ?? this.remoteRuntime,
       bootstrapping: bootstrapping ?? this.bootstrapping,
       busy: busy ?? this.busy,
       disconnecting: disconnecting ?? this.disconnecting,
@@ -342,6 +347,7 @@ class HarmonySimple extends _$HarmonySimple {
     };
     state = state.copyWith(
       clearRemoteProfile: true,
+      remoteRuntime: const {},
       clearSession: true,
       usingCachedConfig: false,
     );
@@ -555,8 +561,14 @@ class HarmonySimple extends _$HarmonySimple {
       final remote = await _api.fetchConfigVersionInfo();
       if (!ref.mounted) return;
       if (remote != null) {
-        _minCheckInterval = remote.minCheckInterval;
-        await _api.saveMinCheckInterval(remote.minCheckInterval);
+        final configured =
+            (state.remoteRuntime['parameters'] as Map?)?['checkSeconds'];
+        _minCheckInterval = configured is int
+            ? Duration(
+                seconds: max(configured, remote.minCheckInterval.inSeconds),
+              )
+            : remote.minCheckInterval;
+        await _api.saveMinCheckInterval(_minCheckInterval);
       }
       var needsDownload = false;
       if (remote != null) {
@@ -668,7 +680,8 @@ class HarmonySimple extends _$HarmonySimple {
     if (operation != null && token != null) {
       _ensureCurrent(operation, token);
     }
-    final rules = system.isOhos
+    final rules =
+        system.isOhos && !config.containsKey(HarmonyRemoteConfig.marker)
         ? defaultRoutingRules(config)
         : List<String>.from(config['rules'] ?? const <String>[]);
     final group = connectionGroup(groups, rules);
@@ -764,6 +777,15 @@ class HarmonySimple extends _$HarmonySimple {
           sha256.convert(bytes).toString() != metadata.contentHash) {
         return null;
       }
+      state = state.copyWith(
+        remoteRuntime: HarmonyRemoteConfig.runtimeFromProfile(
+          bytes,
+          clientVersion:
+              utf8.decode(bytes).contains('harmony-min-client-version')
+              ? '${globalState.packageInfo.version}+${globalState.packageInfo.buildNumber}'
+              : null,
+        ),
+      );
       return profile;
     } catch (_) {
       return null;
@@ -795,6 +817,7 @@ class HarmonySimple extends _$HarmonySimple {
     if (cached == null) {
       state = state.copyWith(
         clearRemoteProfile: true,
+        remoteRuntime: const {},
         usingCachedConfig: false,
       );
     }
@@ -831,51 +854,130 @@ class HarmonySimple extends _$HarmonySimple {
       if (download.notModified || bytes == null || bytes.isEmpty) {
         throw HarmonyAccountError.config;
       }
+      final runtime = HarmonyRemoteConfig.runtimeFromProfile(bytes);
+      final parameters = runtime['parameters'] as Map? ?? {};
       final yamlText = utf8.decode(bytes);
       final interval =
+          (parameters['refreshSeconds'] is int
+              ? Duration(seconds: parameters['refreshSeconds'] as int)
+              : null) ??
           download.profileUpdateInterval ??
           profileUpdateIntervalFromYaml(yamlText) ??
           const Duration(hours: 24);
-      await _api.saveConfigRefreshInterval(interval);
-      _configRefreshInterval = interval;
-      _scheduleConfigRefresh();
       await ref.read(coreActionProvider.notifier).tryStartCore();
       _ensureCurrent(op, session.token);
       final target =
+          cached?.copyWith(label: appDisplayName) ??
           _remoteProfiles().firstOrNull?.copyWith(label: appDisplayName) ??
           Profile.normal(label: appDisplayName);
+      final previousBytes = cached?.id == target.id
+          ? await _files.read(target)
+          : null;
+      _ensureCurrent(op, session.token);
+      final previousId = ref.read(currentProfileIdProvider);
+      final previousVersion = await _api.readConfigVersion();
+      _ensureCurrent(op, session.token);
       final install = (profile: target, done: Completer<void>());
       _profileInstalls.add(install);
       late final Profile profile;
+      var saved = false;
+      var committed = false;
       try {
-        profile = await _files.save(target, bytes);
-        _ensureCurrent(op, session.token);
-        await ref
+        profile = await ref
             .read(profilesActionProvider.notifier)
-            .putProfile(profile.copyWith(autoUpdate: false));
+            .updateProfile(
+              target.copyWith(autoUpdate: false),
+              bytes: bytes,
+              save: (profile, bytes) async {
+                final result = await _files.save(profile, bytes);
+                saved = true;
+                return result;
+              },
+              apply: false,
+            );
+        saved = true;
         _ensureCurrent(op, session.token);
+        if (hotApplyWhenConnected && ref.read(isStartProvider)) {
+          ref.read(currentProfileIdProvider.notifier).value = profile.id;
+          await ref
+              .read(setupActionProvider.notifier)
+              .applyProfile(force: true, silence: true);
+          _ensureCurrent(op, session.token);
+        }
+        await _api.commitConfigCache(
+          HarmonyConfigCacheMetadata(
+            username: session.username,
+            profileId: profile.id,
+            contentHash: sha256.convert(bytes).toString(),
+            etag: download.etag,
+            lastModified: download.lastModified,
+          ),
+          expectedToken: session.token,
+        );
+        committed = true;
+        await _api.persistInstalledConfigValidators(
+          expectedToken: session.token,
+          lastModified: download.lastModified,
+          etag: download.etag,
+          configVersion: download.configVersion,
+        );
+      } catch (_) {
+        if (saved && op == _operation && _api.session?.token == session.token) {
+          ref.read(currentProfileIdProvider.notifier).value = previousId;
+          if (previousBytes != null) {
+            await _files.save(target, previousBytes);
+            ref.read(profilesProvider.notifier).put(target);
+            try {
+              await ref
+                  .read(profilesActionProvider.notifier)
+                  .putProfile(target);
+            } catch (_) {
+              // Restore the live core even if database persistence is unavailable.
+            }
+            if (hotApplyWhenConnected && ref.read(isStartProvider)) {
+              await ref
+                  .read(setupActionProvider.notifier)
+                  .applyProfile(force: true, silence: true);
+            }
+            if (committed && metadata != null) {
+              await _api.commitConfigCache(
+                metadata,
+                expectedToken: session.token,
+              );
+              await _api.persistInstalledConfigValidators(
+                expectedToken: session.token,
+                lastModified: metadata.lastModified,
+                etag: metadata.etag,
+                configVersion: previousVersion,
+              );
+            }
+          } else {
+            await _deleteRemoteProfile(target);
+            if (committed) {
+              await _api.clearConfigCache();
+              await _api.persistInstalledConfigValidators(
+                expectedToken: session.token,
+              );
+            }
+          }
+        }
+        rethrow;
       } finally {
         install.done.complete();
         _profileInstalls.remove(install);
       }
-      await _api.commitConfigCache(
-        HarmonyConfigCacheMetadata(
-          username: session.username,
-          profileId: profile.id,
-          contentHash: sha256.convert(bytes).toString(),
-          etag: download.etag,
-          lastModified: download.lastModified,
-        ),
-        expectedToken: session.token,
-      );
-      await _api.persistInstalledConfigValidators(
-        expectedToken: session.token,
-        lastModified: download.lastModified,
-        etag: download.etag,
-        configVersion: download.configVersion,
-      );
       _ensureCurrent(op, session.token);
       ref.read(currentProfileIdProvider.notifier).value = profile.id;
+      await _api.saveConfigRefreshInterval(interval);
+      _configRefreshInterval = interval;
+      _scheduleConfigRefresh();
+      state = state.copyWith(remoteRuntime: runtime);
+      if (parameters['checkSeconds'] is int) {
+        _minCheckInterval = Duration(
+          seconds: parameters['checkSeconds'] as int,
+        );
+        await _api.saveMinCheckInterval(_minCheckInterval);
+      }
       final now = DateTime.now();
       final autoUpdated =
           hotApplyWhenConnected && ref.read(isStartProvider) && !manualRefresh;
@@ -899,8 +1001,6 @@ class HarmonySimple extends _$HarmonySimple {
         ),
       );
       if (hotApplyWhenConnected && ref.read(isStartProvider)) {
-        final setup = ref.read(setupActionProvider.notifier);
-        await setup.applyProfile(force: true, silence: true);
         await _applyBestRoute(showNoRouteError: false);
       }
     } on HarmonyAccountError catch (error) {
@@ -1037,6 +1137,7 @@ class HarmonySimple extends _$HarmonySimple {
       state = state.copyWith(
         remoteProfile: accepted,
         clearRemoteProfile: accepted == null,
+        remoteRuntime: accepted == null ? const {} : state.remoteRuntime,
       );
     }
   }

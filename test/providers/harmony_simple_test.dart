@@ -317,6 +317,7 @@ class _Setup extends SetupAction {
   final List<String> events;
   Object? stopFailure;
   int applies = 0;
+  Object? applyFailure;
   final starts = <({bool isInit, bool profileApplied})>[];
 
   _Setup(this.events);
@@ -343,6 +344,9 @@ class _Setup extends SetupAction {
   }) async {
     applies++;
     events.add('apply');
+    final failure = applyFailure;
+    applyFailure = null;
+    if (failure != null) throw failure;
     preloadInvoke?.call();
   }
 }
@@ -548,6 +552,33 @@ void main() {
       expect(harness.state.remoteProfile, isNull);
       expect(harness.state.bootstrapping, isFalse);
       expect(harness.state.error, isNotNull);
+    },
+  );
+
+  test(
+    'online apply failure restores old file and does not acknowledge version',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.container.read(runTimeProvider.notifier).value = 0;
+      harness.setup.applyFailure = StateError('core rejected update');
+      harness.api.downloads.add(
+        HarmonyConfigDownload(
+          bytes: Uint8List.fromList(
+            'proxies: []\nrules: [MATCH,DIRECT]'.codeUnits,
+          ),
+          etag: '"bad-update"',
+        ),
+      );
+
+      expect(await harness.notifier.forceRefreshConfig(), isFalse);
+      expect(harness.files.bytes[7], _config);
+      expect(harness.api.metadata?.etag, '"accepted-etag"');
+      expect(harness.api.commits, 0);
+      expect(harness.setup.applies, 2);
+      expect(harness.container.read(currentProfileIdProvider), 7);
     },
   );
 

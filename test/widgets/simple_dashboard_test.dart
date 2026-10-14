@@ -36,6 +36,17 @@ class _EmptyProfiles extends Profiles {
   List<Profile> build() => [];
 }
 
+class RemoteHarmonySimple extends IdleHarmonySimple {
+  @override
+  HarmonySimpleState build() => const HarmonySimpleState(
+    bootstrapping: false,
+    remoteRuntime: {
+      'announcement': '远程服务公告',
+      'texts': {'ready': '远程就绪文案', 'logout': '退出远程账户'},
+    },
+  );
+}
+
 class IdleHarmonySimple extends HarmonySimple {
   @override
   HarmonySimpleState build() => const HarmonySimpleState(bootstrapping: false);
@@ -91,6 +102,31 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
   }
+
+  testWidgets('cached remote announcement and copy override local defaults', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          harmonySimpleProvider.overrideWith(RemoteHarmonySimple.new),
+          totalTrafficProvider.overrideWithValue(const Traffic()),
+          trafficsProvider.overrideWithValue(FixedList(0)),
+        ],
+        child: app(
+          const SimpleConnectionPanel(
+            phase: ConnectionPhase.disconnected,
+            username: 'alice',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('远程服务公告'), findsOneWidget);
+    expect(find.text('远程就绪文案'), findsOneWidget);
+    expect(find.text('退出远程账户'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'signed-out users must log in and cannot import or connect cached profiles',
