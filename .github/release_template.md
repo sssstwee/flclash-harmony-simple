@@ -1,8 +1,8 @@
 # 小猫AI代理 VERSION
 
-Download the assets attached to this release for your platform. Portable filenames use `xiaomao-ai-proxy`. Verify downloaded files against the accompanying SHA-256 checksums.
+This release provides only HarmonyOS / OHOS HAP and APP packages. Verify downloaded files against the accompanying SHA-256 checksums.
 
-下载本次发布所附的对应平台文件，并核对 SHA-256 校验值。
+本次发布仅提供鸿蒙（HarmonyOS / OHOS）的 HAP 和 APP 安装包，请核对随附的 SHA-256 校验值。
 
 Unsigned HarmonyOS HAP / APP files require your own authorized signing before installation. A source rename does not rename an app that is already installed.
 

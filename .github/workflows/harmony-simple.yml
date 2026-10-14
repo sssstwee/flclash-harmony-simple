@@ -1,4 +1,6 @@
-name: 小猫AI代理
+name: 小猫AI代理 HarmonyOS
+
+# Package only HarmonyOS/OHOS. Other platforms must not be added to build jobs or matrices.
 
 on:
   push:
@@ -203,7 +205,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.pkg.outputs.name }}
-          path: dist/
+          path: |
+            dist/**/*.hap
+            dist/**/*.app
+            dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
 
