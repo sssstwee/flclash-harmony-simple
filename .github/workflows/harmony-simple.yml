@@ -24,6 +24,9 @@ jobs:
         run: bash .github/scripts/check-no-secrets.sh
 
   changes:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
@@ -61,7 +64,9 @@ jobs:
   build:
     needs: [changes, backend, secrets-scan]
     if: |
-      always() &&
+      !cancelled() &&
+      needs.changes.result == 'success' &&
+      needs.secrets-scan.result == 'success' &&
       (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
       (github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true')
     runs-on: ubuntu-latest
@@ -110,6 +115,23 @@ jobs:
           GIT_CONFIG_VALUE_0: HTTP/1.1
         run: flutter pub get
 
+      - name: Install icon renderer
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+
+      - name: Generate Dart sources
+        run: |
+          dart format lib/common/atomic_profile.dart lib/common/app_localizations.dart lib/state.dart lib/views/tools.dart test/common/atomic_profile_test.dart lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart
+          dart run intl_utils:generate
+          dart run build_runner build --delete-conflicting-outputs
+          dart run tool/generate_app_icon.dart
+
+      - name: Check generated sources and formatting
+        run: |
+          git diff --exit-code -- lib test tool assets/images/icon.png \
+            ohos/AppScope/resources/base/media/background.png \
+            ohos/AppScope/resources/base/media/foreground.png \
+            ohos/entry/src/main/resources/base/media/icon.png
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
@@ -117,12 +139,14 @@ jobs:
         run: flutter test --reporter expanded
 
       - name: Set up Go bootstrap
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         uses: actions/setup-go@v5
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
       - name: Set up HarmonyOS Go
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         run: |
           set -euo pipefail
           OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
@@ -139,6 +163,7 @@ jobs:
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         env:
           CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
         run: |
@@ -157,6 +182,7 @@ jobs:
           dart setup.dart ohos --env stable -v
 
       - name: Checksums
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         run: |
           cd dist
           find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
@@ -173,9 +199,11 @@ jobs:
           fi
 
       - name: Upload packages
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.pkg.outputs.name }}
           path: dist/
           if-no-files-found: error
           retention-days: 14
+

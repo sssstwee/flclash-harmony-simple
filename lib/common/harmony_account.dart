@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -21,8 +22,7 @@ const harmonyConfigVersionPath = '/v1/config/version';
 const harmonyConfigMaxBytes = 1024 * 1024;
 
 /// Reuses flutter_secure_storage_ohos via its documented MethodChannel.
-/// Pin: pubspec.yaml git ref 545fb022eed8ce7891028d4851a617b9a8328177 — changing
-/// the plugin or channel name requires updating HarmonySessionStore together.
+/// Pin: pubspec.yaml git ref 545fb022eed8ce7891028d4851a617b9a8328177.
 class HarmonySessionStore {
   static const _channel = MethodChannel(
     'plugins.it_nomads.com/flutter_secure_storage',
@@ -30,18 +30,21 @@ class HarmonySessionStore {
   static const _tokenKey = 'harmony_session';
   static const _metaKey = 'harmony_session_meta';
   static const _lastModifiedKey = 'harmony_config_lm';
+  static const _configCacheKey = 'harmony_config_cache';
   static const _etagKey = 'harmony_config_etag';
   static const _configVersionKey = 'harmony_config_version';
   static const _reconnectKey = 'harmony_vpn_reconnect';
   static const _configRefreshKey = 'harmony_config_refresh_sec';
   static const _minCheckKey = 'harmony_config_min_check_sec';
 
-  Future<String?> read() => _channel.invokeMethod<String>('read', _arguments(_tokenKey));
+  Future<String?> read() =>
+      _channel.invokeMethod<String>('read', _arguments(_tokenKey));
 
   Future<void> write(String value) =>
       _channel.invokeMethod<void>('write', _arguments(_tokenKey, value));
 
-  Future<void> delete() => _channel.invokeMethod<void>('delete', _arguments(_tokenKey));
+  Future<void> delete() =>
+      _channel.invokeMethod<void>('delete', _arguments(_tokenKey));
 
   Future<String?> readMeta() =>
       _channel.invokeMethod<String>('read', _arguments(_metaKey));
@@ -120,15 +123,39 @@ class HarmonySessionStore {
   Future<void> deleteMinCheckSeconds() =>
       _channel.invokeMethod<void>('delete', _arguments(_minCheckKey));
 
+  Future<String?> readConfigCache() =>
+      _channel.invokeMethod<String>('read', _arguments(_configCacheKey));
+
+  Future<void> writeConfigCache(String value) =>
+      _channel.invokeMethod<void>('write', _arguments(_configCacheKey, value));
+
+  Future<void> deleteConfigCache() =>
+      _channel.invokeMethod<void>('delete', _arguments(_configCacheKey));
+
   Future<void> clearAll() async {
-    await delete();
-    await deleteMeta();
-    await deleteConfigLastModified();
-    await deleteConfigEtag();
-    await deleteConfigVersion();
-    await deleteReconnectOnLaunch();
-    await deleteConfigRefreshSeconds();
-    await deleteMinCheckSeconds();
+    Object? failure;
+    StackTrace? failureStack;
+    for (final remove in [
+      delete,
+      deleteMeta,
+      deleteConfigLastModified,
+      deleteConfigCache,
+      deleteConfigEtag,
+      deleteConfigVersion,
+      deleteReconnectOnLaunch,
+      deleteConfigRefreshSeconds,
+      deleteMinCheckSeconds,
+    ]) {
+      try {
+        await remove();
+      } catch (error, stack) {
+        failure ??= error;
+        failureStack ??= stack;
+      }
+    }
+    if (failure != null) {
+      Error.throwWithStackTrace(failure, failureStack!);
+    }
   }
 
   Map<String, Object?> _arguments(String key, [String? value]) => {
@@ -163,13 +190,82 @@ class HarmonySession {
   };
 
   static HarmonySession? fromJson(String? raw, String tokenFallback) {
-    if (raw == null || raw.isEmpty) return null;
+    if (raw == null || raw.isEmpty || tokenFallback.isEmpty) {
+      return null;
+    }
     try {
       final data = jsonDecode(raw) as Map<String, dynamic>;
-      final expiresAt = DateTime.tryParse('${data['expiresAt']}');
-      final username = '${data['username']}';
-      if (expiresAt == null || username.isEmpty) return null;
+      final username = data['username'];
+      final expiry = data['expiresAt'];
+      if (data['token'] != tokenFallback ||
+          username is! String ||
+          username.trim().isEmpty ||
+          expiry is! String) {
+        return null;
+      }
+      final expiresAt = DateTime.tryParse(expiry);
+      if (expiresAt == null) {
+        return null;
+      }
       return HarmonySession(tokenFallback, username, expiresAt);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+/// Describes bytes that have already been validated and durably installed.
+/// A response validator alone never proves that a usable profile exists.
+class HarmonyConfigCacheMetadata {
+  final String username;
+  final int profileId;
+  final String contentHash;
+  final String? etag;
+  final String? lastModified;
+
+  const HarmonyConfigCacheMetadata({
+    required this.username,
+    required this.profileId,
+    required this.contentHash,
+    this.etag,
+    this.lastModified,
+  });
+
+  Map<String, Object?> toJson() => {
+    'username': username,
+    'profileId': profileId,
+    'contentHash': contentHash,
+    'etag': etag,
+    'lastModified': lastModified,
+  };
+
+  static HarmonyConfigCacheMetadata? fromJson(String? raw) {
+    if (raw == null) {
+      return null;
+    }
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final username = data['username'];
+      final profileId = data['profileId'];
+      final hash = data['contentHash'];
+      final etag = data['etag'];
+      final lastModified = data['lastModified'];
+      if (username is! String ||
+          username.trim().isEmpty ||
+          profileId is! int ||
+          hash is! String ||
+          !RegExp(r'^[a-f0-9]{64}$').hasMatch(hash) ||
+          (etag != null && etag is! String) ||
+          (lastModified != null && lastModified is! String)) {
+        return null;
+      }
+      return HarmonyConfigCacheMetadata(
+        username: username,
+        profileId: profileId,
+        contentHash: hash,
+        etag: etag as String?,
+        lastModified: lastModified as String?,
+      );
     } catch (_) {
       return null;
     }
@@ -178,16 +274,16 @@ class HarmonySession {
 
 class HarmonyConfigDownload {
   final Uint8List? bytes;
-  final String? lastModified;
   final String? etag;
+  final String? lastModified;
   final String? configVersion;
   final bool notModified;
   final Duration? profileUpdateInterval;
 
   const HarmonyConfigDownload({
     this.bytes,
-    this.lastModified,
     this.etag,
+    this.lastModified,
     this.configVersion,
     this.notModified = false,
     this.profileUpdateInterval,
@@ -198,6 +294,9 @@ class HarmonyAccountApi {
   final Dio _http;
   final HarmonySessionStore _storage;
   HarmonySession? session;
+  int _generation = 0;
+  bool _restoreBlocked = false;
+  Future<void> _storageTail = Future<void>.value();
 
   /// When set (VPN running), config fetches retry via local mixed port after a direct failure.
   int? localMixedProxyPort;
@@ -220,83 +319,211 @@ class HarmonyAccountApi {
 
   bool get isAuthorized => session?.expiresAt.isAfter(DateTime.now()) == true;
 
-  Future<String?> readConfigLastModified() => _storage.readConfigLastModified();
+  // Serialize persistence only. Network requests never hold the storage queue,
+  // so logout can invalidate an in-flight login/restore immediately.
+  Future<T> _store<T>(Future<T> Function() action) {
+    final result = _storageTail.then((_) => action());
+    _storageTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    return result;
+  }
 
-  Future<String?> readConfigEtag() => _storage.readConfigEtag();
+  void _checkGeneration(int generation) {
+    if (_generation != generation) {
+      throw HarmonyAccountError.expired;
+    }
+  }
 
-  Future<String?> readConfigVersion() => _storage.readConfigVersion();
+  Future<String?> readConfigLastModified() =>
+      _store(_storage.readConfigLastModified);
 
-  Future<bool> readReconnectOnLaunch() => _storage.readReconnectOnLaunch();
+  Future<String?> readConfigEtag() => _store(_storage.readConfigEtag);
+
+  Future<String?> readConfigVersion() => _store(_storage.readConfigVersion);
+
+  Future<bool> readReconnectOnLaunch() => _store(_storage.readReconnectOnLaunch);
 
   Future<void> setReconnectOnLaunch(bool value) =>
-      _storage.writeReconnectOnLaunch(value);
+      _store(() => _storage.writeReconnectOnLaunch(value));
 
   Future<Duration> readConfigRefreshInterval({
     Duration fallback = const Duration(hours: 24),
   }) async {
-    final seconds = await _storage.readConfigRefreshSeconds();
+    final seconds = await _store(_storage.readConfigRefreshSeconds);
     if (seconds == null || seconds <= 0) return fallback;
     return Duration(seconds: seconds);
   }
 
   Future<Duration> readMinCheckInterval() async {
-    final seconds = await _storage.readMinCheckSeconds();
+    final seconds = await _store(_storage.readMinCheckSeconds);
     return harmonyMinCheckIntervalFromSeconds(seconds);
   }
 
   Future<void> saveConfigRefreshInterval(Duration interval) {
     final seconds = interval.inSeconds;
-    if (seconds <= 0) return _storage.deleteConfigRefreshSeconds();
-    return _storage.writeConfigRefreshSeconds(seconds);
+    if (seconds <= 0) {
+      return _store(_storage.deleteConfigRefreshSeconds);
+    }
+    return _store(() => _storage.writeConfigRefreshSeconds(seconds));
   }
 
   Future<void> saveMinCheckInterval(Duration interval) {
     final seconds = interval.inSeconds;
-    if (seconds <= 0) return _storage.deleteMinCheckSeconds();
-    return _storage.writeMinCheckSeconds(seconds);
+    if (seconds <= 0) {
+      return _store(_storage.deleteMinCheckSeconds);
+    }
+    return _store(() => _storage.writeMinCheckSeconds(seconds));
   }
 
-  Future<HarmonySession?> restore() async {
-    final token = await _storage.read();
-    if (token == null || token.isEmpty) {
-      session = null;
+  Future<HarmonyConfigCacheMetadata?> readConfigCache() async {
+    final current = session;
+    if (current == null || !isAuthorized) {
       return null;
     }
+    final raw = await _store(_storage.readConfigCache);
+    if (session?.token != current.token || !isAuthorized) {
+      return null;
+    }
+    final metadata = HarmonyConfigCacheMetadata.fromJson(raw);
+    return metadata?.username == current.username ? metadata : null;
+  }
+
+  Future<void> commitConfigCache(
+    HarmonyConfigCacheMetadata metadata, {
+    required String expectedToken,
+  }) async {
+    final generation = _generation;
+    await _store(() async {
+      _checkGeneration(generation);
+      if (!isAuthorized ||
+          session?.token != expectedToken ||
+          session?.username != metadata.username) {
+        throw HarmonyAccountError.expired;
+      }
+      await _storage.writeConfigCache(jsonEncode(metadata.toJson()));
+      _checkGeneration(generation);
+    });
+  }
+
+  Future<void> clearConfigCache() => _store(() async {
     try {
-      return await _validate(token);
+      await _storage.deleteConfigCache();
+    } finally {
+      await _storage.deleteConfigLastModified();
+    }
+  });
+
+  Future<HarmonySession?> restore() async {
+    if (_restoreBlocked) {
+      return null;
+    }
+    final generation = _generation;
+    String? token;
+    try {
+      token = await _store(_storage.read);
+      _checkGeneration(generation);
+      if (token == null || token.isEmpty) {
+        session = null;
+        return null;
+      }
+      final value = await _validate(token);
+      _checkGeneration(generation);
+      await _store(() async {
+        _checkGeneration(generation);
+        await _storage.writeMeta(jsonEncode(value.toJson()));
+      });
+      _checkGeneration(generation);
+      return session = value;
     } on HarmonyAccountError catch (error) {
-      if (error == HarmonyAccountError.expired) await clear();
-      if (error == HarmonyAccountError.unavailable) {
-        final cached = HarmonySession.fromJson(await _storage.readMeta(), token);
+      _checkGeneration(generation);
+      if (error == HarmonyAccountError.expired) {
+        try {
+          await clear();
+        } catch (_) {
+          // In-memory authorization is already gone even if storage is broken.
+        }
+      } else if (error == HarmonyAccountError.unavailable && token != null) {
+        String? raw;
+        try {
+          raw = await _store(_storage.readMeta);
+        } catch (_) {
+          _checkGeneration(generation);
+          session = null;
+          throw HarmonyAccountError.unavailable;
+        }
+        _checkGeneration(generation);
+        final cached = HarmonySession.fromJson(raw, token);
         if (cached != null && cached.expiresAt.isAfter(DateTime.now())) {
           return session = cached;
         }
+        session = null;
       }
       rethrow;
+    } catch (_) {
+      _checkGeneration(generation);
+      session = null;
+      throw HarmonyAccountError.unavailable;
     }
   }
 
   Future<HarmonySession> login(String username, String password) async {
-    final response = await _request(
-      '/api/auth/sign-in/username',
-      method: 'POST',
-      data: {'username': username.trim(), 'password': password},
-      login: true,
-    );
-    final token = response.headers.value('set-auth-token');
-    if (token == null || token.isEmpty) throw HarmonyAccountError.unavailable;
-    final value = await _validate(token);
+    final generation = ++_generation;
+    _restoreBlocked = true;
+    session = null;
+    String? issuedToken;
     try {
-      await _storage.write(token);
-      await _storage.writeMeta(jsonEncode(value.toJson()));
-      if (await _storage.read() != token) {
+      await _store(() async {
+        _checkGeneration(generation);
+        await _storage.clearAll();
+      });
+      _checkGeneration(generation);
+      final response = await _request(
+        '/api/auth/sign-in/username',
+        method: 'POST',
+        data: {'username': username.trim(), 'password': password},
+        login: true,
+      );
+      final token = issuedToken = response.headers.value('set-auth-token');
+      _checkGeneration(generation);
+      if (token == null || token.isEmpty) {
         throw HarmonyAccountError.unavailable;
       }
-    } catch (_) {
-      session = null;
+      final value = await _validate(token);
+      _checkGeneration(generation);
+      await _store(() async {
+        _checkGeneration(generation);
+        await _storage.write(token);
+        await _storage.writeMeta(jsonEncode(value.toJson()));
+        if (await _storage.read() != token) {
+          throw HarmonyAccountError.unavailable;
+        }
+      });
+      _checkGeneration(generation);
+      _restoreBlocked = false;
+      return session = value;
+    } catch (error) {
+      if (_generation == generation) {
+        try {
+          await clear();
+        } catch (_) {}
+      }
+      if (issuedToken != null && issuedToken.isNotEmpty) {
+        try {
+          await _request(
+            '/api/auth/sign-out',
+            method: 'POST',
+            data: {},
+            token: issuedToken,
+          );
+        } catch (_) {}
+      }
+      if (error is HarmonyAccountError) {
+        rethrow;
+      }
       throw HarmonyAccountError.unavailable;
     }
-    return value;
   }
 
   Future<HarmonySession> _validate(String token) async {
@@ -305,17 +532,15 @@ class HarmonyAccountApi {
     if (data is! Map || data['session'] is! Map || data['user'] is! Map) {
       throw HarmonyAccountError.expired;
     }
+    final username = data['user']['username'];
     final expiresAt = DateTime.tryParse('${data['session']['expiresAt']}');
-    if (expiresAt == null || !expiresAt.isAfter(DateTime.now())) {
+    if (expiresAt == null ||
+        !expiresAt.isAfter(DateTime.now()) ||
+        username is! String ||
+        username.trim().isEmpty) {
       throw HarmonyAccountError.expired;
     }
-    final value = session = HarmonySession(
-      token,
-      '${data['user']['username']}',
-      expiresAt,
-    );
-    await _storage.writeMeta(jsonEncode(value.toJson()));
-    return value;
+    return HarmonySession(token, username, expiresAt);
   }
 
   /// Lightweight version probe (GET only). Returns null when the server has no `/version` route.
@@ -345,77 +570,105 @@ class HarmonyAccountApi {
   /// Conditional GET (never HEAD). Returns true when config is unchanged (304).
   Future<bool> probeConfigNotModified() async {
     final download = await downloadConfig(
-      ifModifiedSince: await _storage.readConfigLastModified(),
-      ifNoneMatch: await _storage.readConfigEtag(),
+      ifModifiedSince: await readConfigLastModified(),
+      ifNoneMatch: await readConfigEtag(),
     );
     return download.notModified;
   }
 
   Future<HarmonyConfigDownload> downloadConfig({
-    String? ifModifiedSince,
     String? ifNoneMatch,
+    String? ifModifiedSince,
   }) async {
-    if (!isAuthorized) throw HarmonyAccountError.expired;
+    if (!isAuthorized) {
+      throw HarmonyAccountError.expired;
+    }
+    final token = session!.token;
+    final generation = _generation;
     final response = await _request(
       harmonyConfigPath,
-      token: session!.token,
+      token: token,
       responseType: ResponseType.stream,
       headers: {
-        if (ifModifiedSince != null && ifModifiedSince.isNotEmpty)
-          'If-Modified-Since': ifModifiedSince,
         if (ifNoneMatch != null && ifNoneMatch.isNotEmpty)
           'If-None-Match': ifNoneMatch,
+        if (ifModifiedSince != null && ifModifiedSince.isNotEmpty)
+          'If-Modified-Since': ifModifiedSince,
       },
     );
+    _checkGeneration(generation);
+    if (session?.token != token || !isAuthorized) {
+      throw HarmonyAccountError.expired;
+    }
     if (response.statusCode == 304) {
       final etag = response.headers.value('etag');
       final version = response.headers.value('x-config-version');
-      if (etag != null && etag.isNotEmpty) {
-        await _storage.writeConfigEtag(etag);
-      }
-      if (version != null && version.isNotEmpty) {
-        await _storage.writeConfigVersion(version);
-      }
+      await _store(() async {
+        if (etag != null && etag.isNotEmpty) {
+          await _storage.writeConfigEtag(etag);
+        }
+        if (version != null && version.isNotEmpty) {
+          await _storage.writeConfigVersion(version);
+        }
+      });
       return HarmonyConfigDownload(
         notModified: true,
+        etag: etag ?? ifNoneMatch ?? await readConfigEtag(),
         lastModified:
             response.headers.value('last-modified') ??
             ifModifiedSince ??
-            await _storage.readConfigLastModified(),
-        etag: etag ?? await _storage.readConfigEtag(),
-        configVersion: version ?? await _storage.readConfigVersion(),
+            await readConfigLastModified(),
+        configVersion: version ?? await readConfigVersion(),
         profileUpdateInterval: null,
       );
     }
-    final stream = response.data as ResponseBody;
+    final stream = response.data;
+    if (stream is! ResponseBody) {
+      throw HarmonyAccountError.config;
+    }
     final builder = BytesBuilder(copy: false);
     var length = 0;
-    await for (final chunk in stream.stream) {
-      length += chunk.length;
-      if (length > harmonyConfigMaxBytes) {
-        throw HarmonyAccountError.config;
+    try {
+      await for (final chunk in stream.stream) {
+        _checkGeneration(generation);
+        length += chunk.length;
+        if (length > harmonyConfigMaxBytes) {
+          throw HarmonyAccountError.config;
+        }
+        builder.add(chunk);
       }
-      builder.add(chunk);
+    } on HarmonyAccountError {
+      rethrow;
+    } catch (_) {
+      throw HarmonyAccountError.unavailable;
+    }
+    _checkGeneration(generation);
+    if (session?.token != token || !isAuthorized) {
+      throw HarmonyAccountError.expired;
     }
     final bytes = builder.takeBytes();
-    if (bytes.isEmpty) throw HarmonyAccountError.config;
+    if (bytes.isEmpty) {
+      throw HarmonyAccountError.config;
+    }
     final lastModified = response.headers.value('last-modified');
-    if (lastModified != null && lastModified.isNotEmpty) {
-      await _storage.writeConfigLastModified(lastModified);
-    }
     final etag = response.headers.value('etag');
-    if (etag != null && etag.isNotEmpty) {
-      await _storage.writeConfigEtag(etag);
-    }
     final configVersion = response.headers.value('x-config-version');
-    if (configVersion != null && configVersion.isNotEmpty) {
-      await _storage.writeConfigVersion(configVersion);
-    }
     final headerInterval = response.headers.value('profile-update-interval');
+    await _store(() async {
+      if (lastModified != null && lastModified.isNotEmpty) {
+        await _storage.writeConfigLastModified(lastModified);
+      }
+      if (etag != null && etag.isNotEmpty) {
+        await _storage.writeConfigEtag(etag);
+      }
+      if (configVersion != null && configVersion.isNotEmpty) {
+        await _storage.writeConfigVersion(configVersion);
+      }
+    });
     return HarmonyConfigDownload(
       bytes: Uint8List.fromList(bytes),
-      lastModified: lastModified,
       etag: etag,
+      lastModified: lastModified,
       configVersion: configVersion,
       profileUpdateInterval: profileUpdateIntervalFromHeader(headerInterval),
     );
@@ -430,7 +683,6 @@ class HarmonyAccountApi {
     } catch (error, stackTrace) {
       storageFailure = error;
       storageStackTrace = stackTrace;
-      session = null;
     }
     if (token != null) {
       try {
@@ -445,17 +697,18 @@ class HarmonyAccountApi {
       }
     }
     if (storageFailure != null) {
-      Error.throwWithStackTrace(
-        storageFailure,
-        storageStackTrace ?? StackTrace.current,
-      );
+      Error.throwWithStackTrace(storageFailure, storageStackTrace!);
     }
   }
 
-  Future<void> clear() async {
+  Future<void> clear() {
+    ++_generation;
+    // A broken keystore must not silently sign this process back in. Only a
+    // subsequent successful explicit login lifts this barrier.
+    _restoreBlocked = true;
     session = null;
     versionEndpointSupported = null;
-    await _storage.clearAll();
+    return _store(_storage.clearAll);
   }
 
   Future<Response<dynamic>> _request(
@@ -607,7 +860,9 @@ class HarmonyAccountApi {
           method: method,
           responseType: responseType,
           validateStatus: (status) =>
-              status != null && (status >= 200 && status < 300 || status == 304),
+              status != null &&
+              (status >= 200 && status < 300 ||
+                  path == harmonyConfigPath && status == 304),
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
             ...?headers,

@@ -31,7 +31,9 @@ class System {
 
   bool get isLinux => Platform.isLinux;
 
-  bool get isOhos => Platform.isOhos;
+  // The host flutter_tester may use the upstream runtime even when the
+  // compiler SDK exposes fork-only getters. The OS identifier works on both.
+  bool get isOhos => Platform.operatingSystem == 'ohos';
 
   Future<int> get version async {
     final deviceInfo = await DeviceInfoPlugin().deviceInfo;
@@ -437,3 +439,4 @@ class MacOS {
 }
 
 final macOS = system.isMacOS ? MacOS() : null;
+

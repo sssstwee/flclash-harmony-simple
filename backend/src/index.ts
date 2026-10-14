@@ -1,7 +1,7 @@
 import { createAuth } from './auth';
 import {
   DEFAULT_MIN_CHECK_SECONDS,
-  configContentMeta,
+  configRowMeta,
   etagMatches,
 } from './config_meta';
 
@@ -34,13 +34,13 @@ function failure(code: string, status: number) {
   return Response.json({ code }, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-async function configHeaders(content: string, updatedAt: string) {
-  const meta = await configContentMeta(content);
+async function configHeaders(config: ConfigRow) {
+  const meta = await configRowMeta(config);
   return {
     'Content-Type': 'application/yaml; charset=utf-8',
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff',
-    'Last-Modified': new Date(updatedAt).toUTCString(),
+    'Last-Modified': new Date(config.updated_at).toUTCString(),
     ETag: meta.etag,
     'X-Config-Version': meta.version,
   };
@@ -132,43 +132,6 @@ function auditConfigFetch(
   );
 }
 
-async function notModifiedResponse(content: string, updatedAt: string) {
-  const meta = await configContentMeta(content);
-  return new Response(null, {
-    status: 304,
-    headers: {
-      'Cache-Control': 'private, no-store',
-      'Last-Modified': new Date(updatedAt).toUTCString(),
-      ETag: meta.etag,
-      'X-Config-Version': meta.version,
-    },
-  });
-}
-
-async function isConfigUnchanged(
-  config: ConfigRow,
-  request: Request,
-): Promise<boolean> {
-  const meta = await configContentMeta(config.content);
-  const ifNoneMatch = request.headers.get('If-None-Match');
-  if (ifNoneMatch && etagMatches(ifNoneMatch, meta.etag)) {
-    return true;
-  }
-  const ifModifiedSince = request.headers.get('If-Modified-Since');
-  if (ifModifiedSince) {
-    const serverSec = Math.floor(new Date(config.updated_at).getTime() / 1000);
-    const clientSec = Math.floor(new Date(ifModifiedSince).getTime() / 1000);
-    if (
-      !Number.isNaN(clientSec) &&
-      !Number.isNaN(serverSec) &&
-      serverSec <= clientSec
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
 type AuthorizedConfig =
   | { ok: true; session: { user: { id: string } }; config: ConfigRow }
   | { ok: false; response: Response };
@@ -217,7 +180,7 @@ export default {
         const loaded = await loadAuthorizedConfig(request, env);
         if (!loaded.ok) return loaded.response;
         const { config } = loaded;
-        const meta = await configContentMeta(config.content);
+        const meta = await configRowMeta(config);
         const updatedUnix = Math.floor(new Date(config.updated_at).getTime() / 1000);
         return Response.json(
           {
@@ -245,16 +208,18 @@ export default {
       const allowed = await allowConfigFetch(env.DB, session.user.id);
       if (!allowed) return failure('RATE_LIMITED', 429);
 
-      if (await isConfigUnchanged(config, request)) {
-        return notModifiedResponse(config.content, config.updated_at);
-      }
-
+      const meta = await configRowMeta(config);
+      const headers = await configHeaders(config);
       const clientIp = request.headers.get('cf-connecting-ip');
       auditConfigFetch(ctx, env.DB, session.user.id, config.scope, config.scope_key, clientIp);
 
-      return new Response(config.content, {
-        headers: await configHeaders(config.content, config.updated_at),
-      });
+      // Date-only clients get a full response: even a later Last-Modified date
+      // cannot prove that the previously selected scope/content is unchanged.
+      if (etagMatches(request.headers.get('If-None-Match'), meta.etag)) {
+        return new Response(null, { status: 304, headers });
+      }
+
+      return new Response(config.content, { headers });
     } catch (error) {
       console.error(
         JSON.stringify({ event: 'request_failed', type: error instanceof Error ? error.name : 'unknown' }),

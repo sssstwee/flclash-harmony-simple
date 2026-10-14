@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -13,8 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class SimpleDashboardView extends ConsumerStatefulWidget {
-  final HarmonyAccountApi? accountApi;
-  const SimpleDashboardView({super.key, this.accountApi});
+  const SimpleDashboardView({super.key});
 
   @override
   ConsumerState<SimpleDashboardView> createState() =>
@@ -35,6 +33,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(harmonySimpleProvider.notifier).bootstrap();
     });
     _sessionTimer = Timer.periodic(
@@ -116,7 +115,12 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
         );
       },
     );
-    if (selected == null || groupName == null) return;
+    if (!mounted || selected == null || groupName == null) return;
+    if (ref.read(currentProfileProvider)?.id != profile?.id ||
+        ref.read(harmonySimpleProvider).busy ||
+        !ref.read(isStartProvider)) {
+      return;
+    }
     await ref
         .read(proxiesActionProvider.notifier)
         .changeProxy(groupName: groupName, proxyName: selected);
@@ -177,10 +181,14 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   issue: ui.issue,
                   showReconnectHint: !running,
                   onToggle: ready && !ui.bootstrapping
-                      ? () => ref.read(harmonySimpleProvider.notifier).toggleConnect()
+                      ? () => ref
+                            .read(harmonySimpleProvider.notifier)
+                            .toggleConnect()
                       : null,
-                  onLogout: () => ref.read(harmonySimpleProvider.notifier).logout(),
-                  onRetry: () => ref.read(harmonySimpleProvider.notifier).retryConnect(),
+                  onLogout: () =>
+                      ref.read(harmonySimpleProvider.notifier).logout(),
+                  onRetry: () =>
+                      ref.read(harmonySimpleProvider.notifier).retryConnect(),
                   onSwitchNode: running ? _showNodeSwitcher : null,
                   configFreshness: ui.homeStatus.configFreshness,
                   onConfigRefresh: () => ref

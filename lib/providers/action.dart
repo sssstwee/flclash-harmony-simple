@@ -200,7 +200,11 @@ class SetupAction extends _$SetupAction {
     }
   }
 
-  Future<void> updateStatus(bool isStart, {bool isInit = false}) async {
+  Future<void> updateStatus(
+    bool isStart, {
+    bool isInit = false,
+    bool profileApplied = false,
+  }) async {
     if (isStart && system.isOhos && !harmonyAccount.isAuthorized) return;
     if (isStart) {
       if (!isInit) {
@@ -215,12 +219,16 @@ class SetupAction extends _$SetupAction {
         globalState.needInitStatus = false;
         ref.read(runTimeProvider.notifier).value = 0;
         try {
-          await applyProfile(
-            force: true,
-            preloadInvoke: () async {
-              await _handleStart();
-            },
-          );
+          if (profileApplied) {
+            await _handleStart();
+          } else {
+            await applyProfile(
+              force: true,
+              preloadInvoke: () async {
+                await _handleStart();
+              },
+            );
+          }
         } catch (_) {
           ref.read(runTimeProvider.notifier).value = null;
         }
@@ -867,8 +875,8 @@ class ProfilesAction extends _$ProfilesAction {
   }
 
   Future<void> deleteProfile(int id) async {
-    ref.read(profilesProvider.notifier).del(id);
-    clearEffect(id);
+    await ref.read(profilesProvider.notifier).delAndWait(id);
+    await clearEffect(id);
     final currentProfileId = ref.read(currentProfileIdProvider);
     if (currentProfileId == id) {
       final profiles = ref.read(profilesProvider);
@@ -899,8 +907,8 @@ class ProfilesAction extends _$ProfilesAction {
     }
   }
 
-  void putProfile(Profile profile) {
-    ref.read(profilesProvider.notifier).put(profile);
+  Future<void> putProfile(Profile profile) async {
+    await ref.read(profilesProvider.notifier).putAndWait(profile);
     if (ref.read(currentProfileIdProvider) != null) return;
     ref.read(currentProfileIdProvider.notifier).value = profile.id;
   }

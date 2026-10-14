@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/atomic_profile.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
@@ -211,26 +212,12 @@ extension ProfileExtension on Profile {
   }
 
   Future<Profile> saveFile(Uint8List bytes) async {
-    final path = await appPath.tempFilePath;
-    final tempFile = File(path);
-    await tempFile.safeWriteAsBytes(bytes);
-    final message = await coreController.validateConfig(path);
-    if (message.isNotEmpty) {
-      throw message;
-    }
-    final mFile = await file;
-    await tempFile.copy(mFile.path);
-    await tempFile.safeDelete();
+    final destination = await _getFile(false);
+    await replaceProfileFile(destination, bytes, coreController.validateConfig);
     return copyWith(lastUpdateDate: DateTime.now());
   }
 
   Future<Profile> saveFileWithPath(String path) async {
-    final message = await coreController.validateConfig(path);
-    if (message.isNotEmpty) {
-      throw message;
-    }
-    final mFile = await file;
-    await File(path).copy(mFile.path);
-    return copyWith(lastUpdateDate: DateTime.now());
+    return saveFile(await File(path).readAsBytes());
   }
 }
