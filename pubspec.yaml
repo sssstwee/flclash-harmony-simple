@@ -1,7 +1,7 @@
 name: fl_clash
 description: 小猫AI代理 / Xiaomao AI Proxy, a multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.
 publish_to: 'none'
-version: 0.8.94+2026101502
+version: 0.8.94+2026101501
 environment:
   sdk: '>=3.8.0 <4.0.0'
 
