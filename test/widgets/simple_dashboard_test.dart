@@ -97,7 +97,7 @@ void main() {
     (tester) async {
       final api = SignedOutApi();
       await renderLogin(tester, api);
-      expect(find.text('Clash Harmony'), findsOneWidget);
+      expect(find.text('小猫AI代理'), findsOneWidget);
       expect(find.byType(TextFormField), findsNWidgets(2));
       expect(find.text('导入订阅'), findsNothing);
       expect(find.text('连接'), findsNothing);
