@@ -33,6 +33,8 @@
 
 推送到 `main` 或手动运行 Actions 的 **Clash Harmony** 工作流，会检查服务端类型和认证测试，并依次安装应用依赖、静态检查、运行全部 Flutter 测试、编译鸿蒙 Go 内核并构建 HAP / APP。构建产物与 SHA-256 校验文件保存在对应运行的 Artifacts 中，保留 14 天。
 
+本自动适应修复的独立分支 `dot/harmony-auto-adapt-20261014-0519` 首轮 PR 检查只做验证，不打包。只有同一提交首轮完整验证成功后，明确重跑该 PR 的 build 作业或提供成功验证记录手动运行，才允许独立构建；其他修复分支不参与。包名包含 `dot-harmony-auto-adapt` 和提交短 SHA，随附完整提交、验证/打包执行次数及校验和，便于与并行实现区分。
+
 工作流沿用上游 CI 的 SDK 和工具链，输出未签名 HAP。安装前需要使用与 `com.follow.clash.simple` 对应、包含目标手机 UDID 的 HarmonyOS 调试证书和 profile 签名；证书、私钥和订阅链接不得提交进公开仓库。真机的 VPN 授权仍需设备所有者完成。
 
 Profile 的 ACL 授权需包含 `ohos.permission.KEEP_BACKGROUND_RUNNING_SYSTEM`，以支持手机后台任务。简洁版移除了分应用选择及旧媒体访问的权限声明。

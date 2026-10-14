@@ -6,6 +6,22 @@ on:
   pull_request:
     branches: [main, codex/harmony-audit-fixes-github]
   workflow_dispatch:
+    inputs:
+      package:
+        description: 'Build isolated unsigned dot packages after exact-head validation'
+        type: boolean
+        required: false
+        default: false
+      expected_sha:
+        description: 'Full dot branch commit SHA for this manual run'
+        type: string
+        required: false
+        default: ''
+      validation_run_id:
+        description: 'Successful exact-head validation-only run ID'
+        type: string
+        required: false
+        default: ''
 
 concurrency:
   group: harmony-simple-${{ github.ref }}
@@ -20,6 +36,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source snapshot
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - name: Check for committed secrets
         run: bash .github/scripts/check-no-secrets.sh
 
@@ -33,6 +55,12 @@ jobs:
       app: ${{ steps.filter.outputs.app }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source snapshot
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -53,6 +81,12 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify source snapshot
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -72,7 +106,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: recursive
+      - name: Verify source snapshot
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
       - name: Set up Go for isolated unit tests
         uses: actions/setup-go@v5
         with:
@@ -82,21 +121,13 @@ jobs:
         with:
           node-version: '24'
       - name: Test network observer and VPN lifecycle with in-memory APIs
-        run: node --test ../test/native/*.cjs
+        run: |
+          node --test ../test/native/*.cjs ../test/ci/*.cjs
+          python3 -m unittest discover -s ../test/ci -p 'test_*.py'
       - name: Format native recovery sources
         run: gofmt -w lib.go hub.go common.go constant.go network_recovery.go network_dns_*.go health.go health_test.go internal/recovery/*.go
-      - name: Report formatted native sources during implementation
-        if: always() && github.head_ref == 'dot/harmony-auto-adapt-20261014-0519'
-        run: |
-          python3 - <<'PYGEN'
-          import base64, json, pathlib, subprocess
-          root = pathlib.Path('..')
-          paths = subprocess.check_output(['git', 'diff', '--name-only', '-z'], cwd=root).decode().split('\0')
-          for name in paths:
-              path = root / name
-              if name.startswith('core/') and name.endswith('.go') and path.is_file():
-                  print('GENERATED_SOURCE ' + json.dumps({'path': name, 'base64': base64.b64encode(path.read_bytes()).decode()}))
-          PYGEN
+      - name: Check native formatting
+        run: git diff --exit-code -- .
       - name: Test bounded native recovery with race detection
         run: GO111MODULE=off go test -race ./internal/recovery
       - name: Compile shared core integration for host tests
@@ -105,19 +136,40 @@ jobs:
         run: go test .
 
   build:
-    needs: [changes, backend, secrets-scan]
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+    needs: [changes, backend, secrets-scan, native-tests]
     if: |
       !cancelled() &&
       needs.changes.result == 'success' &&
       needs.secrets-scan.result == 'success' &&
       (needs.backend.result == 'success' || needs.backend.result == 'skipped') &&
+      (needs.native-tests.result == 'success' || needs.native-tests.result == 'skipped') &&
       (github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           submodules: recursive
+      - name: Verify source snapshot
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+
+      - name: Validate isolated packaging request
+        id: package_gate
+        uses: actions/github-script@v7
+        env:
+          REQUEST_PACKAGE: ${{ inputs.package }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          VALIDATION_RUN_ID: ${{ inputs.validation_run_id }}
+        with:
+          script: |
+            await require('./.github/scripts/dot-package-gate.cjs')({github, context, core, env: process.env});
 
       - name: Load pinned gitcode SHAs
         run: grep -v '^#' .github/harmony-pinned-shas.env >> "$GITHUB_ENV"
@@ -163,26 +215,10 @@ jobs:
 
       - name: Generate Dart sources
         run: |
-          dart format lib/common/atomic_profile.dart lib/common/app_localizations.dart lib/state.dart lib/views/tools.dart test/common/atomic_profile_test.dart lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart lib/common/default_routing.dart lib/common/task.dart lib/common/harmony_recovery.dart lib/application.dart lib/manager/app_manager.dart lib/core/controller.dart lib/core/interface.dart lib/views/dashboard/widgets/simple_connection.dart test/common/default_routing_test.dart test/common/harmony_recovery_test.dart test/providers/proxy_recovery_test.dart test/core/harmony_health_interface_test.dart
+          dart format lib/common/atomic_profile.dart lib/common/app_localizations.dart lib/state.dart lib/views/tools.dart test/common/atomic_profile_test.dart lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart lib/common/default_routing.dart lib/common/task.dart lib/common/harmony_recovery.dart lib/application.dart lib/manager/app_manager.dart lib/core/controller.dart lib/core/interface.dart lib/views/dashboard/widgets/simple_connection.dart test/common/default_routing_test.dart test/common/harmony_recovery_test.dart test/providers/proxy_recovery_test.dart test/core/harmony_health_interface_test.dart lib/common/compute.dart test/common/harmony_proxy_resolution_test.dart
           dart run intl_utils:generate
           dart run build_runner build --delete-conflicting-outputs
           dart run tool/generate_app_icon.dart
-
-      - name: Report regenerated sources during implementation
-        if: always() && github.head_ref == 'dot/harmony-auto-adapt-20261014-0519'
-        run: |
-          python3 - <<'PYGEN'
-          import base64, json, pathlib, subprocess
-          paths = subprocess.check_output(['git', 'diff', '--name-only', '-z']).decode().split('\0')
-          for name in paths:
-              path = pathlib.Path(name)
-              if name and path.is_file() and (name.startswith(('lib/', 'test/', 'tool/')) or name.endswith('.png')):
-                  print('GENERATED_SOURCE ' + json.dumps({'path': name, 'base64': base64.b64encode(path.read_bytes()).decode()}))
-          PYGEN
-
-      - name: Check generated files on other branches
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
-        run: git diff --exit-code
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
@@ -190,15 +226,18 @@ jobs:
       - name: Test
         run: flutter test --reporter expanded
 
+      - name: Check generated files
+        run: git diff --exit-code
+
       - name: Set up Go bootstrap
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
+        if: steps.package_gate.outputs.enabled == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
       - name: Set up HarmonyOS Go
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
+        if: steps.package_gate.outputs.enabled == 'true'
         run: |
           set -euo pipefail
           OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
@@ -215,15 +254,35 @@ jobs:
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
+        if: steps.package_gate.outputs.enabled == 'true'
         env:
           CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
+          DOT_ISOLATED: ${{ steps.package_gate.outputs.isolated }}
+          EXPECTED_SHA: ${{ steps.package_gate.outputs.sha }}
+          APP_ENV: stable
         run: |
           set -euo pipefail
-          API_URL="${CLASH_HARMONY_API_URL:-https://auth.example.com}"
+          if [[ "$DOT_ISOLATED" == true ]]; then
+            test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+            git diff --exit-code
+            API_URL="${CLASH_HARMONY_API_URL:-}"
+            rm -rf dist
+          else
+            API_URL="${CLASH_HARMONY_API_URL:-https://auth.example.com}"
+          fi
           cp env.json.example env.json
           API_URL="$API_URL" python3 - <<'PY'
           import json, os
+          from urllib.parse import urlsplit
+          if os.environ.get('DOT_ISOLATED') == 'true':
+              url = urlsplit(os.environ['API_URL'])
+              host = (url.hostname or '').lower()
+              if (url.scheme != 'https' or not host or url.username or url.password or
+                  url.query or url.fragment or url.path not in ('', '/') or
+                  host in ('localhost', 'example.com', 'example.org', 'example.net',
+                           'your-public-https-api-origin') or
+                  host.endswith(('.example.com', '.example.org', '.example.net', '.invalid', '.localhost'))):
+                  raise SystemExit('Configure a real public HTTPS CLASH_HARMONY_API_URL origin before packaging.')
           with open("env.json") as f:
               data = json.load(f)
           data["CLASH_HARMONY_API_URL"] = os.environ["API_URL"]
@@ -234,17 +293,32 @@ jobs:
           dart setup.dart ohos --env stable -v
 
       - name: Checksums
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
+        if: steps.package_gate.outputs.enabled == 'true'
+        env:
+          DOT_ISOLATED: ${{ steps.package_gate.outputs.isolated }}
+          EXPECTED_SHA: ${{ steps.package_gate.outputs.sha }}
+          SOURCE_SHA: ${{ steps.package_gate.outputs.sha }}
+          SOURCE_REF: ${{ steps.package_gate.outputs.source_ref }}
+          VALIDATION_RUN_ID: ${{ steps.package_gate.outputs.validation_run_id }}
+          VALIDATION_ATTEMPT: ${{ steps.package_gate.outputs.validation_attempt }}
+          PACKAGE_ATTEMPT: ${{ steps.package_gate.outputs.package_attempt }}
         run: |
-          cd dist
-          find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          set -euo pipefail
+          if [[ "$DOT_ISOLATED" == true ]]; then
+            test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+            python3 .github/scripts/stage-dot-package.py
+            (cd dot-package && sha256sum --check SHA256SUMS)
+          else
+            cd dist
+            find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          fi
 
       - name: Upload packages
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
+        if: steps.package_gate.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: Clash-Harmony-HarmonyOS-${{ github.sha }}
-          path: dist/
+          name: ${{ steps.package_gate.outputs.artifact }}
+          path: ${{ steps.package_gate.outputs.upload_path }}
           if-no-files-found: error
           retention-days: 14
 

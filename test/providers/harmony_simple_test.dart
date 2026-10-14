@@ -1200,7 +1200,8 @@ void main() {
         expect(
           harness.events.where((event) => event == 'health-Harmony Auto'),
           hasLength(1),
-          reason: 'Verify the native managed root exactly once, never a leaf alias',
+          reason:
+              'Verify the native managed root exactly once, never a leaf alias',
         );
         expect(
           harness.events.indexOf('refresh-managed'),
@@ -1212,5 +1213,4 @@ void main() {
       },
     );
   }
-
 }

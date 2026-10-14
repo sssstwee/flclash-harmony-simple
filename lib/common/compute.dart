@@ -61,22 +61,28 @@ SelectedProxyState getRealSelectedProxyState(
   required List<Group> groups,
   required Map<String, String> selectedMap,
 }) {
-  if (state.proxyName.isEmpty) return state;
-  final index = groups.indexWhere((element) => element.name == state.proxyName);
-  final newState = state.copyWith(group: true);
-  if (index == -1) return newState;
-  final group = groups[index];
-  final currentSelectedName = group.getCurrentSelectedName(
-    selectedMap[newState.proxyName] ?? '',
-  );
-  if (currentSelectedName.isEmpty) {
-    return newState;
+  var current = state;
+  final visited = <String>{};
+  while (true) {
+    if (current.proxyName.isEmpty) return current;
+    final newState = current.copyWith(group: true);
+    // Provider names can collide with static group names in a core snapshot.
+    // Keep the unresolved group state rather than following a self/cyclic now.
+    if (!visited.add(current.proxyName)) return newState;
+    final index = groups.indexWhere(
+      (element) => element.name == current.proxyName,
+    );
+    if (index == -1) return newState;
+    final group = groups[index];
+    final currentSelectedName = group.getCurrentSelectedName(
+      selectedMap[newState.proxyName] ?? '',
+    );
+    if (currentSelectedName.isEmpty) return newState;
+    current = newState.copyWith(
+      proxyName: currentSelectedName,
+      testUrl: group.testUrl,
+    );
   }
-  return getRealSelectedProxyState(
-    newState.copyWith(proxyName: currentSelectedName, testUrl: group.testUrl),
-    groups: groups,
-    selectedMap: selectedMap,
-  );
 }
 
 SelectedProxyState computeRealSelectedProxyState(
@@ -103,8 +109,7 @@ DelayState computeProxyDelayState({
     groups: groups,
     selectedMap: selectedMap,
   );
-  final currentDelayMap =
-      delayMap[state.testUrl.takeFirstValid([testUrl])] ?? {};
+  final currentDelayMap = delayMap[state.testUrl.takeFirstValid([testUrl])] ?? {};
   final delay = currentDelayMap[state.proxyName];
   return DelayState(delay: delay ?? 0, group: state.group);
 }

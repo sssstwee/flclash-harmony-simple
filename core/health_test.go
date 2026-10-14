@@ -210,26 +210,43 @@ func TestProviderCollisionCannotHideManagedRuleTarget(t *testing.T) {
 	static := tunnel.Proxies()
 	provider := &memoryProvider{proxies: []constant.Proxy{colliding}}
 	tunnel.UpdateProxies(static, map[string]P.ProxyProvider{"memory": provider})
-	if tunnel.AllProxies()[group.Name()] != colliding { t.Fatal("fixture did not reproduce provider overlay") }
-	if managedRecoveryGroup() != group { t.Fatal("provider leaf hid managed group discovery") }
+	if tunnel.AllProxies()[group.Name()] != colliding {
+		t.Fatal("fixture did not reproduce provider overlay")
+	}
+	if managedRecoveryGroup() != group {
+		t.Fatal("provider leaf hid managed group discovery")
+	}
 	root := appProxies()[group.Name()]
-	if root.Adapter() != group { t.Fatal("named lookup differs from actual rule routing") }
-	if handleGetProxies().Proxies[group.Name()].Adapter() != group { t.Fatal("UI proxy view hid static group") }
+	if root.Adapter() != group {
+		t.Fatal("named lookup differs from actual rule routing")
+	}
+	if handleGetProxies().Proxies[group.Name()].Adapter() != group {
+		t.Fatal("UI proxy view hid static group")
+	}
 	_, err := probeHealthWithTransport(context.Background(), root, recovery.ManagedTestURL,
 		func(selected constant.Proxy, _ *constant.Metadata) (http.RoundTripper, error) {
-			if selected != colliding { t.Fatal("strict probe lost actual selected leaf identity") }
+			if selected != colliding {
+				t.Fatal("strict probe lost actual selected leaf identity")
+			}
 			return memoryRoundTripper(func(request *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 204, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("")), Request: request}, nil
 			}), nil
 		})
-	if err != nil { t.Fatal(err) }
-	if !refreshManagedGroup(context.Background()) || colliding.tests != 1 { t.Fatal("colliding managed group did not refresh") }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !refreshManagedGroup(context.Background()) || colliding.tests != 1 {
+		t.Fatal("colliding managed group did not refresh")
+	}
 	result := make(chan string, 1)
 	handleChangeProxy(`{"group-name":"Managed Test","proxy-name":""}`, func(value string) { result <- value })
 	select {
 	case message := <-result:
-		if message != "" { t.Fatalf("selector lookup targeted provider leaf: %s", message) }
-	case <-time.After(2 * time.Second): t.Fatal("selector lookup did not finish")
+		if message != "" {
+			t.Fatalf("selector lookup targeted provider leaf: %s", message)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("selector lookup did not finish")
 	}
 }
 
@@ -241,7 +258,11 @@ func TestStaticDirectWinsProviderNameAndReturnedMapIsIndependent(t *testing.T) {
 	static := map[string]constant.Proxy{group.Name(): tunnel.Proxies()[group.Name()], "DIRECT": direct}
 	tunnel.UpdateProxies(static, map[string]P.ProxyProvider{"memory": &memoryProvider{proxies: []constant.Proxy{shadow}}})
 	view := appProxies()
-	if view["DIRECT"] != direct { t.Fatal("domestic DIRECT lookup was shadowed by a provider") }
+	if view["DIRECT"] != direct {
+		t.Fatal("domestic DIRECT lookup was shadowed by a provider")
+	}
 	delete(view, "DIRECT")
-	if tunnel.Proxies()["DIRECT"] != direct { t.Fatal("application view mutated static registry") }
+	if tunnel.Proxies()["DIRECT"] != direct {
+		t.Fatal("application view mutated static registry")
+	}
 }
