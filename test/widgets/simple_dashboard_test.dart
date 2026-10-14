@@ -183,7 +183,20 @@ void main() {
             ),
           ),
         );
+        await tester.pump();
         await tester.pump(const Duration(milliseconds: 400));
+        final scrollable = find.descendant(
+          of: find.byType(SimpleConnectionPanel),
+          matching: find.byType(Scrollable),
+        );
+        if (scrollable.evaluate().isNotEmpty) {
+          await tester.scrollUntilVisible(
+            primaryFilledButton,
+            120,
+            scrollable: scrollable.first,
+          );
+        }
+        expect(primaryFilledButton, findsOneWidget);
         final busy =
             phase == ConnectionPhase.connecting ||
             phase == ConnectionPhase.disconnecting;
