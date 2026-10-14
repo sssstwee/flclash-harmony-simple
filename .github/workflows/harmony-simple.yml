@@ -208,7 +208,7 @@ jobs:
           GIT_CONFIG_COUNT: '1'
           GIT_CONFIG_KEY_0: http.version
           GIT_CONFIG_VALUE_0: HTTP/1.1
-        run: flutter pub get
+        run: flutter pub get --enforce-lockfile
 
       - name: Install icon renderer
         run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
@@ -266,6 +266,8 @@ jobs:
             test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
             git diff --exit-code
             API_URL="${CLASH_HARMONY_API_URL:-}"
+            flutter pub get --enforce-lockfile
+            git diff --exit-code -- pubspec.lock
             rm -rf dist
           else
             API_URL="${CLASH_HARMONY_API_URL:-https://auth.example.com}"
@@ -291,6 +293,9 @@ jobs:
               f.write("\n")
           PY
           dart setup.dart ohos --env stable -v
+          if [[ "$DOT_ISOLATED" == true ]]; then
+            git diff --exit-code -- pubspec.lock
+          fi
 
       - name: Checksums
         if: steps.package_gate.outputs.enabled == 'true'
