@@ -21,15 +21,16 @@ export async function syncConfig(args, dependencies = {}) {
   try {
     if (typeof secrets?.SUBSCRIPTION_URL !== 'string') throw new Error();
     subscription = new URL(secrets.SUBSCRIPTION_URL);
-    if (!['http:', 'https:'].includes(subscription.protocol) || subscription.username || subscription.password) throw new Error();
+    if (subscription.protocol !== 'https:' || subscription.username || subscription.password) throw new Error();
   } catch {
-    throw new Error('SUBSCRIPTION_URL must be an HTTP(S) URL without embedded login credentials.');
+    throw new Error('SUBSCRIPTION_URL must be an HTTPS URL without embedded login credentials.');
   }
   const chunks = [];
   let size = 0;
   try {
     const response = await (dependencies.fetch ?? fetch)(subscription, {
       headers: { 'User-Agent': 'XiaomaoAIProxy/1.0' },
+      redirect: 'error',
       signal: AbortSignal.timeout(30_000),
     });
     if (!response.ok) throw new Error(`Subscription returned HTTP ${response.status}`);

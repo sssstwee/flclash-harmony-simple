@@ -180,6 +180,41 @@ test('private JSON, YAML and transport parse errors redact source snippets', asy
   ]) await assert.rejects(syncConfig(['private.json'], configDependencies(deps)), error => !error.message.includes('sensitive-fixture'));
 });
 
+test('HTTP subscriptions are rejected before any request or database mutation', async () => {
+  let requests = 0;
+  let mutations = 0;
+  const logs = [];
+  await assert.rejects(syncConfig(['private.json'], configDependencies({
+    readPrivateJson: async () => ({ SUBSCRIPTION_URL: 'http://example.org/private?token=sensitive-fixture' }),
+    fetch: async () => { requests++; },
+    executeSql: async () => { mutations++; },
+    log: value => logs.push(value),
+  })), { message: 'SUBSCRIPTION_URL must be an HTTPS URL without embedded login credentials.' });
+  assert.equal(requests, 0);
+  assert.equal(mutations, 0);
+  assert.deepEqual(logs, []);
+});
+
+test('subscription redirects fail without importing or exposing URLs and credentials', async () => {
+  let requests = 0;
+  let mutations = 0;
+  let redirectMode;
+  const logs = [];
+  await assert.rejects(syncConfig(['private.json'], configDependencies({
+    fetch: async (url, options) => {
+      requests++;
+      redirectMode = options.redirect;
+      throw new TypeError(`Redirect from ${url} to http://other.example.org/private?token=sensitive-fixture`);
+    },
+    executeSql: async () => { mutations++; },
+    log: value => logs.push(value),
+  })), { message: 'Could not download the subscription. Check its URL, connectivity, and the 30-second timeout.' });
+  assert.equal(requests, 1);
+  assert.equal(redirectMode, 'error');
+  assert.equal(mutations, 0);
+  assert.deepEqual(logs, []);
+});
+
 test('configuration import validates scope, source shape and SQL byte budget before mutation', async () => {
   let mutations = 0;
   const base = { executeSql: async () => { mutations++; } };
@@ -201,6 +236,11 @@ test('configuration import validates scope, source shape and SQL byte budget bef
 
 test('valid configuration is quoted and forwarded to the selected database scope', async () => {
   await syncConfig(['private.json', '--remote', '--scope=user', "--scope-key=fixture'user"], configDependencies({
+    fetch: async (url, options) => {
+      assert.equal(url.protocol, 'https:');
+      assert.equal(options.redirect, 'error');
+      return new Response("proxies:\n  - name: 'fixture'\n");
+    },
     executeSql: async (sql, options) => {
       assert.ok(sql.includes("fixture''user"));
       assert.ok(sql.includes("''fixture''"));

@@ -4,10 +4,16 @@
 
 ## 配置格式与发布
 
-编辑 `payload.example.json`；用 Node 内置模块打包，无需安装依赖：
+先复制示例到已被 Git 忽略的私有文件，再编辑其中的真实配置；不要把节点密码或订阅地址写入受跟踪的 `payload.example.json` 或 `config.example.json`：
 
 ```sh
-node backend/remote-config/package-config.mjs backend/remote-config/payload.example.json 2026-10-14.2 0.8.94+2026101206 > config.json
+cp backend/remote-config/payload.example.json private-config-payload.json
+```
+
+编辑 `private-config-payload.json` 后，用 Node 内置模块打包，无需安装依赖。输出文件同样被 Git 忽略：
+
+```sh
+node backend/remote-config/package-config.mjs private-config-payload.json 2026-10-14.2 0.8.94+2026101206 > private-config-envelope.json
 ```
 
 输出与 `config.example.json` 同格式。`schemaVersion=1`；`minClientVersion` 为三段版本，可含 `+build`。`payload` 是 JSON 字符串，`sha256` 校验它的原始 UTF-8 字节，不能在计算哈希后重排或改写字符串。客户端严格验证 HTTPS 证书、禁止重定向、限制下载 1 MiB、校验 SHA-256、版本门槛和字段白名单，再由内核验证配置。SHA-256 用于完整性检测，发布者身份依赖 HTTPS/账户服务；这不是独立数字签名。不得使用自签证书或关闭证书校验。
