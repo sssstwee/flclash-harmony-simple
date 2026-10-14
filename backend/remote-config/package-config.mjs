@@ -5,4 +5,4 @@ const [path, version, minClientVersion] = process.argv.slice(2);
 if (!path || !version || !minClientVersion) throw new Error('payload path, version and minimum client version required');
 const payload = JSON.stringify(JSON.parse(readFileSync(path, 'utf8')));
 process.stdout.write(JSON.stringify({ schemaVersion: 1, version, minClientVersion,
-  sha256: createHash('sha256').update(payload, 'utf8').digest('hex'), payload }, null, 2));
+  sha256: createHash('sha256').update(payload, 'utf8').digest('hex').toLowerCase(), payload }, null, 2));

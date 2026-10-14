@@ -34,3 +34,7 @@ node backend/remote-config/package-config.mjs backend/remote-config/payload.exam
 仍需打包：新增字段及其行为、其他页面的文案接线、新语言支持、页面布局和控件、业务逻辑/新功能、Flutter/Dart/原生代码、插件、VPN 权限和通知能力、内核或新协议、内置资源、API 根地址及信任机制。禁止把可执行代码作为配置下发。
 
 示例验证：`node --test backend/remote-config/worker.test.mjs`；客户端验证：`flutter test test/common/harmony_remote_config_test.dart test/providers/harmony_simple_test.dart`。
+
+## 生产实现（backend/src）
+
+正式 Worker 已内置本协议：可选 KV 绑定 `CONFIGS`，使用现有 better-auth 会话鉴权后按 `user:<username>` → `group:<config_group>` → `default` 查找信封；均不存在时回退到原 D1 YAML（旧客户端行为不变）。服务端在下发前再次校验信封字段、`minClientVersion` 格式和 `sha256`，不合法返回 503。`/v1/config` 返回 JSON 信封，`X-Config-Version` 等于信封 `version`，ETag 随 key/version/sha256/minClientVersion 变化，`If-None-Match` 命中返回 304；`/v1/config/version` 额外返回 `minClientVersion` 与 `sha256`。KV 元数据 `{"updatedAt": <unix秒>}` 可选，用于 `updated_at`/`Last-Modified`。注意：一旦写入 `default`，所有账户（含不支持 JSON 的旧客户端）都会收到 JSON。
