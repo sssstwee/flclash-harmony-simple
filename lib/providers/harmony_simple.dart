@@ -950,13 +950,6 @@ class HarmonySimple extends _$HarmonySimple {
     _versionCheckTimer = null;
   }
 
-  Profile? _findRemoteProfile() {
-    return ref
-        .read(profilesProvider)
-        .where((p) => p.url.isEmpty && p.label == appDisplayName)
-        .firstOrNull;
-  }
-
   Future<void> _cleanupOrphanRemoteProfiles(int operation) async {
     final metadata = await _api.readConfigCache();
     if (!ref.mounted || operation != _operation) {
