@@ -138,19 +138,22 @@ type AuthorizedConfig =
   | { ok: true; session: { user: { id: string } }; config: null; remote: RemoteConfigDocument }
   | { ok: false; response: Response };
 
-async function loadAuthorizedConfig(request: Request, env: Env): Promise<AuthorizedConfig> {
+type AuthenticatedUser = { session: { user: { id: string } }; username: string | null; configGroup: string | null };
+
+async function authenticate(request: Request, env: Env): Promise<AuthenticatedUser | null> {
   const auth = getAuth(env);
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user?.id) {
-    return { ok: false, response: failure('UNAUTHORIZED', 401) };
-  }
-
+  if (!session?.user?.id) return null;
   const configGroup = await env.DB.prepare('SELECT config_group FROM user WHERE id = ?')
     .bind(session.user.id)
     .first<{ config_group: string | null }>()
     .then(row => row?.config_group ?? null);
-
   const username = (session.user as { username?: string | null }).username ?? null;
+  return { session, username, configGroup };
+}
+
+async function loadConfigFor(user: AuthenticatedUser, env: Env): Promise<AuthorizedConfig> {
+  const { session, username, configGroup } = user;
   try {
     const remote = await loadRemoteConfig(env.CONFIGS, username, configGroup);
     if (remote) return { ok: true, session, config: null, remote };
@@ -189,7 +192,11 @@ export default {
       }
 
       if (path === '/v1/config/version' && request.method === 'GET') {
-        const loaded = await loadAuthorizedConfig(request, env);
+        // The lightweight poll endpoint stays outside the download quota (as before) so
+        // clients can keep checking cheaply; it is throttled via min_check_seconds.
+        const user = await authenticate(request, env);
+        if (!user) return failure('UNAUTHORIZED', 401);
+        const loaded = await loadConfigFor(user, env);
         if (!loaded.ok) return loaded.response;
         if (loaded.remote) {
           const { envelope, updatedAt } = loaded.remote;
@@ -226,12 +233,17 @@ export default {
         return failure('NOT_FOUND', 404);
       }
 
-      const loaded = await loadAuthorizedConfig(request, env);
+      const user = await authenticate(request, env);
+      if (!user) return failure('UNAUTHORIZED', 401);
+
+      // Enforce the download quota before any KV/D1 config read or hashing, including
+      // conditional requests, so over-limit accounts cannot consume storage reads or CPU.
+      const allowed = await allowConfigFetch(env.DB, user.session.user.id);
+      if (!allowed) return failure('RATE_LIMITED', 429);
+
+      const loaded = await loadConfigFor(user, env);
       if (!loaded.ok) return loaded.response;
       const { session } = loaded;
-
-      const allowed = await allowConfigFetch(env.DB, session.user.id);
-      if (!allowed) return failure('RATE_LIMITED', 429);
 
       if (loaded.remote) {
         const { remote } = loaded;

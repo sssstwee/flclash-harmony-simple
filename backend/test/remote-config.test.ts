@@ -1,7 +1,9 @@
 import { env, exports } from 'cloudflare:workers';
 import { hashPassword } from 'better-auth/crypto';
 import { createHash } from 'node:crypto';
-import { beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+
+afterEach(() => vi.restoreAllMocks());
 
 const password = 'Test-password-42!';
 const url = (path: string) => `${env.AUTH_ORIGIN}${path}`;
@@ -121,4 +123,23 @@ test('uppercase sha256 is served lowercase with a stable ETag', async () => {
   const lower = await request('/v1/config', { headers: { ...bearer(token), 'If-None-Match': etag } });
   expect(lower.status).toBe(304);
   expect(lower.headers.get('ETag')).toBe(etag);
+});
+
+test('over-limit accounts are refused before KV is read', async () => {
+  await kv().put('default', JSON.stringify(envelope('2026-10-14.4')));
+  const token = await login();
+  const spy = vi.spyOn(kv(), 'getWithMetadata');
+  const ok = await request('/v1/config', { headers: bearer(token) });
+  expect(ok.status).toBe(200);
+  await ok.text();
+  expect(spy).toHaveBeenCalled();
+  const etag = ok.headers.get('ETag')!;
+  spy.mockClear();
+  await env.DB.prepare('UPDATE config_api_rate_limit SET request_count = 30').run();
+  for (const headers of [bearer(token), { ...bearer(token), 'If-None-Match': etag }]) {
+    const limited = await request('/v1/config', { headers });
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({ code: 'RATE_LIMITED' });
+  }
+  expect(spy).not.toHaveBeenCalled();
 });
