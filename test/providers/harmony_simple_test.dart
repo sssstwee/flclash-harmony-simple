@@ -581,45 +581,51 @@ void main() {
     });
   }
 
-  test('label migration failure retains verified legacy offline cache', () async {
-    final harness = _Harness(
-      initial: [_profile().copyWith(label: legacyAppDisplayName)],
-    );
-    harness.cache();
-    harness.profiles.putFailure = StateError('database unavailable');
-    harness.api.downloads.add(HarmonyAccountError.unavailable);
+  test(
+    'label migration failure retains verified legacy offline cache',
+    () async {
+      final harness = _Harness(
+        initial: [_profile().copyWith(label: legacyAppDisplayName)],
+      );
+      harness.cache();
+      harness.profiles.putFailure = StateError('database unavailable');
+      harness.api.downloads.add(HarmonyAccountError.unavailable);
 
-    await harness.notifier.bootstrap();
+      await harness.notifier.bootstrap();
 
-    expect(harness.state.remoteProfile?.id, 7);
-    expect(harness.state.usingCachedConfig, isTrue);
-    expect(harness.state.error, isNull);
-    expect(harness.files.bytes[7], orderedEquals(_config));
-  });
+      expect(harness.state.remoteProfile?.id, 7);
+      expect(harness.state.usingCachedConfig, isTrue);
+      expect(harness.state.error, isNull);
+      expect(harness.files.bytes[7], orderedEquals(_config));
+    },
+  );
 
-  test('logout joins a pending legacy label migration before cleanup', () async {
-    final harness = _Harness(
-      initial: [_profile().copyWith(label: legacyAppDisplayName)],
-    );
-    harness.cache();
-    final entered = Completer<void>();
-    final release = Completer<void>();
-    harness.profiles.putHook = (_) async {
-      entered.complete();
-      await release.future;
-    };
-    final bootstrap = harness.notifier.bootstrap();
-    await entered.future;
-    final logout = harness.notifier.logout();
-    release.complete();
-    await Future.wait([bootstrap, logout]);
+  test(
+    'logout joins a pending legacy label migration before cleanup',
+    () async {
+      final harness = _Harness(
+        initial: [_profile().copyWith(label: legacyAppDisplayName)],
+      );
+      harness.cache();
+      final entered = Completer<void>();
+      final release = Completer<void>();
+      harness.profiles.putHook = (_) async {
+        entered.complete();
+        await release.future;
+      };
+      final bootstrap = harness.notifier.bootstrap();
+      await entered.future;
+      final logout = harness.notifier.logout();
+      release.complete();
+      await Future.wait([bootstrap, logout]);
 
-    expect(harness.state.session, isNull);
-    expect(harness.state.remoteProfile, isNull);
-    expect(harness.container.read(profilesProvider), isEmpty);
-    expect(harness.files.bytes, isEmpty);
-    expect(harness.api.requests, isEmpty);
-  });
+      expect(harness.state.session, isNull);
+      expect(harness.state.remoteProfile, isNull);
+      expect(harness.container.read(profilesProvider), isEmpty);
+      expect(harness.files.bytes, isEmpty);
+      expect(harness.api.requests, isEmpty);
+    },
+  );
 
   test(
     'missing cache retries an unsolicited 304 once without validators',
