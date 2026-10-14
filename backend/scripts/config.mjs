@@ -63,6 +63,7 @@ export async function syncConfig(args, dependencies = {}) {
     // YAML parser messages include source snippets, which can contain proxy credentials.
     throw new Error('Subscription is not valid YAML. Its contents were not logged.');
   }
+  await dependencies.validateContent?.(content, config);
   const providers = config?.['proxy-providers'];
   const hasProxies = Array.isArray(config?.proxies) && config.proxies.length > 0;
   const hasProviders = providers && typeof providers === 'object' && !Array.isArray(providers) && Object.keys(providers).length > 0;
