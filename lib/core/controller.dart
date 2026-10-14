@@ -208,6 +208,24 @@ class CoreController {
     return Delay.fromJson(json.decode(data));
   }
 
+  /// A native portal flag is evidence; failed HTTPS probes are not.
+  Future<({bool? connected, bool captivePortal})> getHarmonyNetworkState() async {
+    final data = json.decode(await _interface.getHarmonyNetworkState()) as Map;
+    return (
+      connected: data['connected'] as bool?,
+      captivePortal: data['captivePortal'] == true,
+    );
+  }
+
+  /// Refreshes the app-owned automatic group without changing existing flows.
+  Future<bool> refreshHarmonyHealth() => _interface.refreshHarmonyHealth();
+
+  /// Verifies HTTPS success independently from a positive latency sample.
+  Future<Delay> getHealthDelay(String url, String proxyName) async {
+    final data = await _interface.asyncHealthDelay(url, proxyName);
+    return Delay.fromJson(json.decode(data));
+  }
+
   Future<Map<String, dynamic>> getConfig(int id) async {
     final profilePath = await appPath.getProfilePath(id.toString());
     final res = await _interface.getConfig(profilePath);
@@ -285,3 +303,4 @@ class CoreController {
 }
 
 final coreController = CoreController();
+

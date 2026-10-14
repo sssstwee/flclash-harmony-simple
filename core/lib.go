@@ -48,6 +48,8 @@ func (th *TunHandler) start(fd int, stack, address, dns string) {
 	if tunListener != nil {
 		log.Infoln("TUN address: %v", tunListener.Address())
 		th.listener = tunListener
+		networkRecovery.SetEnabled(true)
+		networkRecovery.SetBackgroundActive(true)
 		return
 	}
 	th.clear()
@@ -135,6 +137,7 @@ var (
 )
 
 func handleStopTun() {
+	networkRecovery.SetEnabled(false)
 	tunLock.Lock()
 	defer tunLock.Unlock()
 	if tunHandler != nil {
@@ -156,6 +159,9 @@ func handleStartTun(callback unsafe.Pointer, fd int, stack, address, dns string)
 }
 
 func handleUpdateDns(value string) {
+	if handleNativeNetworkChange(value) {
+		return
+	}
 	go func() {
 		log.Infoln("[DNS] updateDns %s", value)
 		dns.UpdateSystemDNS(strings.Split(value, ","))
@@ -284,3 +290,4 @@ func forceGC() {
 func updateDns(s *C.char) {
 	handleUpdateDns(takeCString(s))
 }
+

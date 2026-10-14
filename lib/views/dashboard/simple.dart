@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/harmony_recovery.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -8,6 +10,38 @@ import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// A running native service is not proof that either route can reach the web.
+ConnectionPhase connectionPhaseFor(HarmonySimpleState ui, bool running) {
+  if (ui.busy && ui.disconnecting) {
+    return ConnectionPhase.disconnecting;
+  }
+  if (ui.busy && ui.health != HarmonyConnectionHealth.checking) {
+    return ConnectionPhase.connecting;
+  }
+  if (!running && !ui.connectionRequested) {
+    if (ui.health == HarmonyConnectionHealth.loginRequired) {
+      return ConnectionPhase.loginRequired;
+    }
+    return ui.error != null
+        ? ConnectionPhase.error
+        : ConnectionPhase.disconnected;
+  }
+  return switch (ui.health) {
+    HarmonyConnectionHealth.disconnected => ConnectionPhase.checking,
+    HarmonyConnectionHealth.checking => ConnectionPhase.checking,
+    HarmonyConnectionHealth.connected =>
+      running && ui.domesticHealthy == true && ui.foreignHealthy == true
+          ? ConnectionPhase.connected
+          : ConnectionPhase.checking,
+    HarmonyConnectionHealth.reconnecting => ConnectionPhase.reconnecting,
+    HarmonyConnectionHealth.degraded => ConnectionPhase.degraded,
+    HarmonyConnectionHealth.offline => ConnectionPhase.offline,
+    HarmonyConnectionHealth.captivePortal => ConnectionPhase.captivePortal,
+    HarmonyConnectionHealth.loginRequired => ConnectionPhase.loginRequired,
+    HarmonyConnectionHealth.noRoute => ConnectionPhase.noRoute,
+  };
+}
 
 class SimpleDashboardView extends ConsumerStatefulWidget {
   const SimpleDashboardView({super.key});
@@ -23,6 +57,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   final _username = TextEditingController();
   final _password = TextEditingController();
   Timer? _sessionTimer;
+  int _connectionRevision = 0;
 
   @override
   void initState() {
@@ -55,6 +90,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   }
 
   Future<void> _login() async {
+    final ui = ref.read(harmonySimpleProvider);
+    if (ui.busy || ui.bootstrapping || !ref.read(initProvider)) return;
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     final password = _password.text;
@@ -65,17 +102,21 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   }
 
   Future<void> _showNodeSwitcher() async {
+    final ui = ref.read(harmonySimpleProvider);
+    final token = ui.session?.token;
+    final revision = _connectionRevision;
+    if (token == null || ui.busy || !ui.actualConnected) return;
     final groups = ref.read(groupsProvider);
     final profile = ref.read(currentProfileProvider);
     final groupName = profile?.currentGroupName;
     final group = groups.getGroup(groupName ?? '');
     if (group == null || group.type != GroupType.Selector) return;
     if (!mounted) return;
-    final texts = context.appLocalizations;
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
       builder: (context) {
+        final texts = context.appLocalizations;
         return SafeArea(
           child: ListView(
             shrinkWrap: true,
@@ -88,8 +129,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                 ),
               ),
               for (final proxy in group.all)
-                if (proxy.type.toUpperCase() != 'DIRECT' &&
-                    !proxy.type.toUpperCase().startsWith('REJECT'))
+                if (isSafeProxyRoute(proxy, groups))
                   ListTile(
                     title: Text(proxy.name),
                     subtitle: Text(proxy.type),
@@ -101,17 +141,20 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
       },
     );
     if (!mounted || selected == null || groupName == null) return;
-    if (ref.read(currentProfileProvider)?.id != profile?.id ||
-        ref.read(harmonySimpleProvider).busy ||
+    final currentUi = ref.read(harmonySimpleProvider);
+    final currentProfile = ref.read(currentProfileProvider);
+    if (revision != _connectionRevision ||
+        currentProfile?.id != profile?.id ||
+        currentProfile?.currentGroupName != groupName ||
+        currentUi.session?.token != token ||
+        currentUi.busy ||
+        !currentUi.actualConnected ||
         !ref.read(isStartProvider)) {
       return;
     }
     await ref
-        .read(proxiesActionProvider.notifier)
-        .changeProxy(groupName: groupName, proxyName: selected);
-    ref
-        .read(profilesActionProvider.notifier)
-        .updateCurrentSelectedMap(groupName, selected);
+        .read(harmonySimpleProvider.notifier)
+        .switchNode(groupName, selected);
   }
 
   String? _activeNodeName() {
@@ -126,20 +169,22 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     return ref.watch(delayProvider(proxyName: proxyName));
   }
 
-  ConnectionPhase _phase(HarmonySimpleState ui, bool running) {
-    if (ui.error != null && !ui.busy && !running) {
-      return ConnectionPhase.error;
-    }
-    if (ui.busy) {
-      return ui.disconnecting
-          ? ConnectionPhase.disconnecting
-          : ConnectionPhase.connecting;
-    }
-    return running ? ConnectionPhase.connected : ConnectionPhase.disconnected;
-  }
-
   @override
   Widget build(BuildContext context) {
+    ref.listen(harmonySimpleProvider, (previous, next) {
+      if (previous?.connectionRequested != next.connectionRequested ||
+          previous?.session?.token != next.session?.token ||
+          previous?.health != next.health ||
+          previous?.busy != next.busy) {
+        _connectionRevision++;
+      }
+    });
+    ref.listen(currentProfileProvider, (previous, next) {
+      if (previous?.id != next?.id ||
+          previous?.currentGroupName != next?.currentGroupName) {
+        _connectionRevision++;
+      }
+    });
     final texts = context.appLocalizations;
     final ui = ref.watch(harmonySimpleProvider);
     final session = ui.session;
@@ -147,7 +192,16 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     final running = ref.watch(isStartProvider);
     final nodeName = _activeNodeName();
     final nodeDelay = _activeDelay(nodeName);
-    final phase = _phase(ui, running);
+    final phase = connectionPhaseFor(ui, running);
+    final error = ui.resolveError(texts);
+    final groups = ref.watch(groupsProvider);
+    final group = groups.getGroup(
+      ref.watch(currentProfileProvider)?.currentGroupName ?? '',
+    );
+    final canSwitchNode =
+        phase == ConnectionPhase.connected &&
+        group?.type == GroupType.Selector &&
+        group!.all.any((proxy) => isSafeProxyRoute(proxy, groups));
 
     return CommonScaffold(
       title: appDisplayName,
@@ -158,7 +212,11 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
               ? SimpleConnectionPanel(
                   phase: phase,
                   username: session.username,
-                  error: ui.error,
+                  error: error,
+                  busy: ui.busy || ui.bootstrapping,
+                  connectionRequested: ui.connectionRequested || running,
+                  domesticHealthy: ui.domesticHealthy,
+                  foreignHealthy: ui.foreignHealthy,
                   usingCachedConfig: ui.usingCachedConfig,
                   nodeName: nodeName,
                   nodeDelayMs: nodeDelay,
@@ -171,7 +229,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                       ref.read(harmonySimpleProvider.notifier).logout(),
                   onRetry: () =>
                       ref.read(harmonySimpleProvider.notifier).retryConnect(),
-                  onSwitchNode: running ? _showNodeSwitcher : null,
+                  onSwitchNode: canSwitchNode ? _showNodeSwitcher : null,
                 )
               : AutofillGroup(
                   child: Form(
@@ -244,10 +302,10 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                                 )
                               : Text(texts.harmonyLogin),
                         ),
-                        if (ui.error != null) ...[
+                        if (error != null) ...[
                           const SizedBox(height: 16),
                           Text(
-                            ui.error!,
+                            error,
                             textAlign: TextAlign.center,
                             style: TextStyle(color: context.colorScheme.error),
                           ),

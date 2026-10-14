@@ -1,137 +1,191 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 
-/// Uses the subscription's catch-all group without rewriting its routing rules.
+typedef AutomaticProxySelection = ({String name, Map<String, String> selections});
+
+bool _safeGroup(Group group, List<Group> groups, Set<String> visited) {
+  if (group.type == GroupType.Relay ||
+      group.name == GroupName.GLOBAL.name ||
+      group.all.isEmpty ||
+      visited.contains(group.name)) {
+    return false;
+  }
+  final nextVisited = {...visited, group.name};
+  return group.all.every((proxy) {
+    final nested = groups.getGroup(proxy.name);
+    if (nested != null) return _safeGroup(nested, groups, nextVisited);
+    return isHarmonyProxyLeaf(proxy.name, proxy.type);
+  });
+}
+
+/// Validates every branch in the current core snapshot. Empty providers,
+/// missing groups, cycles and unknown adapters fail closed. Harmony's generated
+/// group also enforces these constraints after future provider updates.
+bool isSafeProxyRoute(Proxy proxy, List<Group> groups) {
+  final nested = groups.getGroup(proxy.name);
+  if (nested != null) return _safeGroup(nested, groups, {});
+  return isHarmonyProxyLeaf(proxy.name, proxy.type);
+}
+
+/// Uses the first reachable catch-all, matching the core's rule order. Callers
+/// on HarmonyOS resolve effectiveHarmonyAutoGroupName from the raw profile.
 Group? connectionGroup(List<Group> groups, List<String> rules) {
-  for (final rule in rules.reversed) {
+  for (final rule in rules) {
     final parts = rule.split(',').map((part) => part.trim()).toList();
     if (parts.length >= 2 &&
-        (parts.first.toUpperCase() == 'MATCH' ||
-            parts.first.toUpperCase() == 'FINAL')) {
+        const {'MATCH', 'FINAL'}.contains(parts.first.toUpperCase())) {
       return groups.getGroup(parts[1]);
     }
   }
   for (final group in groups) {
     if (group.name != GroupName.GLOBAL.name &&
         group.hidden != true &&
-        group.all.any(
-          (proxy) =>
-              proxy.type.toUpperCase() != 'DIRECT' &&
-              !proxy.type.toUpperCase().startsWith('REJECT'),
-        )) {
+        group.type != GroupType.Relay &&
+        group.all.any((proxy) => isSafeProxyRoute(proxy, groups))) {
       return group;
     }
   }
   return null;
 }
 
-/// Returns only selector changes along the chosen route. Automatic groups keep
-/// their own health checks; DIRECT/REJECT and cyclic routes are never candidates.
-Future<({String name, Map<String, String> selections})?> autoSelectProxy(
+/// Returns selector changes only, never a fixed choice inside automatic groups.
+/// All work shares a 24-second deadline; cancellation stops new probes and drops
+/// late results. Warm using harmonyAutomaticTestUrl so the core sees leaf health.
+Future<AutomaticProxySelection?> autoSelectProxy(
   Group root,
   List<Group> groups,
-  Future<int?> Function(String name) measure,
-) async {
-  final candidates = <({String name, Map<String, String> selections})>[];
-  final automatic = <String>{};
+  Future<int?> Function(String name) measure, {
+  Future<void>? cancelled,
+  bool Function()? isCurrent,
+  bool warmAutomatic = true,
+}) async {
+  final candidates = <AutomaticProxySelection>[];
+  final automatic = <String, Group>{};
 
   void collect(Group group, Map<String, String> route, Set<String> visited) {
-    if (visited.contains(group.name)) return;
+    if (visited.contains(group.name) || group.type == GroupType.Relay) return;
     if (group.type != GroupType.Selector) {
-      if (group.type != GroupType.Relay) {
-        automatic.add(group.name);
+      if (_safeGroup(group, groups, visited)) {
+        automatic[group.name] = group;
         candidates.add((name: group.name, selections: route));
       }
       return;
     }
     final nextVisited = {...visited, group.name};
     for (final proxy in group.all) {
-      final type = proxy.type.toUpperCase();
-      if (type == 'DIRECT' ||
-          type.startsWith('REJECT') ||
-          proxy.name == 'DIRECT' ||
-          proxy.name.startsWith('REJECT')) {
-        continue;
-      }
       final selections = {...route, group.name: proxy.name};
       final nested = groups.getGroup(proxy.name);
       if (nested != null) {
         collect(nested, selections, nextVisited);
-      } else {
+      } else if (isHarmonyProxyLeaf(proxy.name, proxy.type)) {
         candidates.add((name: proxy.name, selections: selections));
       }
     }
   }
 
   collect(root, {}, {});
+  if (candidates.isEmpty || isCurrent?.call() == false) return null;
   final probes = <String, Future<int?>>{};
-  final deadline = Completer<void>();
-  var timedOut = false;
-  final timer = Timer(const Duration(seconds: 24), () {
-    timedOut = true;
-    deadline.complete();
-  });
+  final stopped = Completer<void>();
+  var finished = false;
+  void stop() {
+    if (!stopped.isCompleted) stopped.complete();
+  }
+
+  bool active() => !finished && !stopped.isCompleted && isCurrent?.call() != false;
+  final timer = Timer(const Duration(seconds: 24), stop);
+  cancelled?.then<void>((_) => stop(), onError: (Object _) => stop());
 
   Future<int?> delay(String name) {
-    if (timedOut) return Future<int?>.value();
+    if (!active()) return Future<int?>.value();
     return probes.putIfAbsent(name, () async {
       try {
-        return await Future.any<int?>([
-          Future<int?>.sync(
-            () => measure(name),
-          ).timeout(const Duration(seconds: 8)),
-          deadline.future.then<int?>((_) => null),
+        final value = await Future.any<int?>([
+          Future<int?>.sync(() => active() ? measure(name) : null)
+              .timeout(const Duration(seconds: 8)),
+          stopped.future.then<int?>((_) => null),
         ]);
+        return active() ? value : null;
       } catch (_) {
         return null;
       }
     });
   }
 
-  Future<({String name, Map<String, String> selections})?> select() async {
-    final automaticCandidates = candidates
-        .where((item) => automatic.contains(item.name))
-        .toList();
-    final manual = candidates
-        .where((item) => !automatic.contains(item.name))
-        .toList();
-    for (final candidateSet in [automaticCandidates, manual]) {
-      for (var offset = 0; offset < candidateSet.length; offset += 6) {
-        if (timedOut) return null;
-        final batch = candidateSet.skip(offset).take(6).toList();
-        final values = await Future.wait(
-          batch.map((candidate) => delay(candidate.name)),
-        );
-        if (timedOut) return null;
-        ({String name, Map<String, String> selections})? best;
-        var bestDelay = double.infinity;
-        for (var index = 0; index < batch.length; index++) {
-          final value = values[index];
-          if (value == null || value <= 0) continue;
-          if (automatic.contains(batch[index].name)) return batch[index];
-          if (value < bestDelay) {
-            best = batch[index];
-            bestDelay = value.toDouble();
-          }
+  List<String> leaves(Group group) {
+    final result = <String>{};
+    void visit(Group current) {
+      for (final proxy in current.all) {
+        final nested = groups.getGroup(proxy.name);
+        if (nested != null) {
+          visit(nested);
+        } else {
+          result.add(proxy.name);
         }
-        if (best != null) return best;
       }
+    }
+    // Only recursively validated, acyclic automatic groups reach this method.
+    visit(group);
+    return result.toList();
+  }
+
+  Future<bool> warm(Group group) async {
+    final names = leaves(group);
+    for (var offset = 0; offset < names.length; offset += 6) {
+      if (!active()) return false;
+      final values = await Future.wait(names.skip(offset).take(6).map(delay));
+      if (!active()) return false;
+      if (values.any((value) => value != null && value > 0)) return true;
+    }
+    return false;
+  }
+
+  Future<AutomaticProxySelection?> select() async {
+    // One automatic group at a time keeps warm-up fanout at six globally.
+    for (final candidate in candidates.where((item) => automatic.containsKey(item.name))) {
+      if (!active()) return null;
+      if (warmAutomatic && !await warm(automatic[candidate.name]!)) continue;
+      final value = await delay(candidate.name);
+      if (!active()) return null;
+      if (value != null && value > 0) return candidate;
+    }
+    final manual = candidates.where((item) => !automatic.containsKey(item.name)).toList();
+    for (var offset = 0; offset < manual.length; offset += 6) {
+      if (!active()) return null;
+      final batch = manual.skip(offset).take(6).toList();
+      final values = await Future.wait(batch.map((candidate) => delay(candidate.name)));
+      if (!active()) return null;
+      AutomaticProxySelection? best;
+      var bestDelay = double.infinity;
+      for (var index = 0; index < batch.length; index++) {
+        final value = values[index];
+        if (value != null && value > 0 && value < bestDelay) {
+          best = batch[index];
+          bestDelay = value.toDouble();
+        }
+      }
+      if (best != null) return best;
     }
     return null;
   }
 
   try {
-    // This deadline spans automatic and manual batches together. Merely
-    // checking a stopwatch between batches can overshoot by a full probe.
-    return await Future.any([
+    if (cancelled != null) {
+      // Observe a token cancelled before entry before starting any core probes.
+      await Future<void>.value();
+      if (!active()) return null;
+    }
+    final result = await Future.any<AutomaticProxySelection?>([
       select(),
-      deadline.future.then<({String name, Map<String, String> selections})?>(
-        (_) => null,
-      ),
+      stopped.future.then<AutomaticProxySelection?>((_) => null),
     ]);
+    return active() ? result : null;
   } finally {
+    finished = true;
     timer.cancel();
+    stop();
   }
 }

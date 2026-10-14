@@ -98,6 +98,9 @@ Future<VM2<String, String>> _makeRealProfileTask(
 ) async {
   final (data, isOhos) = params;
   final rawConfig = Map<String, dynamic>.from(data.rawConfig);
+  final subscriptionDns = Map<String, dynamic>.from(
+    rawConfig['dns'] as Map? ?? {},
+  );
   final realPatchConfig = data.realPatchConfig;
   final profilesPath = data.profilesPath;
   final profileId = data.profileId;
@@ -135,7 +138,9 @@ Future<VM2<String, String>> _makeRealProfileTask(
       ? FindProcessMode.off.name
       : realPatchConfig.findProcessMode.name;
   rawConfig['allow-lan'] = realPatchConfig.allowLan;
-  rawConfig['mode'] = realPatchConfig.mode.name;
+  // Harmony's one-click contract is always split routing; stale desktop mode
+  // preferences must not bypass the managed rules in the generated profile.
+  rawConfig['mode'] = isOhos ? Mode.rule.name : realPatchConfig.mode.name;
   if (rawConfig['tun'] == null) {
     rawConfig['tun'] = {};
   }
@@ -215,6 +220,28 @@ Future<VM2<String, String>> _makeRealProfileTask(
           entry.value.splitByMultipleSeparators;
     }
   }
+  if (isOhos) {
+    // Fill missing DNS defaults, preserving the subscription's complete resolver
+    // routing (respect-rules, fallback, split DNS, hosts and fake-IP exceptions).
+    // DNS itself must remain enabled for Harmony's VPN DNS hijacking.
+    final dns = Map<String, dynamic>.from(rawConfig['dns'] as Map);
+    for (final entry in subscriptionDns.entries) {
+      if (entry.key == 'enable') continue;
+      if (const {
+        'nameserver-policy',
+        'proxy-server-nameserver-policy',
+      }.contains(entry.key) && entry.value is Map) {
+        dns[entry.key] = {
+          ...Map<String, dynamic>.from(dns[entry.key] as Map? ?? {}),
+          ...Map<String, dynamic>.from(entry.value as Map),
+        };
+      } else {
+        dns[entry.key] = entry.value;
+      }
+    }
+    dns['enable'] = true;
+    rawConfig['dns'] = dns;
+  }
   if (appendSystemDns) {
     final List<String> nameserver = List<String>.from(
       rawConfig['dns']['nameserver'] ?? [],
@@ -226,9 +253,8 @@ Future<VM2<String, String>> _makeRealProfileTask(
   List<String> rules = [];
   if (isOhos || data.rules.isEmpty) {
     if (isOhos) {
-      excludeDirectFromAutomaticGroups(rawConfig);
-      rules = defaultRoutingRules(rawConfig);
-      applyDefaultDns(rawConfig);
+      applyHarmonyAutomaticRouting(rawConfig);
+      rules = List<String>.from(rawConfig['rules']);
     } else if (rawConfig['rules'] != null) {
       rules = List<String>.from(rawConfig['rules']);
     }

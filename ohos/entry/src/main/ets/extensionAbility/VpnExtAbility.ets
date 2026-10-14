@@ -80,7 +80,29 @@ export class ServiceStub extends rpc.RemoteObject {
   }
 }
 
+interface CoreRPCAction {
+  method: string
+  data: string
+}
+
+interface NetworkStateRequest {
+  'network-state'?: boolean
+}
+
+interface PendingServiceStart {
+  options: VpnOptions
+  runTime: number
+  remote: rpc.RemoteObject
+}
+
 export default class VpnExtAbility extends VpnExtensionAbility {
+  private serviceEpoch: number = 0
+  private destroyed: boolean = false
+  private starting: boolean = false
+  private stopping: boolean = false
+  private pendingStops: number = 0
+  private pendingStart: PendingServiceStart | undefined
+  private tunStarted: boolean = false
   private service: ServiceStub | undefined
   private vpnConnection: vpnExtension.VpnConnection | undefined
   private vpnId: string | undefined
@@ -94,12 +116,31 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     this.vpnConnection = vpnExtension.createVpnConnection(this.context)
     this.powerManager = new PowerManager()
     this.networkManager = new NetworkManager()
+    // Observe before first-connect preflight so portal evidence is available
+    // without creating a VPN. Core background recovery remains disabled.
+    this.observeNetwork()
+  }
+
+  private observeNetwork(): void {
+    this.networkManager?.subscribe(updateDns).catch(() => {
+      console.log("Network observer registration failed")
+    })
   }
 
   onDestroy(): void {
+    ++this.serviceEpoch
+    this.destroyed = true
+    if (this.pendingStart) this.sendResult(this.pendingStart.remote, 0)
+    this.pendingStart = undefined
+    if (this.tunStarted) stopTun()
+    this.tunStarted = false
+    this.vpnId = undefined
+    this.runTime = 0
     this.vpnConnection?.destroy()
     this.powerManager?.unsubscribe()
-    this.networkManager?.unsubscribe()
+    this.networkManager?.unsubscribe().catch((err: Error) => {
+      console.log("Network observer removal failed")
+    })
   }
 
   onConnect(want: Want): rpc.RemoteObject {
@@ -237,15 +278,49 @@ export default class VpnExtAbility extends VpnExtensionAbility {
   }
 
   handleInvokeAction(data: string, remote: rpc.RemoteObject): void {
+    try {
+      const action = JSON.parse(data) as CoreRPCAction
+      if (action.method === "asyncTestDelay") {
+        const request = JSON.parse(action.data) as NetworkStateRequest
+        if (request['network-state'] === true) {
+          this.observeNetwork()
+          const snapshot = this.networkManager?.refreshSnapshot() ?? Promise.resolve()
+          snapshot.catch(() => console.log("Network snapshot unavailable")).then(() => {
+            invokeAction((callbackData: string) => { this.sendCallback(remote, callbackData) }, data)
+          })
+          return
+        }
+      }
+    } catch (_) {
+      // Keep malformed-action handling at the existing core protocol boundary.
+    }
     invokeAction((callbackData: string) => { this.sendCallback(remote, callbackData) }, data)
   }
 
   handleStartService(vpnOptions: VpnOptions, runTime: number, remote: rpc.RemoteObject): void {
+    if (this.destroyed || this.runTime !== 0) {
+      this.sendResult(remote, this.runTime)
+      return
+    }
+    if (this.starting || this.stopping) {
+      if (this.pendingStart) this.sendResult(this.pendingStart.remote, 0)
+      this.pendingStart = { options: vpnOptions, runTime, remote }
+      return
+    }
+    const epoch = ++this.serviceEpoch
     if (vpnOptions.enable) {
+      this.starting = true
+      // Start/stop operations are serialized even if the platform's destroy is
+      // application-wide. A canceled create fully settles before another start.
+      const startingConnection = vpnExtension.createVpnConnection(this.context)
+      this.vpnConnection = startingConnection
       const vpnConfig = this.toVpnConfig(vpnOptions)
-      this.vpnConnection?.create(vpnConfig).then((fd: number) => {
+      startingConnection.create(vpnConfig).then((fd: number) => {
+        if (epoch !== this.serviceEpoch || this.destroyed) {
+          return startingConnection.destroy()
+        }
         startTUN(
-          (socketFd: number): Promise<void> => this.vpnConnection?.protect(socketFd).catch((err: Error) => {
+          (socketFd: number): Promise<void> => startingConnection.protect(socketFd).catch((err: Error) => {
             console.log(`Call protect failed <= ${err.message ?? err}`)
           }) ?? Promise.resolve(),
           (protocol: number, source: string, target: string, uid: number) => this.resolverProcess(protocol, source, target, uid),
@@ -254,34 +329,61 @@ export default class VpnExtAbility extends VpnExtensionAbility {
           this.toTunAddress(vpnOptions),
           this.toTunDns(vpnOptions),
         )
+        this.tunStarted = true
         if (deviceInfo.sdkApiVersion >= 20) {
-          this.vpnConnection?.generateVpnId().then((vpnId) => { this.vpnId = vpnId })
+          startingConnection.generateVpnId().then((vpnId) => {
+            if (epoch === this.serviceEpoch && !this.destroyed) this.vpnId = vpnId
+          }).catch(() => console.log("VPN identifier unavailable"))
         } else {
           this.vpnId = util.generateRandomUUID(true);
         }
         this.powerManager?.subscribe(suspend)
-        this.networkManager?.subscribe(updateDns)
+        this.observeNetwork()
         this.runTime = runTime !== 0 ? runTime : Date.now()
       }).catch((err: Error) => {
         console.log(`Call startTUN failed <= ${err.message ?? err}`)
       }).finally(() => {
-        this.sendResult(remote, this.runTime)
+        this.starting = false
+        this.sendResult(remote, epoch === this.serviceEpoch ? this.runTime : 0)
+        this.startPendingService()
       })
     } else {
       this.vpnId = undefined
       this.powerManager?.subscribe(suspend)
-      this.networkManager?.subscribe(updateDns)
+      this.observeNetwork()
       this.runTime = runTime !== 0 ? runTime : Date.now()
       this.sendResult(remote, this.runTime)
     }
   }
 
+  private startPendingService(): void {
+    if (this.destroyed || this.starting || this.stopping || !this.pendingStart) return
+    const pending = this.pendingStart
+    this.pendingStart = undefined
+    this.handleStartService(pending.options, pending.runTime, pending.remote)
+  }
+
   handleStopService(remote: rpc.RemoteObject): void {
-    if (this.vpnId) stopTun()
+    ++this.serviceEpoch
+    if (this.pendingStart) this.sendResult(this.pendingStart.remote, 0)
+    this.pendingStart = undefined
+    this.stopping = true
+    ++this.pendingStops
+    if (this.tunStarted) stopTun()
+    this.tunStarted = false
     this.vpnId = undefined
-    this.vpnConnection?.destroy()
+    const stopped = this.vpnConnection?.destroy() ?? Promise.resolve()
+    stopped.catch((err: Error) => {
+      console.log("VPN removal failed")
+    }).finally(() => {
+      --this.pendingStops
+      this.stopping = this.pendingStops > 0
+      this.startPendingService()
+    })
     this.powerManager?.unsubscribe()
-    this.networkManager?.unsubscribe()
+    // Keep physical-network evidence for the next preflight, while canceling
+    // every pending/in-flight automatic refresh for the stopped service.
+    updateDns(JSON.stringify({ kind: "recovery-stop" }))
     this.runTime = 0
     this.sendResult(remote, this.runTime)
   }
@@ -294,4 +396,5 @@ export default class VpnExtAbility extends VpnExtensionAbility {
     quickSetup((callbackData: string) => { this.sendCallback(remote, callbackData) }, initParams, setupParams)
   }
 }
+
 

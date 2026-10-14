@@ -108,7 +108,13 @@ class ApplicationState extends ConsumerState<Application> {
       child: CoreManager(
         child: ConnectivityManager(
           onConnectivityChanged: (results) async {
-            commonPrint.log('connectivityChanged ${results.toString()}');
+            if (system.isOhos) {
+              ref.read(harmonySimpleProvider.notifier).handleNetworkChanged(
+                connected: results.any((result) =>
+                    result != ConnectivityResult.none &&
+                    result != ConnectivityResult.vpn),
+              );
+            }
             ref.read(systemActionProvider.notifier).updateLocalIp();
             final hasVpn = results.contains(ConnectivityResult.vpn);
             if (_preHasVpn == hasVpn) {
@@ -196,3 +202,4 @@ class ApplicationState extends ConsumerState<Application> {
     super.dispose();
   }
 }
+

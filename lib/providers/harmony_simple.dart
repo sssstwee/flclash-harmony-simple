@@ -3,11 +3,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
+import 'package:fl_clash/common/harmony_recovery.dart';
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -15,13 +18,41 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show Provider;
 
+export 'package:fl_clash/common/harmony_recovery.dart'
+    show HarmonyConnectionHealth;
+
 part 'generated/harmony_simple.g.dart';
+
+enum HarmonySimpleError {
+  credentials, sessionExpired, rateLimited, config, service, noRoute, connectFailed,
+}
 
 class HarmonySimpleState {
   final bool bootstrapping;
   final bool busy;
   final bool disconnecting;
-  final String? error;
+  final String? _error;
+  final HarmonySimpleError? errorCause;
+  final HarmonyConnectionHealth health;
+  final bool connectionRequested;
+  final bool? domesticHealthy;
+  final bool? foreignHealthy;
+  final int recoveryAttempt;
+  final DateTime? nextRetryAt;
+
+  bool get actualConnected => health == HarmonyConnectionHealth.connected;
+  String? get error => resolveError(currentAppLocalizations);
+
+  String? resolveError(AppLocalizations localizations) => switch (errorCause) {
+    HarmonySimpleError.credentials => localizations.harmonyCredentialsError,
+    HarmonySimpleError.sessionExpired => localizations.harmonySessionExpired,
+    HarmonySimpleError.rateLimited => localizations.harmonyRateLimited,
+    HarmonySimpleError.config => localizations.harmonyConfigError,
+    HarmonySimpleError.service => localizations.harmonyServiceError,
+    HarmonySimpleError.noRoute => localizations.simpleNoRoute,
+    HarmonySimpleError.connectFailed => localizations.simpleConnectFailed,
+    null => _error,
+  };
   final bool usingCachedConfig;
   final Profile? remoteProfile;
   final HarmonySession? session;
@@ -30,17 +61,33 @@ class HarmonySimpleState {
     this.bootstrapping = true,
     this.busy = false,
     this.disconnecting = false,
-    this.error,
+    String? error,
+    this.errorCause,
+    this.health = HarmonyConnectionHealth.disconnected,
+    this.connectionRequested = false,
+    this.domesticHealthy,
+    this.foreignHealthy,
+    this.recoveryAttempt = 0,
+    this.nextRetryAt,
     this.usingCachedConfig = false,
     this.remoteProfile,
     this.session,
-  });
+  }) : _error = error;
 
   HarmonySimpleState copyWith({
     bool? bootstrapping,
     bool? busy,
     bool? disconnecting,
     String? error,
+    HarmonySimpleError? errorCause,
+    HarmonyConnectionHealth? health,
+    bool? connectionRequested,
+    bool? domesticHealthy,
+    bool? foreignHealthy,
+    bool clearHealthChecks = false,
+    int? recoveryAttempt,
+    DateTime? nextRetryAt,
+    bool clearNextRetry = false,
     bool clearError = false,
     bool? usingCachedConfig,
     Profile? remoteProfile,
@@ -52,7 +99,14 @@ class HarmonySimpleState {
       bootstrapping: bootstrapping ?? this.bootstrapping,
       busy: busy ?? this.busy,
       disconnecting: disconnecting ?? this.disconnecting,
-      error: clearError ? null : (error ?? this.error),
+      error: clearError ? null : (error ?? _error),
+      errorCause: clearError ? null : (errorCause ?? this.errorCause),
+      health: health ?? this.health,
+      connectionRequested: connectionRequested ?? this.connectionRequested,
+      domesticHealthy: clearHealthChecks ? null : (domesticHealthy ?? this.domesticHealthy),
+      foreignHealthy: clearHealthChecks ? null : (foreignHealthy ?? this.foreignHealthy),
+      recoveryAttempt: recoveryAttempt ?? this.recoveryAttempt,
+      nextRetryAt: clearNextRetry ? null : (nextRetryAt ?? this.nextRetryAt),
       usingCachedConfig: usingCachedConfig ?? this.usingCachedConfig,
       remoteProfile: clearRemoteProfile
           ? null
@@ -89,6 +143,17 @@ final harmonyCoreControllerProvider = Provider<CoreController>(
   (ref) => coreController,
 );
 
+/// Lets tests exercise the OHOS-generated routing contract without a device.
+final harmonyManagedRoutingProvider = Provider<bool>((ref) => system.isOhos);
+
+final harmonyConnectivityCheckProvider = Provider<Future<bool> Function()>(
+  (ref) => () async {
+    final results = await Connectivity().checkConnectivity();
+    return results.any((result) => result != ConnectivityResult.none &&
+        result != ConnectivityResult.vpn);
+  },
+);
+
 class _SupersededHarmonyOperation implements Exception {}
 
 @Riverpod(keepAlive: true)
@@ -100,6 +165,10 @@ class HarmonySimple extends _$HarmonySimple {
   HarmonyProfileStore get _files => ref.read(harmonyProfileStoreProvider);
   int _operation = 0;
   bool _restoring = false;
+  late HarmonyRecoveryCoordinator _recovery;
+  String? _runtimeGroupName;
+  bool _connectionIntentKnown = false;
+  int _lifecycleEpoch = 0;
   final _profileInstalls = <({Profile profile, Completer<void> done})>[];
 
   void _ensureCurrent(int operation, String token) {
@@ -119,7 +188,33 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   @override
-  HarmonySimpleState build() => const HarmonySimpleState();
+  HarmonySimpleState build() {
+    _recovery = HarmonyRecoveryCoordinator(
+      attempt: _recoverConnection,
+      onChanged: (snapshot) {
+        if (!ref.mounted) return;
+        state = state.copyWith(
+          health: snapshot.health,
+          connectionRequested: snapshot.connectionRequested,
+          domesticHealthy: snapshot.domesticHealthy,
+          foreignHealthy: snapshot.foreignHealthy,
+          clearHealthChecks: snapshot.domesticHealthy == null &&
+              snapshot.foreignHealthy == null,
+          recoveryAttempt: snapshot.recoveryAttempt,
+          nextRetryAt: snapshot.nextRetryAt,
+          clearNextRetry: snapshot.nextRetryAt == null,
+        );
+      },
+    );
+    ref.onDispose(_recovery.dispose);
+    ref.listen(isStartProvider, (previous, running) {
+      if (previous == true && !running &&
+          _recovery.snapshot.connectionRequested) {
+        _recovery.serviceStopped();
+      }
+    });
+    return const HarmonySimpleState();
+  }
 
   Future<void> bootstrap() async {
     if (_restoring || state.busy) {
@@ -148,17 +243,24 @@ class HarmonySimple extends _$HarmonySimple {
         if (error == HarmonyAccountError.expired) {
           await logout(expired: true);
         } else if (error != HarmonyAccountError.unavailable) {
-          state = state.copyWith(error: _message(error));
+          state = state.copyWith(errorCause: _errorCause(error));
         }
       }
     } catch (error) {
       if (operation == _operation && ref.mounted) {
-        state = state.copyWith(error: _message(error));
+        state = state.copyWith(errorCause: _errorCause(error));
       }
     } finally {
       _restoring = false;
       if (operation == _operation && ref.mounted) {
         state = state.copyWith(bootstrapping: false);
+        if (state.connectionRequested && state.remoteProfile != null) {
+          unawaited(_recovery.checkNow());
+        } else if (!_connectionIntentKnown && _api.session != null &&
+            state.remoteProfile != null && ref.read(isStartProvider)) {
+          _connectionIntentKnown = true;
+          unawaited(_recovery.connect());
+        }
       }
     }
   }
@@ -212,7 +314,7 @@ class HarmonySimple extends _$HarmonySimple {
         if (error == HarmonyAccountError.expired) {
           await logout(expired: true);
         } else {
-          state = state.copyWith(error: _message(error));
+          state = state.copyWith(errorCause: _errorCause(error));
         }
       }
     } finally {
@@ -224,6 +326,9 @@ class HarmonySimple extends _$HarmonySimple {
 
   Future<void> logout({bool expired = false}) async {
     final operation = ++_operation;
+    _connectionIntentKnown = true;
+    final recoveryStopped = _recovery.disconnect();
+    _runtimeGroupName = null;
     state = state.copyWith(busy: true, clearError: true);
     final installations = List.of(_profileInstalls);
     final profiles = <int, Profile>{
@@ -240,6 +345,9 @@ class HarmonySimple extends _$HarmonySimple {
       final logout = _api.logout().catchError((Object _) {
         _api.session = null;
       });
+      // A native start cannot be cancelled after submission. Join it before
+      // stopping so an old completion cannot recreate VPN after logout.
+      await recoveryStopped;
       await _stopSafely();
       try {
         await logout;
@@ -261,125 +369,318 @@ class HarmonySimple extends _$HarmonySimple {
           disconnecting: false,
           clearSession: true,
           clearRemoteProfile: true,
-          error: expired ? _message(HarmonyAccountError.expired) : null,
+          health: expired
+              ? HarmonyConnectionHealth.loginRequired
+              : HarmonyConnectionHealth.disconnected,
+          errorCause: expired ? HarmonySimpleError.sessionExpired : null,
           clearError: !expired,
         );
       }
     }
   }
 
-  Future<void> retryConnect() => toggleConnect();
+  Future<void> retryConnect() async {
+    if (state.busy || _restoring || _api.session == null) return;
+    if (state.connectionRequested) {
+      state = state.copyWith(clearError: true);
+      await _recovery.connect();
+    } else {
+      await toggleConnect();
+    }
+  }
+
+  void handleNetworkChanged({
+    required bool connected,
+    bool captivePortal = false,
+  }) {
+    _recovery.networkChanged(
+      connected: connected,
+      captivePortal: captivePortal,
+    );
+  }
+
+  void onAppPaused() {
+    _lifecycleEpoch++;
+    _recovery.pause();
+  }
+
+  Future<void> onAppResumed() async {
+    if (_api.session == null) return;
+    final operation = _operation;
+    final lifecycleEpoch = ++_lifecycleEpoch;
+    _recovery.pause();
+    try {
+      final connected = await ref.read(harmonyConnectivityCheckProvider)()
+          .timeout(const Duration(seconds: 3));
+      if (!ref.mounted || operation != _operation ||
+          lifecycleEpoch != _lifecycleEpoch) return;
+      _recovery.networkChanged(connected: connected);
+    } catch (_) {
+      // Availability is only a hint. The bounded HTTPS checks remain decisive.
+    }
+    if (!ref.mounted || operation != _operation ||
+        lifecycleEpoch != _lifecycleEpoch) return;
+    await _recovery.resume();
+    if (!_connectionIntentKnown && ref.read(isStartProvider)) {
+      _connectionIntentKnown = true;
+      await _recovery.connect();
+    }
+  }
 
   Future<void> toggleConnect() async {
-    if (state.busy || _restoring || _api.session == null) {
-      return;
-    }
+    if (_restoring || _api.session == null || state.disconnecting ||
+        (state.busy && !state.connectionRequested)) return;
     final operation = ++_operation;
     final token = _api.session!.token;
-    final setup = ref.read(setupActionProvider.notifier);
     final running = ref.read(isStartProvider);
-    state = state.copyWith(
-      busy: true,
-      disconnecting: running,
-      clearError: true,
-    );
-    try {
-      if (running) {
-        await setup.updateStatus(false);
-        return;
+    _connectionIntentKnown = true;
+    if (running || state.connectionRequested) {
+      final stopped = _recovery.disconnect();
+      state = state.copyWith(busy: true, disconnecting: true, clearError: true);
+      try {
+        await stopped;
+        _ensureCurrent(operation, token);
+        await ref.read(setupActionProvider.notifier).updateStatus(false);
+      } catch (_) {
+        if (ref.mounted && operation == _operation) {
+          state = state.copyWith(errorCause: HarmonySimpleError.connectFailed);
+        }
+      } finally {
+        if (ref.mounted && operation == _operation) {
+          state = state.copyWith(busy: false, disconnecting: false);
+        }
       }
+      return;
+    }
+    state = state.copyWith(busy: true, clearError: true);
+    try {
       await _syncRemoteProfile(
         fallbackOnNetworkError: true,
         operation: operation,
       );
       _ensureCurrent(operation, token);
-      final profile = state.remoteProfile;
-      if (profile == null) {
-        state = state.copyWith(error: _message(HarmonyAccountError.config));
-        return;
+      if (state.remoteProfile == null) {
+        throw HarmonyAccountError.config;
       }
-      if (profile.id != ref.read(currentProfileIdProvider)) {
-        return;
-      }
-      ref
-          .read(patchClashConfigProvider.notifier)
+      _runtimeGroupName = null;
+      ref.read(patchClashConfigProvider.notifier)
           .update((s) => s.copyWith(mode: Mode.rule));
-      ref
-          .read(vpnSettingProvider.notifier)
+      ref.read(vpnSettingProvider.notifier)
           .update((s) => s.copyWith(enable: true));
-      await setup.applyProfile(force: true);
-      _ensureCurrent(operation, token);
-      final groups = ref.read(groupsProvider);
-      final config = await ref
-          .read(harmonyCoreControllerProvider)
-          .getConfig(profile.id);
-      final group = connectionGroup(
-        groups,
-        system.isOhos
-            ? defaultRoutingRules(config)
-            : List<String>.from(config['rules'] ?? const <String>[]),
-      );
-      final selected = group == null
-          ? null
-          : await autoSelectProxy(
-              group,
-              groups,
-              (name) async =>
-                  (await ref
-                          .read(harmonyCoreControllerProvider)
-                          .getDelay(
-                            group.testUrl ??
-                                ref.read(appSettingProvider).testUrl,
-                            name,
-                          ))
-                      .value,
-            );
-      _ensureCurrent(operation, token);
-      if (selected == null) {
-        state = state.copyWith(error: currentAppLocalizations.simpleNoRoute);
-        return;
-      }
-      for (final entry in selected.selections.entries.toList().reversed) {
-        _ensureCurrent(operation, token);
-        await ref
-            .read(proxiesActionProvider.notifier)
-            .changeProxy(groupName: entry.key, proxyName: entry.value);
-        ref
-            .read(profilesActionProvider.notifier)
-            .updateCurrentSelectedMap(entry.key, entry.value);
-      }
-      ref
-          .read(proxiesActionProvider.notifier)
-          .updateCurrentGroupName(group!.name);
-      _ensureCurrent(operation, token);
-      await setup.updateStatus(true, isInit: true, profileApplied: true);
-      _ensureCurrent(operation, token);
-      if (!ref.read(isStartProvider)) {
-        state = state.copyWith(
-          error: currentAppLocalizations.simpleConnectFailed,
-        );
-      }
+      await _recovery.connect();
     } on _SupersededHarmonyOperation {
-      // Do not let an old probe/connect completion revive a signed-out session.
-    } on HarmonyAccountError catch (error) {
+      // A newer logout owns state and native cleanup.
+    } catch (error) {
       if (ref.mounted && operation == _operation) {
-        await _stopSafely();
         if (error == HarmonyAccountError.expired) {
           await logout(expired: true);
         } else {
-          state = state.copyWith(error: _message(error));
+          state = state.copyWith(errorCause: _errorCause(error));
         }
-      }
-    } catch (_) {
-      if (ref.mounted && operation == _operation) {
-        await _stopSafely();
-        state = state.copyWith(
-          error: currentAppLocalizations.simpleConnectFailed,
-        );
       }
     } finally {
       if (ref.mounted && operation == _operation) {
         state = state.copyWith(busy: false, disconnecting: false);
+      }
+    }
+  }
+
+  void _ensureRecovery(
+    HarmonyRecoveryTicket ticket,
+    int operation,
+    String token,
+  ) {
+    ticket.ensureCurrent();
+    _ensureCurrent(operation, token);
+  }
+
+  Future<bool> _probeHealth(
+    HarmonyRecoveryTicket ticket,
+    String url,
+    String proxyName,
+  ) async {
+    ticket.ensureCurrent();
+    try {
+      final delay = await ticket.wait(
+        ref.read(harmonyCoreControllerProvider)
+            .getHealthDelay(url, proxyName)
+            .timeout(const Duration(seconds: 8)),
+      );
+      ticket.ensureCurrent();
+      return delay.value != null && delay.value! > 0;
+    } on HarmonyRecoveryCancelled {
+      rethrow;
+    } catch (_) {
+      ticket.ensureCurrent();
+      return false;
+    }
+  }
+
+  Future<HarmonyHealthResult> _recoverConnection(
+    HarmonyRecoveryTicket ticket,
+  ) async {
+    final session = _api.session;
+    final profile = state.remoteProfile;
+    final operation = _operation;
+    if (session == null || profile == null ||
+        profile.id != ref.read(currentProfileIdProvider)) {
+      return const HarmonyHealthResult(
+        domesticHealthy: false, foreignHealthy: false, hasRoute: false,
+      );
+    }
+    final token = session.token;
+    _ensureRecovery(ticket, operation, token);
+    if (ref.read(harmonyManagedRoutingProvider)) {
+      final network = await ticket.wait(ref.read(harmonyCoreControllerProvider)
+          .getHarmonyNetworkState().timeout(const Duration(seconds: 3)));
+      _ensureRecovery(ticket, operation, token);
+      if (network.connected == false || network.captivePortal) {
+        // Only an observed platform state may produce offline/portal guidance.
+        // No HTTPS failure, missing VALIDATED capability, or delay implies it.
+        return HarmonyHealthResult(
+          domesticHealthy: false,
+          foreignHealthy: false,
+          offline: network.connected == false,
+          captivePortal: network.captivePortal,
+        );
+      }
+    }
+    final setup = ref.read(setupActionProvider.notifier);
+    final wasRunning = ref.read(isStartProvider);
+    if (!wasRunning) {
+      // Only a genuinely stopped VPN may be started. A failed probe never
+      // stops/reapplies a running configuration or drops healthy DIRECT flows.
+      await ref.read(coreActionProvider.notifier).tryStartCore();
+      _ensureRecovery(ticket, operation, token);
+      await setup.applyProfile(force: true);
+      _ensureRecovery(ticket, operation, token);
+    }
+    final groups = ref.read(groupsProvider);
+    var group = _runtimeGroupName == null
+        ? null : groups.getGroup(_runtimeGroupName!);
+    if (group == null) {
+      final config = await ticket.wait(
+        ref.read(harmonyCoreControllerProvider).getConfig(profile.id)
+            .timeout(const Duration(seconds: 8)),
+      );
+      _ensureRecovery(ticket, operation, token);
+      group = ref.read(harmonyManagedRoutingProvider)
+          ? groups.getGroup(effectiveHarmonyAutoGroupName(config))
+          : connectionGroup(groups, List<String>.from(
+              config['rules'] ?? const <String>[],
+            ));
+      _runtimeGroupName = group?.name;
+    }
+    if (group == null) {
+      return const HarmonyHealthResult(
+        domesticHealthy: false, foreignHealthy: false, hasRoute: false,
+      );
+    }
+    final root = group;
+    final managed = ref.read(harmonyManagedRoutingProvider);
+    var managedRootVerified = false;
+    Future<bool> selectRoute() async {
+      if (ref.read(harmonyManagedRoutingProvider)) {
+        // Native refresh warms the managed group's real leaves with its exact
+        // URL/status policy and clears only its stale fast-selection cache.
+        // Isolated strict probes below must never overwrite shared core health.
+        await ticket.wait(ref.read(harmonyCoreControllerProvider)
+            .refreshHarmonyHealth().timeout(const Duration(seconds: 15)));
+        _ensureRecovery(ticket, operation, token);
+      }
+      final selected = await autoSelectProxy(
+        root,
+        groups,
+        (name) async => await _probeHealth(
+          ticket, harmonyAutomaticTestUrl, name,
+        ) ? 1 : null,
+        cancelled: ticket.cancelled,
+        isCurrent: () => ticket.mayProbe,
+        warmAutomatic: !ref.read(harmonyManagedRoutingProvider),
+      );
+      _ensureRecovery(ticket, operation, token);
+      if (selected == null) return false;
+      for (final entry in selected.selections.entries.toList().reversed) {
+        _ensureRecovery(ticket, operation, token);
+        await ref.read(proxiesActionProvider.notifier).changeProxy(
+          groupName: entry.key, proxyName: entry.value,
+          preserveConnections: true,
+        );
+        _ensureRecovery(ticket, operation, token);
+        ref.read(profilesActionProvider.notifier)
+            .updateCurrentSelectedMap(entry.key, entry.value);
+      }
+      ref.read(proxiesActionProvider.notifier)
+          .updateCurrentGroupName(root.name);
+      managedRootVerified = managed;
+      return true;
+    }
+    if (!wasRunning) {
+      if (!await selectRoute()) {
+        return const HarmonyHealthResult(
+          domesticHealthy: false, foreignHealthy: false, hasRoute: false,
+        );
+      }
+      _ensureRecovery(ticket, operation, token);
+      await setup.updateStatus(true, isInit: true, profileApplied: true);
+      _ensureRecovery(ticket, operation, token);
+    }
+    final results = await Future.wait([
+      _probeHealth(ticket, 'https://www.baidu.com', 'DIRECT'),
+      managedRootVerified
+          ? Future<bool>.value(true)
+          : _probeHealth(ticket, harmonyAutomaticTestUrl, root.name),
+    ]);
+    _ensureRecovery(ticket, operation, token);
+    var foreignHealthy = results[1];
+    if (wasRunning && !foreignHealthy && results[0]) {
+      // Warm safe real nodes and allow the core's automatic group to choose a
+      // live route. Domestic-only failures must not churn a working proxy.
+      if (await selectRoute()) {
+        foreignHealthy = managedRootVerified || await _probeHealth(
+          ticket, harmonyAutomaticTestUrl, root.name,
+        );
+      }
+    }
+    _ensureRecovery(ticket, operation, token);
+    return HarmonyHealthResult(
+      domesticHealthy: results[0],
+      foreignHealthy: foreignHealthy,
+      running: ref.read(isStartProvider),
+    );
+  }
+
+  Future<void> switchNode(String groupName, String proxyName) async {
+    if (state.busy || _api.session == null || !state.connectionRequested) return;
+    final groups = ref.read(groupsProvider);
+    final group = groups.getGroup(groupName);
+    final proxy = group?.all.where((proxy) => proxy.name == proxyName).firstOrNull;
+    if (group?.type != GroupType.Selector || proxy == null ||
+        !isSafeProxyRoute(proxy, groups)) return;
+    final operation = ++_operation;
+    final token = _api.session!.token;
+    final stopped = _recovery.disconnect();
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      await stopped;
+      _ensureCurrent(operation, token);
+      await ref.read(proxiesActionProvider.notifier).changeProxy(
+        groupName: groupName, proxyName: proxyName, preserveConnections: true,
+      );
+      _ensureCurrent(operation, token);
+      ref.read(profilesActionProvider.notifier)
+          .updateCurrentSelectedMap(groupName, proxyName);
+      await _recovery.connect();
+    } on _SupersededHarmonyOperation {
+      // Logout superseded the requested change.
+    } catch (_) {
+      if (ref.mounted && operation == _operation) {
+        state = state.copyWith(errorCause: HarmonySimpleError.connectFailed);
+        await _recovery.connect();
+      }
+    } finally {
+      if (ref.mounted && operation == _operation) {
+        state = state.copyWith(busy: false);
       }
     }
   }
@@ -544,16 +845,11 @@ class HarmonySimple extends _$HarmonySimple {
     }
   }
 
-  String _message(Object error) {
-    return switch (error) {
-      HarmonyAccountError.credentials =>
-        currentAppLocalizations.harmonyCredentialsError,
-      HarmonyAccountError.expired =>
-        currentAppLocalizations.harmonySessionExpired,
-      HarmonyAccountError.rateLimited =>
-        currentAppLocalizations.harmonyRateLimited,
-      HarmonyAccountError.config => currentAppLocalizations.harmonyConfigError,
-      _ => currentAppLocalizations.harmonyServiceError,
-    };
-  }
+  HarmonySimpleError _errorCause(Object error) => switch (error) {
+    HarmonyAccountError.credentials => HarmonySimpleError.credentials,
+    HarmonyAccountError.expired => HarmonySimpleError.sessionExpired,
+    HarmonyAccountError.rateLimited => HarmonySimpleError.rateLimited,
+    HarmonyAccountError.config => HarmonySimpleError.config,
+    _ => HarmonySimpleError.service,
+  };
 }

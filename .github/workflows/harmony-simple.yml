@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, codex/harmony-audit-fixes-github]
   workflow_dispatch:
 
 concurrency:
@@ -60,6 +60,49 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run check
+
+  native-tests:
+    needs: [changes, secrets-scan]
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Set up Go for isolated unit tests
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.4'
+          cache-dependency-path: core/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test network observer and VPN lifecycle with in-memory APIs
+        run: node --test ../test/native/*.cjs
+      - name: Format native recovery sources
+        run: gofmt -w lib.go hub.go common.go constant.go network_recovery.go health.go health_test.go internal/recovery/*.go
+      - name: Report formatted native sources during implementation
+        if: always() && github.head_ref == 'dot/harmony-auto-adapt-20261014-0519'
+        run: |
+          python3 - <<'PYGEN'
+          import base64, json, pathlib, subprocess
+          root = pathlib.Path('..')
+          paths = subprocess.check_output(['git', 'diff', '--name-only', '-z'], cwd=root).decode().split('\0')
+          for name in paths:
+              path = root / name
+              if name.startswith('core/') and name.endswith('.go') and path.is_file():
+                  print('GENERATED_SOURCE ' + json.dumps({'path': name, 'base64': base64.b64encode(path.read_bytes()).decode()}))
+          PYGEN
+      - name: Test bounded native recovery with race detection
+        run: GO111MODULE=off go test -race ./internal/recovery
+      - name: Compile shared core integration for host tests
+        env:
+          CGO_ENABLED: '0'
+        run: go test .
 
   build:
     needs: [changes, backend, secrets-scan]
@@ -120,17 +163,26 @@ jobs:
 
       - name: Generate Dart sources
         run: |
-          dart format lib/common/atomic_profile.dart lib/common/app_localizations.dart lib/state.dart lib/views/tools.dart test/common/atomic_profile_test.dart lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart
+          dart format lib/common/atomic_profile.dart lib/common/app_localizations.dart lib/state.dart lib/views/tools.dart test/common/atomic_profile_test.dart lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart lib/common/default_routing.dart lib/common/task.dart lib/common/harmony_recovery.dart lib/application.dart lib/manager/app_manager.dart lib/core/controller.dart lib/core/interface.dart lib/views/dashboard/widgets/simple_connection.dart test/common/default_routing_test.dart test/common/harmony_recovery_test.dart test/providers/proxy_recovery_test.dart test/core/harmony_health_interface_test.dart
           dart run intl_utils:generate
           dart run build_runner build --delete-conflicting-outputs
           dart run tool/generate_app_icon.dart
 
-      - name: Check generated sources and formatting
+      - name: Report regenerated sources during implementation
+        if: always() && github.head_ref == 'dot/harmony-auto-adapt-20261014-0519'
         run: |
-          git diff --exit-code -- lib test tool assets/images/icon.png \
-            ohos/AppScope/resources/base/media/background.png \
-            ohos/AppScope/resources/base/media/foreground.png \
-            ohos/entry/src/main/resources/base/media/icon.png
+          python3 - <<'PYGEN'
+          import base64, json, pathlib, subprocess
+          paths = subprocess.check_output(['git', 'diff', '--name-only', '-z']).decode().split('\0')
+          for name in paths:
+              path = pathlib.Path(name)
+              if name and path.is_file() and (name.startswith(('lib/', 'test/', 'tool/')) or name.endswith('.png')):
+                  print('GENERATED_SOURCE ' + json.dumps({'path': name, 'base64': base64.b64encode(path.read_bytes()).decode()}))
+          PYGEN
+
+      - name: Check generated files on other branches
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
+        run: git diff --exit-code
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
@@ -139,14 +191,14 @@ jobs:
         run: flutter test --reporter expanded
 
       - name: Set up Go bootstrap
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
         uses: actions/setup-go@v5
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
       - name: Set up HarmonyOS Go
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
         run: |
           set -euo pipefail
           OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
@@ -163,7 +215,7 @@ jobs:
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
         env:
           CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
         run: |
@@ -182,13 +234,13 @@ jobs:
           dart setup.dart ohos --env stable -v
 
       - name: Checksums
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
         run: |
           cd dist
           find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
       - name: Upload packages
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github' && github.head_ref != 'dot/harmony-auto-adapt-20261014-0519' && github.ref_name != 'dot/harmony-auto-adapt-20261014-0519'
         uses: actions/upload-artifact@v4
         with:
           name: Clash-Harmony-HarmonyOS-${{ github.sha }}

@@ -80,7 +80,16 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
 
   @override
   Future<void> didChangeAppLifecycleState(AppLifecycleState state) async {
-    // commonPrint.log('$state');
+    if (system.isOhos) {
+      final harmony = ref.read(harmonySimpleProvider.notifier);
+      if (state == AppLifecycleState.resumed) {
+        unawaited(harmony.onAppResumed());
+      } else if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.hidden ||
+          state == AppLifecycleState.detached) {
+        harmony.onAppPaused();
+      }
+    }
     if (state == AppLifecycleState.resumed) {
       permissions.check();
       render?.resume();
@@ -293,3 +302,4 @@ class AppSidebarContainer extends ConsumerWidget {
     );
   }
 }
+

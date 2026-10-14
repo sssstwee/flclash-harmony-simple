@@ -749,6 +749,9 @@ class ThemeAction extends _$ThemeAction {
   }
 }
 
+/// Injectable core boundary for route changes and connection-preservation tests.
+final proxiesCoreControllerProvider = Provider<CoreController>((ref) => coreController);
+
 @Riverpod(keepAlive: true)
 class ProxiesAction extends _$ProxiesAction {
   @override
@@ -821,14 +824,24 @@ class ProxiesAction extends _$ProxiesAction {
   Future<void> changeProxy({
     required String groupName,
     required String proxyName,
+    bool preserveConnections = false,
   }) async {
-    await coreController.changeProxy(
+    final controller = ref.read(proxiesCoreControllerProvider);
+    final error = await controller.changeProxy(
       ChangeProxyParams(groupName: groupName, proxyName: proxyName),
     );
-    if (ref.read(appSettingProvider).closeConnections) {
-      await coreController.closeConnections();
-    } else {
-      await coreController.resetConnections();
+    if (error.isNotEmpty) {
+      // Native errors may contain endpoint details. Never surface them verbatim.
+      throw StateError('Proxy selection failed');
+    }
+    // Automatic recovery changes only the route used by new connections.
+    // Never reset healthy domestic/direct flows to repair an overseas route.
+    if (!preserveConnections) {
+      if (ref.read(appSettingProvider).closeConnections) {
+        await controller.closeConnections();
+      } else {
+        await controller.resetConnections();
+      }
     }
     ref.read(checkIpNumProvider.notifier).add();
   }
@@ -1024,3 +1037,4 @@ class GeoResourceAction extends _$GeoResourceAction {
     });
   }
 }
+

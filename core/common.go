@@ -250,6 +250,7 @@ func updateConfig(params *UpdateParams) {
 }
 
 func applyConfig(params *SetupParams) error {
+	networkRecovery.SetEnabled(false)
 	runtime.GC()
 	runLock.Lock()
 	defer runLock.Unlock()
@@ -261,6 +262,8 @@ func applyConfig(params *SetupParams) error {
 	}
 	hub.ApplyConfig(currentConfig)
 	patchSelectGroup(params.SelectedMap)
+	networkRecovery.SetEnabled(err == nil)
+	networkRecovery.SetBackgroundActive(isRunning)
 	updateListeners()
 	if updater.GeoAutoUpdate() {
 		updater.RegisterGeoUpdaterWithCancel()
@@ -281,3 +284,4 @@ func logError(format string, args ...interface{}) {
 		fmt.Fprintf(os.Stderr, "[ERROR] "+format+"\n", args...)
 	}
 }
+

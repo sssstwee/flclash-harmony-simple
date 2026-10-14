@@ -22,6 +22,12 @@ mixin CoreInterface {
 
   Future<String> asyncTestDelay(String url, String proxyName);
 
+  Future<String> asyncHealthDelay(String url, String proxyName);
+
+  Future<bool> refreshHarmonyHealth();
+
+  Future<String> getHarmonyNetworkState();
+
   Future<String> updateConfig(UpdateParams updateParams);
 
   Future<String> setupConfig(SetupParams setupParams);
@@ -195,7 +201,7 @@ abstract class CoreHandlerInterface with CoreInterface {
           method: ActionMethod.changeProxy,
           data: json.encode(changeProxyParams),
         ) ??
-        '';
+        'Proxy change was not acknowledged';
   }
 
   @override
@@ -332,6 +338,44 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
+  Future<String> getHarmonyNetworkState() async {
+    return await _invoke<String>(
+          method: ActionMethod.asyncTestDelay,
+          data: json.encode({'network-state': true}),
+          timeout: const Duration(seconds: 2),
+        ) ??
+        '{}';
+  }
+
+  /// Coalesces with native background recovery and warms only the managed group.
+  @override
+  Future<bool> refreshHarmonyHealth() async {
+    final result = await _invoke<String>(
+      method: ActionMethod.asyncTestDelay,
+      data: json.encode({'refresh-managed': true}),
+      timeout: const Duration(seconds: 15),
+    );
+    return result == 'true';
+  }
+
+  /// Dedicated strict probe. It does not publish latency samples or alter the
+  /// core URL-test group's cached health while checking DIRECT connectivity.
+  @override
+  Future<String> asyncHealthDelay(String url, String proxyName) async {
+    return await _invoke<String>(
+          method: ActionMethod.asyncTestDelay,
+          data: json.encode({
+            'proxy-name': proxyName,
+            'timeout': 4000,
+            'test-url': url,
+            'health-check': true,
+          }),
+          timeout: const Duration(seconds: 5),
+        ) ??
+        json.encode(Delay(name: proxyName, value: -1, url: url));
+  }
+
+  @override
   Future<String> getCountryCode(String ip) async {
     return await _invoke<String>(
           method: ActionMethod.getCountryCode,
@@ -345,3 +389,4 @@ abstract class CoreHandlerInterface with CoreInterface {
     return await _invoke<String>(method: ActionMethod.getMemory) ?? '';
   }
 }
+

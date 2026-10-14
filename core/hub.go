@@ -53,6 +53,8 @@ func handleStartListener() bool {
 	runLock.Lock()
 	defer runLock.Unlock()
 	isRunning = true
+	networkRecovery.SetEnabled(true)
+	networkRecovery.SetBackgroundActive(true)
 	updateListeners()
 	resolver.ResetConnection()
 	return true
@@ -62,6 +64,7 @@ func handleStopListener() bool {
 	runLock.Lock()
 	defer runLock.Unlock()
 	isRunning = false
+	networkRecovery.SetEnabled(false)
 	listener.StopListener()
 	resolver.ResetConnection()
 	return true
@@ -80,6 +83,7 @@ func handleForceGC() {
 }
 
 func handleShutdown() bool {
+	networkRecovery.SetEnabled(false)
 	stopListeners()
 	executor.Shutdown()
 	handleForceGC()
@@ -208,6 +212,22 @@ func handleResetTraffic() {
 }
 
 func handleAsyncTestDelay(paramsString string, fn func(string)) {
+	var request struct {
+		RefreshManaged bool `json:"refresh-managed"`
+		NetworkState bool `json:"network-state"`
+	}
+	if json.Unmarshal([]byte(paramsString), &request) == nil && request.NetworkState {
+		fn(getNativeNetworkState())
+		return
+	}
+	if json.Unmarshal([]byte(paramsString), &request) == nil && request.RefreshManaged {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 14 * time.Second)
+			defer cancel()
+			fn(strconv.FormatBool(networkRecovery.Refresh(ctx)))
+		}()
+		return
+	}
 	mBatch.Go(paramsString, func() (bool, error) {
 		var params = &TestDelayParams{}
 		err := json.Unmarshal([]byte(paramsString), params)
@@ -245,7 +265,12 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 			testUrl = params.TestUrl
 		}
 		delayData.Url = testUrl
-		delay, err := proxy.URLTest(ctx, testUrl, expectedStatus)
+		var delay uint16
+		if params.HealthCheck {
+			delay, err = probeHealth(ctx, proxy, testUrl)
+		} else {
+			delay, err = proxy.URLTest(ctx, testUrl, expectedStatus)
+		}
 		if err != nil || delay == 0 {
 			delayData.Value = -1
 			data, _ := json.Marshal(delayData)
@@ -570,3 +595,4 @@ func init() {
 		})
 	}
 }
+
