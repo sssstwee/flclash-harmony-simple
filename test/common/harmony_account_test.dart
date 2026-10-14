@@ -254,32 +254,40 @@ void main() {
       // A new process may have a persisted token. The signed-out instance must
       // never restore after its own failed login/logout.
       final restartedApi = HarmonyAccountApi(http: http, storage: store);
-      await expectLater(restartedApi.restore(), throwsA(HarmonyAccountError.expired));
+      await expectLater(
+        restartedApi.restore(),
+        throwsA(HarmonyAccountError.expired),
+      );
       expect(store.token, isNull);
       expect(restartedApi.isAuthorized, isFalse);
     },
   );
 
-  test('restore keeps cached session metadata when the service is unavailable', () async {
-    final store = MemoryStore()
-      ..token = 'saved-token'
-      ..meta = jsonEncode({
-        'token': 'saved-token',
-        'username': 'offline-user',
-        'expiresAt': DateTime.now().add(const Duration(days: 2)).toIso8601String(),
-      });
-    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-    http.httpClientAdapter = Adapter(
-      (_) => throw DioException(
-        requestOptions: RequestOptions(path: '/api/auth/get-session'),
-        type: DioExceptionType.connectionError,
-      ),
-    );
-    final api = HarmonyAccountApi(http: http, storage: store);
-    final session = await api.restore();
-    expect(session?.username, 'offline-user');
-    expect(api.isAuthorized, isTrue);
-  });
+  test(
+    'restore keeps cached session metadata when the service is unavailable',
+    () async {
+      final store = MemoryStore()
+        ..token = 'saved-token'
+        ..meta = jsonEncode({
+          'token': 'saved-token',
+          'username': 'offline-user',
+          'expiresAt': DateTime.now()
+              .add(const Duration(days: 2))
+              .toIso8601String(),
+        });
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter(
+        (_) => throw DioException(
+          requestOptions: RequestOptions(path: '/api/auth/get-session'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+      final api = HarmonyAccountApi(http: http, storage: store);
+      final session = await api.restore();
+      expect(session?.username, 'offline-user');
+      expect(api.isAuthorized, isTrue);
+    },
+  );
 
   test(
     'plaintext API endpoints are refused before credentials are sent',
@@ -296,29 +304,36 @@ void main() {
     },
   );
 
-  test('downloading does not acknowledge a config before it is installed', () async {
-    final store = MemoryStore()..lastModified = 'previous-version';
-    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-    http.httpClientAdapter = Adapter(
-      (_) => ResponseBody.fromString(
-        'proxies: []',
-        200,
-        headers: {'last-modified': ['new-version']},
-      ),
-    );
-    final api = HarmonyAccountApi(http: http, storage: store)
-      ..session = HarmonySession(
-        'token',
-        'harmony',
-        DateTime.now().add(const Duration(days: 1)),
+  test(
+    'downloading does not acknowledge a config before it is installed',
+    () async {
+      final store = MemoryStore()..lastModified = 'previous-version';
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter(
+        (_) => ResponseBody.fromString(
+          'proxies: []',
+          200,
+          headers: {
+            'last-modified': ['new-version'],
+          },
+        ),
+      );
+      final api = HarmonyAccountApi(http: http, storage: store)
+        ..session = HarmonySession(
+          'token',
+          'harmony',
+          DateTime.now().add(const Duration(days: 1)),
+        );
+
+      final download = await api.downloadConfig(
+        ifModifiedSince: 'previous-version',
       );
 
-    final download = await api.downloadConfig(ifModifiedSince: 'previous-version');
-
-    expect(download.lastModified, 'new-version');
-    expect(download.bytes, isNotEmpty);
-    expect(store.lastModified, 'previous-version');
-  });
+      expect(download.lastModified, 'new-version');
+      expect(download.bytes, isNotEmpty);
+      expect(store.lastModified, 'previous-version');
+    },
+  );
 
   test('conditional config requests preserve the validator on 304', () async {
     final store = MemoryStore()..lastModified = 'installed-version';
@@ -335,7 +350,9 @@ void main() {
         DateTime.now().add(const Duration(days: 1)),
       );
 
-    final download = await api.downloadConfig(ifModifiedSince: 'installed-version');
+    final download = await api.downloadConfig(
+      ifModifiedSince: 'installed-version',
+    );
 
     expect(download.notModified, isTrue);
     expect(download.bytes, isNull);
@@ -344,66 +361,83 @@ void main() {
   });
 
   for (final size in [0, harmonyConfigMaxBytes + 1]) {
-    test('rejects a $size byte config without changing its validator', () async {
-      final store = MemoryStore()..lastModified = 'installed-version';
-      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-      http.httpClientAdapter = Adapter(
-        (_) => ResponseBody.fromBytes(
-          List<int>.filled(size, 65),
-          200,
-          headers: {'last-modified': ['bad-version']},
-        ),
-      );
-      final api = HarmonyAccountApi(http: http, storage: store)
-        ..session = HarmonySession(
-          'token',
-          'harmony',
-          DateTime.now().add(const Duration(days: 1)),
+    test(
+      'rejects a $size byte config without changing its validator',
+      () async {
+        final store = MemoryStore()..lastModified = 'installed-version';
+        final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+        http.httpClientAdapter = Adapter(
+          (_) => ResponseBody.fromBytes(
+            List<int>.filled(size, 65),
+            200,
+            headers: {
+              'last-modified': ['bad-version'],
+            },
+          ),
+        );
+        final api = HarmonyAccountApi(http: http, storage: store)
+          ..session = HarmonySession(
+            'token',
+            'harmony',
+            DateTime.now().add(const Duration(days: 1)),
+          );
+
+        await expectLater(
+          api.downloadConfig(),
+          throwsA(HarmonyAccountError.config),
         );
 
-      await expectLater(api.downloadConfig(), throwsA(HarmonyAccountError.config));
-
-      expect(store.lastModified, 'installed-version');
-    });
+        expect(store.lastModified, 'installed-version');
+      },
+    );
   }
 
   for (final status in [401, 403, 429, 500, 503]) {
-    test('config HTTP $status retains its distinct error classification', () async {
+    test(
+      'config HTTP $status retains its distinct error classification',
+      () async {
+        final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+        http.httpClientAdapter = Adapter((_) => jsonBody({}, status));
+        final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+          ..session = HarmonySession(
+            'token',
+            'harmony',
+            DateTime.now().add(const Duration(days: 1)),
+          );
+        final expected = switch (status) {
+          401 || 403 => HarmonyAccountError.expired,
+          429 => HarmonyAccountError.rateLimited,
+          _ => HarmonyAccountError.unavailable,
+        };
+
+        await expectLater(api.downloadConfig(), throwsA(expected));
+      },
+    );
+  }
+
+  test(
+    'transport errors are unavailable rather than invalid configuration',
+    () async {
       final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-      http.httpClientAdapter = Adapter((_) => jsonBody({}, status));
+      http.httpClientAdapter = Adapter(
+        (request) => throw DioException(
+          requestOptions: request,
+          type: DioExceptionType.connectionError,
+        ),
+      );
       final api = HarmonyAccountApi(http: http, storage: MemoryStore())
         ..session = HarmonySession(
           'token',
           'harmony',
           DateTime.now().add(const Duration(days: 1)),
         );
-      final expected = switch (status) {
-        401 || 403 => HarmonyAccountError.expired,
-        429 => HarmonyAccountError.rateLimited,
-        _ => HarmonyAccountError.unavailable,
-      };
 
-      await expectLater(api.downloadConfig(), throwsA(expected));
-    });
-  }
-
-  test('transport errors are unavailable rather than invalid configuration', () async {
-    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-    http.httpClientAdapter = Adapter(
-      (request) => throw DioException(
-        requestOptions: request,
-        type: DioExceptionType.connectionError,
-      ),
-    );
-    final api = HarmonyAccountApi(http: http, storage: MemoryStore())
-      ..session = HarmonySession(
-        'token',
-        'harmony',
-        DateTime.now().add(const Duration(days: 1)),
+      await expectLater(
+        api.downloadConfig(),
+        throwsA(HarmonyAccountError.unavailable),
       );
-
-    await expectLater(api.downloadConfig(), throwsA(HarmonyAccountError.unavailable));
-  });
+    },
+  );
 
   test('logout wins over an in-flight session restoration', () async {
     final store = MemoryStore()..token = 'saved-token';
@@ -425,12 +459,16 @@ void main() {
     );
     await validationStarted.future;
     await api.logout();
-    validation.complete(jsonBody({
-      'session': {
-        'expiresAt': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
-      },
-      'user': {'username': 'harmony'},
-    }));
+    validation.complete(
+      jsonBody({
+        'session': {
+          'expiresAt': DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String(),
+        },
+        'user': {'username': 'harmony'},
+      }),
+    );
     await restoring;
 
     expect(api.session, isNull);
@@ -439,60 +477,81 @@ void main() {
     expect(store.meta, isNull);
   });
 
-  test('ETag and Last-Modified are forwarded without persisting downloads', () async {
-    final store = MemoryStore();
-    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-    http.httpClientAdapter = Adapter((request) {
-      expect(request.headers['If-None-Match'], '"installed"');
-      expect(request.headers['If-Modified-Since'], 'old-date');
-      return ResponseBody.fromString(
-        'proxies: []',
-        200,
-        headers: {
-          'etag': ['"new"'],
-          'last-modified': ['new-date'],
-        },
+  test(
+    'ETag and Last-Modified are forwarded without persisting downloads',
+    () async {
+      final store = MemoryStore();
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter((request) {
+        expect(request.headers['If-None-Match'], '"installed"');
+        expect(request.headers['If-Modified-Since'], 'old-date');
+        return ResponseBody.fromString(
+          'proxies: []',
+          200,
+          headers: {
+            'etag': ['"new"'],
+            'last-modified': ['new-date'],
+          },
+        );
+      });
+      final api = HarmonyAccountApi(http: http, storage: store)
+        ..session = HarmonySession(
+          'token',
+          'alice',
+          DateTime.now().add(const Duration(days: 1)),
+        );
+
+      final downloaded = await api.downloadConfig(
+        ifNoneMatch: '"installed"',
+        ifModifiedSince: 'old-date',
       );
-    });
-    final api = HarmonyAccountApi(http: http, storage: store)
-      ..session = HarmonySession('token', 'alice', DateTime.now().add(const Duration(days: 1)));
 
-    final downloaded = await api.downloadConfig(ifNoneMatch: '"installed"', ifModifiedSince: 'old-date');
+      expect(downloaded.etag, '"new"');
+      expect(downloaded.lastModified, 'new-date');
+      expect(store.cache, isNull);
+      expect(store.lastModified, isNull);
+    },
+  );
 
-    expect(downloaded.etag, '"new"');
-    expect(downloaded.lastModified, 'new-date');
-    expect(store.cache, isNull);
-    expect(store.lastModified, isNull);
-  });
+  test(
+    'cache metadata commits only for the current account and token',
+    () async {
+      final store = MemoryStore();
+      final api = HarmonyAccountApi(storage: store)
+        ..session = HarmonySession(
+          'alice-token',
+          'alice',
+          DateTime.now().add(const Duration(days: 1)),
+        );
+      final metadata = HarmonyConfigCacheMetadata(
+        username: 'alice',
+        profileId: 7,
+        contentHash: 'a' * 64,
+        etag: '"version-1"',
+        lastModified: 'accepted-date',
+      );
 
-  test('cache metadata commits only for the current account and token', () async {
-    final store = MemoryStore();
-    final api = HarmonyAccountApi(storage: store)
-      ..session = HarmonySession('alice-token', 'alice', DateTime.now().add(const Duration(days: 1)));
-    final metadata = HarmonyConfigCacheMetadata(
-      username: 'alice',
-      profileId: 7,
-      contentHash: 'a' * 64,
-      etag: '"version-1"',
-      lastModified: 'accepted-date',
-    );
+      await api.commitConfigCache(metadata, expectedToken: 'alice-token');
+      final saved = await api.readConfigCache();
+      expect(saved?.profileId, 7);
+      expect(saved?.contentHash, 'a' * 64);
+      expect(saved?.etag, '"version-1"');
+      expect(saved?.lastModified, 'accepted-date');
 
-    await api.commitConfigCache(metadata, expectedToken: 'alice-token');
-    final saved = await api.readConfigCache();
-    expect(saved?.profileId, 7);
-    expect(saved?.contentHash, 'a' * 64);
-    expect(saved?.etag, '"version-1"');
-    expect(saved?.lastModified, 'accepted-date');
-
-    api.session = HarmonySession('bob-token', 'bob', DateTime.now().add(const Duration(days: 1)));
-    expect(await api.readConfigCache(), isNull);
-    await expectLater(
-      api.commitConfigCache(metadata, expectedToken: 'alice-token'),
-      throwsA(HarmonyAccountError.expired),
-    );
-    await api.clearConfigCache();
-    expect(store.cache, isNull);
-  });
+      api.session = HarmonySession(
+        'bob-token',
+        'bob',
+        DateTime.now().add(const Duration(days: 1)),
+      );
+      expect(await api.readConfigCache(), isNull);
+      await expectLater(
+        api.commitConfigCache(metadata, expectedToken: 'alice-token'),
+        throwsA(HarmonyAccountError.expired),
+      );
+      await api.clearConfigCache();
+      expect(store.cache, isNull);
+    },
+  );
 
   for (final badMeta in <Map<String, Object?>>[
     {'token': 'other-token', 'username': 'alice'},
@@ -506,16 +565,23 @@ void main() {
         ..token = 'saved-token'
         ..meta = jsonEncode({
           ...badMeta,
-          'expiresAt': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+          'expiresAt': DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String(),
         });
       final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-      http.httpClientAdapter = Adapter((request) => throw DioException(
-        requestOptions: request,
-        type: DioExceptionType.connectionError,
-      ));
+      http.httpClientAdapter = Adapter(
+        (request) => throw DioException(
+          requestOptions: request,
+          type: DioExceptionType.connectionError,
+        ),
+      );
       final api = HarmonyAccountApi(http: http, storage: store);
 
-      await expectLater(api.restore(), throwsA(HarmonyAccountError.unavailable));
+      await expectLater(
+        api.restore(),
+        throwsA(HarmonyAccountError.unavailable),
+      );
 
       expect(api.isAuthorized, isFalse);
       expect(api.session, isNull);
@@ -528,13 +594,17 @@ void main() {
       ..meta = jsonEncode({
         'token': 'saved-token',
         'username': 'alice',
-        'expiresAt': DateTime.now().subtract(const Duration(seconds: 1)).toIso8601String(),
+        'expiresAt': DateTime.now()
+            .subtract(const Duration(seconds: 1))
+            .toIso8601String(),
       });
     final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-    http.httpClientAdapter = Adapter((request) => throw DioException(
-      requestOptions: request,
-      type: DioExceptionType.connectionError,
-    ));
+    http.httpClientAdapter = Adapter(
+      (request) => throw DioException(
+        requestOptions: request,
+        type: DioExceptionType.connectionError,
+      ),
+    );
     final api = HarmonyAccountApi(http: http, storage: store);
 
     await expectLater(api.restore(), throwsA(HarmonyAccountError.unavailable));
@@ -558,18 +628,25 @@ void main() {
       }
       validations++;
       return jsonBody({
-        'session': {'expiresAt': DateTime.now().add(const Duration(days: 1)).toIso8601String()},
+        'session': {
+          'expiresAt': DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String(),
+        },
         'user': {'username': 'alice'},
       });
     });
     final api = HarmonyAccountApi(http: http, storage: store);
-    final login = api.login('alice', 'password').then<Object?>(
-      (value) => value,
-      onError: (Object error) => error,
-    );
+    final login = api
+        .login('alice', 'password')
+        .then<Object?>((value) => value, onError: (Object error) => error);
     await signInStarted.future;
     await api.logout();
-    signIn.complete(jsonBody({}, 200, {'set-auth-token': ['late-token']}));
+    signIn.complete(
+      jsonBody({}, 200, {
+        'set-auth-token': ['late-token'],
+      }),
+    );
     await login;
 
     expect(api.session, isNull);
@@ -582,73 +659,111 @@ void main() {
     final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
     http.httpClientAdapter = Adapter((request) {
       expect(request.followRedirects, isFalse);
-      return jsonBody({}, 307, {'location': ['https://other.example.test/steal']});
+      return jsonBody({}, 307, {
+        'location': ['https://other.example.test/steal'],
+      });
     });
     final api = HarmonyAccountApi(http: http, storage: MemoryStore());
 
-    await expectLater(api.login('alice', 'password'), throwsA(HarmonyAccountError.unavailable));
+    await expectLater(
+      api.login('alice', 'password'),
+      throwsA(HarmonyAccountError.unavailable),
+    );
     expect(api.isAuthorized, isFalse);
   });
 
-  test('failed keystore deletion cannot restore the logged-out session in this process', () async {
-    final value = HarmonySession('saved-token', 'alice', DateTime.now().add(const Duration(days: 1)));
-    final store = DeleteFailureStore()
-      ..token = value.token
-      ..meta = jsonEncode(value.toJson());
-    var validations = 0;
-    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-    http.httpClientAdapter = Adapter((request) {
-      if (request.path == '/api/auth/get-session') validations++;
-      return jsonBody({'success': true});
-    });
-    final api = HarmonyAccountApi(http: http, storage: store)..session = value;
-
-    await expectLater(api.logout(), throwsStateError);
-    expect(store.token, 'saved-token', reason: 'Simulate a keystore that really failed to delete');
-    expect(await api.restore(), isNull);
-    expect(await api.restore(), isNull);
-    expect(validations, 0);
-    expect(api.session, isNull);
-  });
-
-  test('a token issued to a login that cannot persist is revoked best-effort', () async {
-    final store = WriteFailureStore();
-    final revoked = <String?>[];
-    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-    http.httpClientAdapter = Adapter((request) {
-      if (request.path == '/api/auth/sign-in/username') {
-        return jsonBody({}, 200, {'set-auth-token': ['unpersisted-token']});
-      }
-      if (request.path == '/api/auth/sign-out') {
-        revoked.add(request.headers['Authorization'] as String?);
+  test(
+    'failed keystore deletion cannot restore the logged-out session in this process',
+    () async {
+      final value = HarmonySession(
+        'saved-token',
+        'alice',
+        DateTime.now().add(const Duration(days: 1)),
+      );
+      final store = DeleteFailureStore()
+        ..token = value.token
+        ..meta = jsonEncode(value.toJson());
+      var validations = 0;
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter((request) {
+        if (request.path == '/api/auth/get-session') validations++;
         return jsonBody({'success': true});
-      }
-      return jsonBody({
-        'session': {'expiresAt': DateTime.now().add(const Duration(days: 1)).toIso8601String()},
-        'user': {'username': 'alice'},
       });
-    });
-    final api = HarmonyAccountApi(http: http, storage: store);
+      final api = HarmonyAccountApi(http: http, storage: store)
+        ..session = value;
 
-    await expectLater(api.login('alice', 'password'), throwsA(HarmonyAccountError.unavailable));
+      await expectLater(api.logout(), throwsStateError);
+      expect(
+        store.token,
+        'saved-token',
+        reason: 'Simulate a keystore that really failed to delete',
+      );
+      expect(await api.restore(), isNull);
+      expect(await api.restore(), isNull);
+      expect(validations, 0);
+      expect(api.session, isNull);
+    },
+  );
 
-    expect(revoked, ['Bearer unpersisted-token']);
-    expect(store.token, isNull);
-    expect(store.meta, isNull);
-    expect(api.isAuthorized, isFalse);
-  });
+  test(
+    'a token issued to a login that cannot persist is revoked best-effort',
+    () async {
+      final store = WriteFailureStore();
+      final revoked = <String?>[];
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter((request) {
+        if (request.path == '/api/auth/sign-in/username') {
+          return jsonBody({}, 200, {
+            'set-auth-token': ['unpersisted-token'],
+          });
+        }
+        if (request.path == '/api/auth/sign-out') {
+          revoked.add(request.headers['Authorization'] as String?);
+          return jsonBody({'success': true});
+        }
+        return jsonBody({
+          'session': {
+            'expiresAt': DateTime.now()
+                .add(const Duration(days: 1))
+                .toIso8601String(),
+          },
+          'user': {'username': 'alice'},
+        });
+      });
+      final api = HarmonyAccountApi(http: http, storage: store);
+
+      await expectLater(
+        api.login('alice', 'password'),
+        throwsA(HarmonyAccountError.unavailable),
+      );
+
+      expect(revoked, ['Bearer unpersisted-token']);
+      expect(store.token, isNull);
+      expect(store.meta, isNull);
+      expect(api.isAuthorized, isFalse);
+    },
+  );
 
   test('logout is ordered after a cache write already in progress', () async {
     final store = BlockingCacheStore();
     final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
     http.httpClientAdapter = Adapter((_) => jsonBody({'success': true}));
-    final api = HarmonyAccountApi(http: http, storage: store)..session = HarmonySession(
-      'token', 'alice', DateTime.now().add(const Duration(days: 1)),
-    );
-    final committing = api.commitConfigCache(
-      HarmonyConfigCacheMetadata(username: 'alice', profileId: 7, contentHash: 'a' * 64),
-      expectedToken: 'token',
-    ).then<Object?>((_) => null, onError: (Object error) => error);
+    final api = HarmonyAccountApi(http: http, storage: store)
+      ..session = HarmonySession(
+        'token',
+        'alice',
+        DateTime.now().add(const Duration(days: 1)),
+      );
+    final committing = api
+        .commitConfigCache(
+          HarmonyConfigCacheMetadata(
+            username: 'alice',
+            profileId: 7,
+            contentHash: 'a' * 64,
+          ),
+          expectedToken: 'token',
+        )
+        .then<Object?>((_) => null, onError: (Object error) => error);
     await store.writing.future;
     final loggingOut = api.logout();
     expect(api.isAuthorized, isFalse);
@@ -675,9 +790,12 @@ void main() {
       return jsonBody({'success': true});
     });
     final store = MemoryStore();
-    final api = HarmonyAccountApi(http: http, storage: store)..session = HarmonySession(
-      'token', 'alice', DateTime.now().add(const Duration(days: 1)),
-    );
+    final api = HarmonyAccountApi(http: http, storage: store)
+      ..session = HarmonySession(
+        'token',
+        'alice',
+        DateTime.now().add(const Duration(days: 1)),
+      );
     final downloading = api.downloadConfig().then<Object?>(
       (value) => value,
       onError: (Object error) => error,
@@ -691,29 +809,44 @@ void main() {
     expect(api.session, isNull);
   });
 
-  test('native clear attempts every credential deletion after one failure', () async {
-    const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
-    final deleted = <String>[];
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(channel, (call) async {
-          if (call.method == 'delete') {
-            final key = call.arguments['key'] as String;
-            deleted.add(key);
-            if (key == 'harmony_session') {
-              throw PlatformException(code: 'storage_unavailable');
+  test(
+    'native clear attempts every credential deletion after one failure',
+    () async {
+      const channel = MethodChannel(
+        'plugins.it_nomads.com/flutter_secure_storage',
+      );
+      final deleted = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (call) async {
+            if (call.method == 'delete') {
+              final key = call.arguments['key'] as String;
+              deleted.add(key);
+              if (key == 'harmony_session') {
+                throw PlatformException(code: 'storage_unavailable');
+              }
             }
-          }
-          return null;
-        });
-    addTearDown(
-      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null),
-    );
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
 
-    await expectLater(HarmonySessionStore().clearAll(), throwsA(isA<PlatformException>()));
+      await expectLater(
+        HarmonySessionStore().clearAll(),
+        throwsA(isA<PlatformException>()),
+      );
 
-    expect(deleted, containsAll(['harmony_session', 'harmony_session_meta', 'harmony_config_lm']));
-  });
+      expect(
+        deleted,
+        containsAll([
+          'harmony_session',
+          'harmony_session_meta',
+          'harmony_config_lm',
+        ]),
+      );
+    },
+  );
 
   test(
     'native storage uses the maintained plugin channel with RSA OAEP and AES GCM',

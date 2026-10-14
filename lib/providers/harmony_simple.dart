@@ -164,7 +164,10 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> checkSession() async {
-    if (state.bootstrapping || state.busy || _restoring || _api.session == null) {
+    if (state.bootstrapping ||
+        state.busy ||
+        _restoring ||
+        _api.session == null) {
       return;
     }
     final operation = _operation;

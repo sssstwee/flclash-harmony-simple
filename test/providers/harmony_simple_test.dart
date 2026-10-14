@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/auto_proxy.dart';
+import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -395,6 +398,37 @@ void main() {
     await AppLocalizations.load(const Locale('zh', 'CN'));
   });
 
+  test('runtime platform and core routing boundary work without swallowed errors', () async {
+    final harness = _Harness();
+    harness.installRoute();
+    // Keep the platform and routing boundary outside the notifier's
+    // user-facing catch so runtime compatibility failures have a useful stack.
+    // Test-only diagnostic for the fork SDK / host runtime compatibility edge.
+    try {
+      expect(Platform.isOhos, Platform.operatingSystem == 'ohos');
+    } on NoSuchMethodError catch (error, stack) {
+      expect(error.toString(), contains('isOhos'));
+      debugPrint('Host runtime lacks the legacy Platform.isOhos getter: $error');
+      debugPrintStack(stackTrace: stack);
+    }
+    expect(system.isOhos, Platform.operatingSystem == 'ohos');
+    final config = await harness.container.read(harmonyCoreControllerProvider).getConfig(7);
+    final rules = system.isOhos
+        ? defaultRoutingRules(config)
+        : List<String>.from(config['rules']);
+    final groups = harness.container.read(groupsProvider);
+    expect(groups, hasLength(1));
+    final group = connectionGroup(groups, rules);
+    expect(group, isNotNull);
+    final root = group!;
+    final selected = await autoSelectProxy(root, groups, (name) async {
+      final delay = await harness.controller.getDelay(root.testUrl!, name);
+      return delay.value;
+    });
+    expect(selected?.name, 'fast');
+    expect(harness.events, ['read-config', 'probe']);
+  });
+
   test('credential failure clears busy using the real notifier', () async {
     final harness = _Harness();
     harness.api.session = null;
@@ -603,7 +637,9 @@ void main() {
     final reading = Completer<void>();
     final read = Completer<Uint8List?>();
     harness.files.readHook = (_) {
-      if (!reading.isCompleted) reading.complete();
+      if (!reading.isCompleted) {
+        reading.complete();
+      }
       return read.future;
     };
     final bootstrapping = harness.notifier.bootstrap();
