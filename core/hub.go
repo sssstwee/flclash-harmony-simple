@@ -216,7 +216,7 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 			return false, nil
 		}
 
-		expectedStatus, err := utils.NewUnsignedRanges[uint16]("")
+		expectedStatus, err := utils.NewUnsignedRanges[uint16](params.ExpectedStatus)
 		if err != nil {
 			fn("")
 			return false, nil
@@ -246,7 +246,7 @@ func handleAsyncTestDelay(paramsString string, fn func(string)) {
 		}
 		delayData.Url = testUrl
 		delay, err := proxy.URLTest(ctx, testUrl, expectedStatus)
-		if err != nil || delay == 0 {
+		if err != nil || delay == 0 || !proxy.AliveForTestUrl(testUrl) {
 			delayData.Value = -1
 			data, _ := json.Marshal(delayData)
 			fn(string(data))

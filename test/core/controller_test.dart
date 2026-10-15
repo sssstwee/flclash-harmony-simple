@@ -233,6 +233,35 @@ void main() {
       expect(result.value, 100);
     });
 
+    test('getDelay forwards the cloud expected HTTP status', () async {
+      when(
+        () => mock.asyncTestDelay(
+          'https://example.test',
+          'Cloud',
+          expectedStatus: '401',
+        ),
+      ).thenAnswer(
+        (_) async => json.encode({
+          'name': 'Cloud',
+          'value': 100,
+          'url': 'https://example.test',
+        }),
+      );
+      final result = await controller.getDelay(
+        'https://example.test',
+        'Cloud',
+        expectedStatus: '401',
+      );
+      expect(result.value, 100);
+      verify(
+        () => mock.asyncTestDelay(
+          'https://example.test',
+          'Cloud',
+          expectedStatus: '401',
+        ),
+      ).called(1);
+    });
+
     test('startListener delegates', () async {
       when(() => mock.startListener()).thenAnswer((_) async => true);
       final result = await controller.startListener();

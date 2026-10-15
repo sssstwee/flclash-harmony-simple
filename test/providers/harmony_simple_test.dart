@@ -310,14 +310,12 @@ class _ProfileActions extends ProfilesAction {
 
 class _CoreActions extends CoreAction {
   final List<String> events;
-  Future<void> Function()? readyHook;
 
   _CoreActions(this.events);
 
   @override
   Future<bool> tryStartCore([bool start = false]) async {
     events.add('core-ready');
-    await readyHook?.call();
     return false;
   }
 }
@@ -395,7 +393,6 @@ class _Harness {
   late final files = _Files(events);
   late final profiles = _ProfileActions(events);
   late final setup = _Setup(events);
-  late final core = _CoreActions(events);
   final proxies = _ProxyActions();
   final common = _CommonActions();
   final controller = _Controller();
@@ -409,11 +406,12 @@ class _Harness {
         harmonyCoreControllerProvider.overrideWithValue(controller),
         profilesProvider.overrideWith(() => _Profiles(initial)),
         profilesActionProvider.overrideWith(() => profiles),
-        coreActionProvider.overrideWith(() => core),
+        coreActionProvider.overrideWith(() => _CoreActions(events)),
         setupActionProvider.overrideWith(() => setup),
         proxiesActionProvider.overrideWith(() => proxies),
         commonActionProvider.overrideWith(() => common),
         currentProfileIdProvider.overrideWithBuild((_, _) => null),
+        initProvider.overrideWithBuild((_, _) => true),
       ],
     );
     // Keep auto-dispose state alive across awaited notifier operations, as the
@@ -951,24 +949,22 @@ void main() {
   );
 
   test(
-    'login prepares the core during download and first connect reuses its config',
+    'login waits for app initialization and first connect reuses its config',
     () async {
       final harness = _Harness();
-      final downloading = Completer<void>();
-      final preparing = Completer<void>();
+      harness.container.read(initProvider.notifier).value = false;
+      harness.container.listen(initProvider, (_, _) {});
+      final downloaded = Completer<void>();
       final download = Completer<HarmonyConfigDownload>();
-      final ready = Completer<void>();
-      harness.api.downloadStarted = downloading.complete;
+      harness.api.downloadStarted = downloaded.complete;
       harness.api.downloads.add(download.future);
-      harness.core.readyHook = () {
-        preparing.complete();
-        return ready.future;
-      };
       final loggingIn = harness.notifier.login('alice', 'password');
-      await Future.wait([downloading.future, preparing.future]);
-      expect(harness.files.bytes, isEmpty);
-      ready.complete();
+      await downloaded.future;
       download.complete(HarmonyConfigDownload(bytes: _config, etag: '"fresh"'));
+      await Future<void>.delayed(Duration.zero);
+      expect(harness.events, isNot(contains('core-ready')));
+      expect(harness.files.bytes, isEmpty);
+      harness.container.read(initProvider.notifier).value = true;
       await loggingIn;
       expect(harness.state.error, isNull);
       harness.installRoute();
@@ -1048,6 +1044,46 @@ void main() {
       await harness.notifier.reevaluateRoute();
       expect(harness.state.homeStatus.lastHealthCheckOk, isTrue);
       expect(harness.setup.starts, hasLength(1));
+    },
+  );
+
+  test(
+    'health checks use the cloud expected status and publish group latency',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.installRoute();
+      when(() => harness.controller.getConfig(any())).thenAnswer(
+        (_) async => {
+          'rules': ['MATCH,Main'],
+          'proxy-groups': [
+            {'name': 'Main', 'expected-status': 401},
+          ],
+        },
+      );
+      when(
+        () => harness.controller.getDelay(
+          'https://example.test',
+          'Main',
+          expectedStatus: '401',
+        ),
+      ).thenAnswer(
+        (_) async =>
+            const Delay(name: 'Main', value: 123, url: 'https://example.test'),
+      );
+      harness.container.listen(delayDataSourceProvider, (_, _) {});
+      await harness.notifier.toggleConnect();
+      await harness.notifier.reevaluateRoute();
+      expect(harness.state.homeStatus.lastHealthCheckOk, isTrue);
+      expect(
+        harness.container.read(
+          delayDataSourceProvider,
+        )['https://example.test']?['Main'],
+        123,
+      );
+      expect(harness.proxies.changes, isEmpty);
     },
   );
 

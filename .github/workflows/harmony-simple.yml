@@ -147,6 +147,13 @@ jobs:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
 
+      - name: Test core health checks
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        working-directory: core
+        env:
+          CGO_ENABLED: '0'
+        run: go test -mod=mod -run TestDelayHonorsConfiguredHTTPStatus -count=1 .
+
       - name: Set up HarmonyOS Go
         if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
         run: |

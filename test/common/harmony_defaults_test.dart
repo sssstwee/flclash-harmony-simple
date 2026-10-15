@@ -55,7 +55,7 @@ void main() {
   );
 
   test(
-    'keeps subscription data and restores automatic updates without old scripts',
+    'keeps subscription data while clearing legacy selections and scripts',
     () {
       const old = Profile(
         id: 17,
@@ -71,7 +71,7 @@ void main() {
       expect(result.id, old.id);
       expect(result.label, old.label);
       expect(result.url, old.url);
-      expect(result.selectedMap, old.selectedMap);
+      expect(result.selectedMap, isEmpty);
       expect(result.autoUpdate, isTrue);
       expect(result.autoUpdateDuration, const Duration(days: 1));
       expect(result.overwriteType, OverwriteType.standard);

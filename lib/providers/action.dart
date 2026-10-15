@@ -157,7 +157,10 @@ class SetupAction extends _$SetupAction {
     final testUrl = ref.read(
       appSettingProvider.select((state) => state.testUrl),
     );
-    return SetupParams(selectedMap: selectedMap, testUrl: testUrl);
+    return SetupParams(
+      selectedMap: system.isOhos ? const {} : selectedMap,
+      testUrl: testUrl,
+    );
   }
 
   void fullSetup() {

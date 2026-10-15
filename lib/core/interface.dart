@@ -20,7 +20,11 @@ mixin CoreInterface {
 
   Future<Result> getConfig(String path);
 
-  Future<String> asyncTestDelay(String url, String proxyName);
+  Future<String> asyncTestDelay(
+    String url,
+    String proxyName, {
+    String? expectedStatus,
+  });
 
   Future<String> updateConfig(UpdateParams updateParams);
 
@@ -317,11 +321,16 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  Future<String> asyncTestDelay(String url, String proxyName) async {
+  Future<String> asyncTestDelay(
+    String url,
+    String proxyName, {
+    String? expectedStatus,
+  }) async {
     final delayParams = {
       'proxy-name': proxyName,
       'timeout': httpTimeoutDuration.inMilliseconds,
       'test-url': url,
+      'expected-status': ?expectedStatus,
     };
     return await _invoke<String>(
           method: ActionMethod.asyncTestDelay,

@@ -702,11 +702,18 @@ class HarmonySimple extends _$HarmonySimple {
       ),
     );
     ref.read(proxiesActionProvider.notifier).updateCurrentGroupName(group.name);
+    final groupConfig = (config['proxy-groups'] as List? ?? const [])
+        .whereType<Map>()
+        .where((item) => item['name'] == group.name)
+        .firstOrNull;
+    final expectedStatus = groupConfig?['expected-status']?.toString();
     return probeConfiguredRoute(group, (name) async {
-      final delay = await core.getDelay(
-        group.testUrl ?? ref.read(appSettingProvider).testUrl,
-        name,
-      );
+      final url = group.testUrl ?? ref.read(appSettingProvider).testUrl;
+      final delay = expectedStatus == null
+          ? await core.getDelay(url, name)
+          : await core.getDelay(url, name, expectedStatus: expectedStatus);
+      _ensureCurrent(operation, token);
+      ref.read(proxiesActionProvider.notifier).setDelay(delay);
       return delay.value;
     });
   }
@@ -789,23 +796,18 @@ class HarmonySimple extends _$HarmonySimple {
       );
     }
     try {
-      // Preparing the core needs no downloaded policy or active VPN.
-      final prepared = await Future.wait<Object?>([
-        _api.downloadConfig(
-          ifModifiedSince: skipConditionals
-              ? null
-              : cached != null
-              ? metadata?.lastModified ?? await _api.readConfigLastModified()
-              : null,
-          ifNoneMatch: skipConditionals
-              ? null
-              : cached != null
-              ? metadata?.etag
-              : null,
-        ),
-        ref.read(coreActionProvider.notifier).tryStartCore(),
-      ]);
-      var download = prepared.first as HarmonyConfigDownload;
+      var download = await _api.downloadConfig(
+        ifModifiedSince: skipConditionals
+            ? null
+            : cached != null
+            ? metadata?.lastModified ?? await _api.readConfigLastModified()
+            : null,
+        ifNoneMatch: skipConditionals
+            ? null
+            : cached != null
+            ? metadata?.etag
+            : null,
+      );
       _ensureCurrent(op, session.token);
       if (download.notModified) {
         final current = await _verifiedCachedProfile(metadata);
@@ -836,6 +838,17 @@ class HarmonySimple extends _$HarmonySimple {
           download.profileUpdateInterval ??
           profileUpdateIntervalFromYaml(yamlText) ??
           const Duration(hours: 24);
+      // App startup owns the initial core preload. Never race it with restartCore.
+      if (!ref.read(initProvider)) {
+        final ready = Completer<void>();
+        final subscription = ref.listen(initProvider, (_, initialized) {
+          if (initialized && !ready.isCompleted) ready.complete();
+        });
+        await ready.future.whenComplete(subscription.close);
+        _ensureCurrent(op, session.token);
+      }
+      await ref.read(coreActionProvider.notifier).tryStartCore();
+      _ensureCurrent(op, session.token);
       final target =
           cached?.copyWith(label: appDisplayName) ??
           _remoteProfiles().firstOrNull?.copyWith(label: appDisplayName) ??

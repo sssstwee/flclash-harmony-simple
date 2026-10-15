@@ -26,6 +26,7 @@ Config harmonyConfigDefaults(Config config) => config.copyWith(
 );
 
 Profile harmonyProfileDefaults(Profile profile) => profile.copyWith(
+  selectedMap: const {},
   overwriteType: OverwriteType.standard,
   scriptId: null,
   autoUpdate: true,
