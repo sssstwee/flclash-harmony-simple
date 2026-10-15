@@ -37,6 +37,26 @@ void main() {
       config.runtime,
     );
   });
+  test('preserves hosted HTTP health checks and expected status', () {
+    mutatePayload((data) {
+      final group = data['profile']['proxy-groups'][0];
+      group['url'] = 'https://api.example.test/v1/models';
+      group['expected-status'] = 401;
+    });
+    final config = HarmonyRemoteConfig.decode(bytes(), '0.8.94+2026101503');
+    final group = config.profile['proxy-groups'][0];
+    expect(group['url'], 'https://api.example.test/v1/models');
+    expect(group['expected-status'], 401);
+  });
+  test('health checks cannot load local files or executable resources', () {
+    mutatePayload((data) {
+      data['profile']['proxy-groups'][0]['url'] = 'file:///etc/passwd';
+    });
+    expect(
+      () => HarmonyRemoteConfig.decode(bytes(), '0.8.94+2026101503'),
+      throwsFormatException,
+    );
+  });
   test('cached profile enforces minimum client after downgrade', () {
     final config = HarmonyRemoteConfig.decode(bytes(), '0.8.94+2026101206');
     expect(

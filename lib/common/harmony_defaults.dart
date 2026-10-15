@@ -13,7 +13,7 @@ Config harmonyConfigDefaults(Config config) => config.copyWith(
   appSettingProps: defaultAppSettingProps.copyWith(
     disclaimerAccepted: config.appSettingProps.disclaimerAccepted,
     crashlyticsTip: config.appSettingProps.crashlyticsTip,
-    autoCheckUpdate: false,
+    autoCheckUpdate: true,
   ),
   networkProps: defaultNetworkProps,
   vpnProps: defaultVpnProps,

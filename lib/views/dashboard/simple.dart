@@ -82,7 +82,8 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     final profile = ref.watch(currentProfileProvider);
     final groupName = profile?.currentGroupName;
     if (groupName == null) return null;
-    return profile?.selectedMap[groupName];
+    final node = ref.watch(realSelectedProxyStateProvider(groupName)).proxyName;
+    return node.isEmpty ? null : node;
   }
 
   int? _activeDelay(String? proxyName) {

@@ -21,6 +21,7 @@ Read these only when the task touches their area:
 
 ## Highest Priority Rules
 
+- Keep routing configuration driven: domains, node order, failover and DNS belong to the hosted configuration/backend. HarmonyOS clients validate and execute it without embedded business policy or automatic selector rewrites. Prefer the smallest cloud-only change; change/release clients only when parsing, protocol support, validation or a client defect requires it.
 - Use `flutter test`, not `dart test`, because models pull in Flutter types.
 - Run code generation after modifying models, providers, or database schema.
 - Do not manually edit generated files.

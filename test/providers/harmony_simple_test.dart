@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/auto_proxy.dart';
-import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
 import 'package:fl_clash/core/controller.dart';
@@ -311,12 +310,14 @@ class _ProfileActions extends ProfilesAction {
 
 class _CoreActions extends CoreAction {
   final List<String> events;
+  Future<void> Function()? readyHook;
 
   _CoreActions(this.events);
 
   @override
   Future<bool> tryStartCore([bool start = false]) async {
     events.add('core-ready');
+    await readyHook?.call();
     return false;
   }
 }
@@ -359,6 +360,15 @@ class _Setup extends SetupAction {
   }
 }
 
+class _CommonActions extends CommonAction {
+  int updateChecks = 0;
+
+  @override
+  Future<void> autoCheckUpdate() async {
+    updateChecks++;
+  }
+}
+
 class _ProxyActions extends ProxiesAction {
   final changes = <String, String>{};
   String? group;
@@ -385,7 +395,9 @@ class _Harness {
   late final files = _Files(events);
   late final profiles = _ProfileActions(events);
   late final setup = _Setup(events);
+  late final core = _CoreActions(events);
   final proxies = _ProxyActions();
+  final common = _CommonActions();
   final controller = _Controller();
   late final ProviderContainer container;
 
@@ -397,9 +409,10 @@ class _Harness {
         harmonyCoreControllerProvider.overrideWithValue(controller),
         profilesProvider.overrideWith(() => _Profiles(initial)),
         profilesActionProvider.overrideWith(() => profiles),
-        coreActionProvider.overrideWith(() => _CoreActions(events)),
+        coreActionProvider.overrideWith(() => core),
         setupActionProvider.overrideWith(() => setup),
         proxiesActionProvider.overrideWith(() => proxies),
+        commonActionProvider.overrideWith(() => common),
         currentProfileIdProvider.overrideWithBuild((_, _) => null),
       ],
     );
@@ -431,8 +444,7 @@ class _Harness {
     container.read(groupsProvider.notifier).value = [group];
     when(() => controller.getConfig(any())).thenAnswer((_) async {
       events.add('read-config');
-      // Include the same raw subscription structure consumed by the OHOS
-      // routing policy, not only the derived desktop rules list.
+      // The hosted catch-all group is probed without selecting another route.
       return <String, dynamic>{
         'rules': ['MATCH,Main'],
         'proxies': [
@@ -471,19 +483,20 @@ void main() {
       final config = await harness.container
           .read(harmonyCoreControllerProvider)
           .getConfig(7);
-      final rules = system.isOhos
-          ? defaultRoutingRules(config)
-          : List<String>.from(config['rules']);
+      final rules = List<String>.from(config['rules']);
       final groups = harness.container.read(groupsProvider);
       expect(groups, hasLength(1));
       final group = connectionGroup(groups, rules);
       expect(group, isNotNull);
       final root = group!;
-      final selected = await autoSelectProxy(root, groups, (name) async {
+      final available = await probeConfiguredRoute(root, (name) async {
         final delay = await harness.controller.getDelay(root.testUrl!, name);
         return delay.value;
       });
-      expect(selected?.name, 'fast');
+      expect(available, isTrue);
+      verify(
+        () => harness.controller.getDelay(root.testUrl!, 'Main'),
+      ).called(1);
       expect(harness.events, ['read-config', 'probe']);
     },
   );
@@ -901,6 +914,7 @@ void main() {
       harness.cache();
       harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
       await harness.notifier.bootstrap();
+      harness.files.bytes.remove(7);
       harness.api.downloads.add(HarmonyAccountError.rateLimited);
       harness.setup.stopFailure = StateError('native service unavailable');
 
@@ -937,6 +951,35 @@ void main() {
   );
 
   test(
+    'login prepares the core during download and first connect reuses its config',
+    () async {
+      final harness = _Harness();
+      final downloading = Completer<void>();
+      final preparing = Completer<void>();
+      final download = Completer<HarmonyConfigDownload>();
+      final ready = Completer<void>();
+      harness.api.downloadStarted = downloading.complete;
+      harness.api.downloads.add(download.future);
+      harness.core.readyHook = () {
+        preparing.complete();
+        return ready.future;
+      };
+      final loggingIn = harness.notifier.login('alice', 'password');
+      await Future.wait([downloading.future, preparing.future]);
+      expect(harness.files.bytes, isEmpty);
+      ready.complete();
+      download.complete(HarmonyConfigDownload(bytes: _config, etag: '"fresh"'));
+      await loggingIn;
+      expect(harness.state.error, isNull);
+      harness.installRoute();
+      await harness.notifier.toggleConnect();
+      expect(harness.api.requests, hasLength(1));
+      expect(harness.setup.starts, hasLength(1));
+      expect(harness.proxies.changes, isEmpty);
+    },
+  );
+
+  test(
     'connect applies once and preserves the selected route when starting',
     () async {
       final harness = _Harness(initial: [_profile()]);
@@ -957,8 +1000,10 @@ void main() {
       );
       expect(harness.setup.applies, 1);
       expect(harness.setup.starts, [(isInit: true, profileApplied: true)]);
-      expect(harness.proxies.changes, {'Main': 'fast'});
-      expect(harness.profiles.selections, {'Main': 'fast'});
+      expect(harness.proxies.changes, isEmpty);
+      expect(harness.profiles.selections, isEmpty);
+      expect(harness.common.updateChecks, 1);
+      expect(harness.api.requests, hasLength(1));
       expect(harness.container.read(isStartProvider), isTrue);
       expect(harness.state.error, isNull);
       expect(harness.state.busy, isFalse);
@@ -972,7 +1017,57 @@ void main() {
     },
   );
 
-  test('a late successful probe cannot start VPN after logout', () async {
+  test(
+    'failed health checks neither block VPN nor change the hosted route',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.addAll([
+        const HarmonyConfigDownload(notModified: true),
+        const HarmonyConfigDownload(notModified: true),
+      ]);
+      await harness.notifier.bootstrap();
+      harness.installRoute();
+      when(() => harness.controller.getDelay(any(), any())).thenAnswer(
+        (_) async =>
+            const Delay(name: 'Main', value: 0, url: 'https://example.test'),
+      );
+      await harness.notifier.toggleConnect();
+      await harness.notifier.reevaluateRoute();
+      expect(harness.setup.starts, hasLength(1));
+      expect(harness.container.read(isStartProvider), isTrue);
+      expect(harness.state.error, isNull);
+      expect(harness.state.homeStatus.lastHealthCheckOk, isFalse);
+      expect(harness.proxies.changes, isEmpty);
+      expect(harness.profiles.selections, isEmpty);
+
+      when(() => harness.controller.getDelay(any(), any())).thenAnswer(
+        (_) async =>
+            const Delay(name: 'Main', value: 10, url: 'https://example.test'),
+      );
+      await harness.notifier.reevaluateRoute();
+      expect(harness.state.homeStatus.lastHealthCheckOk, isTrue);
+      expect(harness.setup.starts, hasLength(1));
+    },
+  );
+
+  test(
+    'connect rejects a changed cache and revalidates with the server',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.files.bytes[7] = Uint8List.fromList('changed'.codeUnits);
+      harness.api.downloads.add(HarmonyAccountError.config);
+      await harness.notifier.toggleConnect();
+      expect(harness.api.requests, hasLength(2));
+      expect(harness.api.requests.last.etag, isNull);
+      expect(harness.setup.starts, isEmpty);
+    },
+  );
+
+  test('a late health probe cannot revive VPN after logout', () async {
     final harness = _Harness(initial: [_profile()]);
     harness.cache();
     harness.api.downloads.addAll([
@@ -988,23 +1083,18 @@ void main() {
       return probe.future;
     });
     final connecting = harness.notifier.toggleConnect();
-    await Future.any([
-      probing.future,
-      connecting.then((_) {
-        if (!probing.isCompleted) {
-          fail(
-            'Connection ended before probing: ${harness.state.error}; events: ${harness.events}',
-          );
-        }
-      }),
-    ]);
+    await connecting;
+    expect(harness.container.read(isStartProvider), isTrue);
+    await probing.future;
     await harness.notifier.logout();
     probe.complete(
       const Delay(name: 'fast', value: 1, url: 'https://example.test'),
     );
     await connecting;
 
-    expect(harness.setup.starts, isEmpty);
+    expect(harness.setup.starts, hasLength(1));
+    expect(harness.container.read(isStartProvider), isFalse);
+    expect(harness.state.homeStatus.lastHealthCheckAt, isNull);
     expect(harness.proxies.changes, isEmpty);
     expect(harness.state.session, isNull);
     expect(harness.state.remoteProfile, isNull);

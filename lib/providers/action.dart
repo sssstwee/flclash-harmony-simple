@@ -21,6 +21,9 @@ part 'generated/action.g.dart';
 
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
+  bool _checkingUpdate = false;
+  String? _notifiedUpdateTag;
+
   @override
   void build() {}
 
@@ -67,9 +70,23 @@ class CommonAction extends _$CommonAction {
   }
 
   Future<void> autoCheckUpdate() async {
-    if (!ref.read(appSettingProvider).autoCheckUpdate) return;
-    final res = await request.checkForUpdate();
-    checkUpdateResultHandle(data: res);
+    if (_checkingUpdate || !ref.read(appSettingProvider).autoCheckUpdate) {
+      return;
+    }
+    _checkingUpdate = true;
+    try {
+      final res = await request.checkForUpdate();
+      if (!ref.mounted ||
+          res == null ||
+          res['tag_name'] == _notifiedUpdateTag ||
+          globalState.navigatorKey.currentContext == null) {
+        return;
+      }
+      _notifiedUpdateTag = res['tag_name'] as String?;
+      await checkUpdateResultHandle(data: res);
+    } finally {
+      _checkingUpdate = false;
+    }
   }
 
   Future<void> checkUpdateResultHandle({
@@ -94,7 +111,9 @@ class CommonAction extends _$CommonAction {
           ],
         ),
         confirmText: currentAppLocalizations.goDownload,
-        cancelText: isUser ? null : currentAppLocalizations.noLongerRemind,
+        cancelText: isUser || system.isOhos
+            ? null
+            : currentAppLocalizations.noLongerRemind,
       );
       if (res == true) {
         launchUrl(
@@ -103,7 +122,7 @@ class CommonAction extends _$CommonAction {
               ? LaunchMode.externalApplication
               : LaunchMode.platformDefault,
         );
-      } else if (!isUser && res == false) {
+      } else if (!isUser && !system.isOhos && res == false) {
         ref
             .read(appSettingProvider.notifier)
             .update((state) => state.copyWith(autoCheckUpdate: false));

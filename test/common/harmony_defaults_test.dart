@@ -13,6 +13,7 @@ void main() {
         themeProps: ThemeProps(themeMode: ThemeMode.light),
         appSettingProps: AppSettingProps(
           locale: 'en',
+          autoCheckUpdate: false,
           autoRun: true,
           developerMode: true,
           disclaimerAccepted: true,
@@ -34,6 +35,7 @@ void main() {
       expect(result.appSettingProps.disclaimerAccepted, isTrue);
       expect(result.appSettingProps.locale, isNull);
       expect(result.appSettingProps.autoRun, isFalse);
+      expect(result.appSettingProps.autoCheckUpdate, isTrue);
       expect(result.appSettingProps.developerMode, isFalse);
       expect(result.themeProps.themeMode, ThemeMode.system);
       expect(result.vpnProps, defaultVpnProps);
