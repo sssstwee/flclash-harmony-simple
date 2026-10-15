@@ -1,4 +1,5 @@
 import { configUpsertSql } from '../src/config_write.mjs';
+import { normalizeRoutingContent } from '../src/routing_policy.mjs';
 import { executeSql, isMain, parseOptions, quoteSql, readPrivateJson, resolveConfig, runCli } from './operations.mjs';
 
 const usage = 'Usage: npm run config -- PRIVATE_SECRETS_JSON [--remote|--local] [--scope=default|user|group] [--scope-key=ID] [--config PATH]';
@@ -55,7 +56,7 @@ export async function syncConfig(args, dependencies = {}) {
     if (/^(Subscription returned (HTTP \d+|an empty body)|Configuration exceeds the 90 KB SQL import limit)$/.test(error.message)) throw error;
     throw new Error('Could not download the subscription. Check its URL, connectivity, and the 30-second timeout.');
   }
-  const content = Buffer.concat(chunks).toString('utf8');
+  let content = Buffer.concat(chunks).toString('utf8');
   let config;
   try {
     const parse = dependencies.parse ?? (await import('yaml')).parse;
@@ -64,7 +65,6 @@ export async function syncConfig(args, dependencies = {}) {
     // YAML parser messages include source snippets, which can contain proxy credentials.
     throw new Error('Subscription is not valid YAML. Its contents were not logged.');
   }
-  await dependencies.validateContent?.(content, config);
   const providers = config?.['proxy-providers'];
   const hasProxies = Array.isArray(config?.proxies) && config.proxies.length > 0;
   const hasProviders = providers && typeof providers === 'object' && !Array.isArray(providers) && Object.keys(providers).length > 0;
@@ -72,6 +72,8 @@ export async function syncConfig(args, dependencies = {}) {
     throw new Error('Expected a Clash/Mihomo configuration with nonempty proxies or proxy-providers');
   }
   if (content.includes('\0')) throw new Error('Configuration must not contain NUL characters');
+  content = normalizeRoutingContent(content);
+  await dependencies.validateContent?.(content, config);
   const sql = configUpsertSql([scope, scopeKey, content, new Date().toISOString()].map(quoteSql));
   if (Buffer.byteLength(sql) > 99_000) throw new Error('Configuration exceeds the SQL import limit');
   await (dependencies.executeSql ?? executeSql)(sql, { ...values, config: configPath });

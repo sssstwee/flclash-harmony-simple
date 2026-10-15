@@ -671,8 +671,7 @@ class HarmonySimple extends _$HarmonySimple {
     if (operation != null && token != null) {
       _ensureCurrent(operation, token);
     }
-    final rules =
-        system.isOhos && !config.containsKey(HarmonyRemoteConfig.marker)
+    final rules = system.isOhos
         ? defaultRoutingRules(config)
         : List<String>.from(config['rules'] ?? const <String>[]);
     final group = connectionGroup(groups, rules);

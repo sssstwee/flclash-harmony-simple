@@ -4,8 +4,9 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import worker from '../src/index';
 import { configRowMeta } from '../src/config_meta';
 import { SUBSCRIPTION_MAX_BYTES } from '../src/subscription_sync';
+import { normalizeRoutingContent } from '../src/routing_policy.mjs';
 
-const content = 'proxies:\n  - name: node\nproxy-groups:\n  - name: auto\nrules:\n  - DOMAIN,example.org,auto\n  - MATCH,DIRECT\n';
+const content = 'proxies:\n  - name: node\n    type: ss\nproxy-groups:\n  - name: auto\n    type: select\n    proxies: [node]\nrules:\n  - DOMAIN,example.org,auto\n  - MATCH,DIRECT\n';
 const token = 'test-push-secret';
 const current = () => env.DB.prepare("SELECT * FROM proxy_config WHERE scope='default' AND scope_key=''").first();
 const backup = () => env.DB.prepare("SELECT * FROM proxy_config_backup WHERE scope='default' AND scope_key=''").first();
@@ -18,7 +19,7 @@ beforeEach(async () => {
   await env.DB.batch(['proxy_config', 'proxy_config_backup', 'subscription_push_rate_limit'].map(table => env.DB.prepare(`DELETE FROM ${table}`)));
 });
 test('push versions, unchanged timestamp/backup, changed backup', async () => {
-  const version = (await configRowMeta({ scope: 'default', scope_key: '', content })).version;
+  const version = (await configRowMeta({ scope: 'default', scope_key: '', content: normalizeRoutingContent(content) })).version;
   expect(await (await push()).json()).toEqual({ changed: true, oldVersion: null, newVersion: version });
   const first = await current();
   expect(await (await push()).json()).toEqual({ changed: false, oldVersion: version, newVersion: version });
@@ -53,7 +54,7 @@ test('validates scope and isolates scoped writes', async () => {
   }
   expect((await push(content, '?scope=group&key=team')).status).toBe(200);
   expect(await current()).toBeNull();
-  expect((await env.DB.prepare("SELECT content FROM proxy_config WHERE scope='group' AND scope_key='team'").first())?.content).toBe(content);
+  expect((await env.DB.prepare("SELECT content FROM proxy_config WHERE scope='group' AND scope_key='team'").first())?.content).toBe(normalizeRoutingContent(content));
 });
 test('atomic global quota across scopes resets next minute', async () => {
   const now = Date.now();

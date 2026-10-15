@@ -1,6 +1,8 @@
 import { env, exports } from 'cloudflare:workers';
 import { hashPassword } from 'better-auth/crypto';
 import { beforeEach, expect, test } from 'vitest';
+import { normalizeRoutingContent } from '../src/routing_policy.mjs';
+import { parse } from 'yaml';
 
 const password = 'Test-password-42!';
 const config = 'proxies:\n  - name: example\n    type: ss\n    server: example.org\n    port: 443\n    cipher: aes-128-gcm\n    password: test\n';
@@ -79,6 +81,28 @@ test('expired and tampered signed tokens cannot download settings', async () => 
   expect((await request('/v1/config', { headers: bearer(`${token}wrong`) })).status).toBe(401);
   await env.DB.prepare('UPDATE session SET expiresAt = ?').bind('2000-01-01T00:00:00.000Z').run();
   expect((await request('/v1/config', { headers: bearer(token) })).status).toBe(401);
+});
+
+test('existing D1 subscriptions receive routing guards and a stable representation version', async () => {
+  const token = await login();
+  const legacy = config + 'proxy-groups:\n  - name: Main\n    type: select\n    proxies: [example, DIRECT]\nrules: ["MATCH,DIRECT"]\n';
+  await seedDefaultConfig(legacy);
+  const response = await request('/v1/config', { headers: bearer(token) });
+  expect(response.status).toBe(200);
+  const body = await response.text();
+  expect(body).toBe(normalizeRoutingContent(legacy));
+  const document = parse(body);
+  expect(document['harmony-runtime']).toEqual({});
+  expect(document.rules).toContain('DOMAIN-SUFFIX,deepseek.com,DIRECT');
+  expect(document.rules).toContain('DOMAIN-SUFFIX,claude.com,🤖 AI优先原生');
+  expect(document.rules.at(-1)).toBe('MATCH,Main');
+  expect(document['proxy-groups'].find((group: { name: string }) => group.name === '🤖 AI优先原生').proxies).toEqual(['REJECT']);
+  const version = response.headers.get('X-Config-Version');
+  const poll = await request('/v1/config/version', { headers: bearer(token) });
+  expect((await poll.json() as { version: string }).version).toBe(version);
+  await env.DB.prepare('UPDATE proxy_config SET content=?').bind(body).run();
+  const unchanged = await request('/v1/config', { headers: { ...bearer(token), 'If-None-Match': response.headers.get('ETag')! } });
+  expect(unchanged.status).toBe(304);
 });
 
 test('wrong passwords fail and repeated attempts are throttled in D1', async () => {
