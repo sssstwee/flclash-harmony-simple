@@ -529,7 +529,7 @@ ColorScheme genColorScheme(
   Color? color,
   bool ignoreConfig = false,
 }) {
-  if (system.isOhos) return harmonyColorScheme;
+  if (system.isOhos) return harmonyColorScheme(brightness);
   final vm2 = ref.watch(
     themeSettingProvider.select(
       (state) => VM2(state.primaryColor, state.schemeVariant),
@@ -558,7 +558,7 @@ ColorScheme genColorScheme(
 
 @riverpod
 Brightness currentBrightness(Ref ref) {
-  if (system.isOhos) return Brightness.dark;
+  if (system.isOhos) return ref.watch(systemBrightnessProvider);
   final themeMode = ref.watch(
     themeSettingProvider.select((state) => state.themeMode),
   );

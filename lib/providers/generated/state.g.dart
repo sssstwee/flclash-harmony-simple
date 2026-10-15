@@ -1929,7 +1929,7 @@ final class GenColorSchemeProvider
   }
 }
 
-String _$genColorSchemeHash() => r'7634015449be7281f1470beadd2d5367b9b7cd72';
+String _$genColorSchemeHash() => r'1b8f2158d419c6ad86be370fa8752eb6182eb1c9';
 
 final class GenColorSchemeFamily extends $Family
     with
@@ -1998,7 +1998,7 @@ final class CurrentBrightnessProvider
   }
 }
 
-String _$currentBrightnessHash() => r'eff34ba0cf7a67bbde10848ee84f30ca3e150221';
+String _$currentBrightnessHash() => r'51e61e853ae9be110b7d61c02543581c5107018f';
 
 @ProviderFor(autoSetSystemDnsState)
 final autoSetSystemDnsStateProvider = AutoSetSystemDnsStateProvider._();

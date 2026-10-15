@@ -1,7 +1,33 @@
 import 'package:flutter/material.dart';
 
-/// Fixed monochrome palette for the HarmonyOS client, independent of wallpaper.
-final harmonyColorScheme =
+/// Monochrome palettes for the HarmonyOS client, independent of wallpaper.
+final harmonyLightColorScheme =
+    ColorScheme.fromSeed(
+      seedColor: Colors.black,
+      brightness: Brightness.light,
+      dynamicSchemeVariant: DynamicSchemeVariant.monochrome,
+    ).copyWith(
+      primary: Colors.black,
+      onPrimary: Colors.white,
+      secondary: Colors.black,
+      tertiary: Colors.black,
+      surface: Colors.white,
+      onSurface: Colors.black,
+      onSurfaceVariant: const Color(0xff626262),
+      surfaceContainerLowest: Colors.white,
+      surfaceContainerLow: const Color(0xfff5f5f5),
+      surfaceContainer: const Color(0xffeeeeee),
+      surfaceContainerHigh: const Color(0xffe7e7e7),
+      surfaceContainerHighest: const Color(0xffdddddd),
+      outlineVariant: const Color(0xffdedede),
+      surfaceTint: Colors.transparent,
+      error: Colors.black,
+      onError: Colors.white,
+      errorContainer: const Color(0xffeeeeee),
+      onErrorContainer: Colors.black,
+    );
+
+final harmonyDarkColorScheme =
     ColorScheme.fromSeed(
       seedColor: Colors.white,
       brightness: Brightness.dark,
@@ -26,3 +52,8 @@ final harmonyColorScheme =
       errorContainer: const Color(0xff333333),
       onErrorContainer: Colors.white,
     );
+
+ColorScheme harmonyColorScheme(Brightness brightness) =>
+    brightness == Brightness.light
+    ? harmonyLightColorScheme
+    : harmonyDarkColorScheme;
