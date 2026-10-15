@@ -1110,6 +1110,67 @@ void main() {
     },
   );
 
+  test('connecting from cache clears a superseded refresh indicator', () async {
+    final harness = _Harness(initial: [_profile()]);
+    harness.cache();
+    harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+    await harness.notifier.bootstrap();
+    harness.installRoute();
+    harness.api.versionFailure = HarmonyAccountError.unavailable;
+    final entered = Completer<void>();
+    final response = Completer<HarmonyConfigDownload>();
+    harness.api.downloadStarted = entered.complete;
+    harness.api.downloads.add(response.future);
+    final refresh = harness.notifier.forceRefreshConfig();
+    await entered.future;
+    expect(harness.state.homeStatus.configSyncInProgress, isTrue);
+
+    await harness.notifier.toggleConnect();
+    expect(harness.container.read(isStartProvider), isTrue);
+    response.complete(HarmonyConfigDownload(bytes: _config));
+    await refresh;
+
+    expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+    expect(harness.state.homeStatus.configFreshness.refreshInProgress, isFalse);
+    expect(harness.state.session?.username, 'alice');
+  });
+
+  test(
+    'an older refresh cannot clear a newer connection config indicator',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      harness.installRoute();
+      harness.api.versionFailure = HarmonyAccountError.unavailable;
+      final refreshEntered = Completer<void>();
+      final refreshResponse = Completer<HarmonyConfigDownload>();
+      final connectEntered = Completer<void>();
+      final connectResponse = Completer<HarmonyConfigDownload>();
+      harness.api.downloadStarted = refreshEntered.complete;
+      harness.api.downloads.addAll([
+        refreshResponse.future,
+        connectResponse.future,
+      ]);
+      final refresh = harness.notifier.forceRefreshConfig();
+      await refreshEntered.future;
+
+      harness.files.bytes[7] = Uint8List.fromList('changed'.codeUnits);
+      harness.api.downloadStarted = connectEntered.complete;
+      final connecting = harness.notifier.toggleConnect();
+      await connectEntered.future;
+      refreshResponse.complete(HarmonyConfigDownload(bytes: _config));
+      await refresh;
+      expect(harness.state.homeStatus.configSyncInProgress, isTrue);
+
+      connectResponse.complete(HarmonyConfigDownload(bytes: _config));
+      await connecting;
+      expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+      expect(harness.container.read(isStartProvider), isTrue);
+    },
+  );
+
   test(
     'a version probe from before logout cannot expire a new login',
     () async {

@@ -124,6 +124,7 @@ class HarmonySimple extends _$HarmonySimple {
   HarmonyAccountApi get _api => ref.read(harmonyAccountApiProvider);
   HarmonyProfileStore get _files => ref.read(harmonyProfileStoreProvider);
   int _operation = 0;
+  int _configSyncGeneration = 0;
   bool _restoring = false;
   final _profileInstalls = <({Profile profile, Completer<void> done})>[];
 
@@ -793,6 +794,7 @@ class HarmonySimple extends _$HarmonySimple {
       throw HarmonyAccountError.expired;
     }
     final op = operation ?? _operation;
+    final syncGeneration = ++_configSyncGeneration;
     _bindConfigFetchRoute();
     state = state.copyWith(
       homeStatus: state.homeStatus.copyWith(configSyncInProgress: true),
@@ -1041,8 +1043,10 @@ class HarmonySimple extends _$HarmonySimple {
       commonPrint.log('Harmony config/$stage failed (${error.runtimeType})');
       rethrow;
     } finally {
+      // A connect may supersede this operation without starting another sync.
+      // Only a newer sync, rather than any new operation, takes the indicator.
       if (ref.mounted &&
-          op == _operation &&
+          syncGeneration == _configSyncGeneration &&
           _api.session?.token == session.token) {
         state = state.copyWith(
           homeStatus: state.homeStatus.copyWith(configSyncInProgress: false),
