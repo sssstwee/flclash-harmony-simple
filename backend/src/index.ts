@@ -1,5 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import { SUBSCRIPTION_MAX_BYTES, validateSubscription } from './subscription_sync';
+import { normalizePushedAiContent } from './routing_policy.mjs';
 import { configUpsertSql } from './config_write.mjs';
 import { createAuth } from './auth';
 import {
@@ -353,6 +354,9 @@ async function pushSubscription(request: Request, env: Env): Promise<Response> {
     content = new TextDecoder('utf-8', { fatal: true }).decode(body);
     validateSubscription(content);
   } catch { return failure('INVALID_SUBSCRIPTION', 400); }
+
+  try { content = normalizePushedAiContent(content); }
+  catch { return failure('AI_GROUP_EMPTY_AFTER_WARP_REMOVAL', 400); }
 
   // D1 batch is a transaction; the existing trigger backs up a changed row.
   const [previous, written] = await env.DB.batch([

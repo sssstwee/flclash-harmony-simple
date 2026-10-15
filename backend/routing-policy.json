@@ -6,8 +6,6 @@
     "https://github.com/blackmatrix7/ios_rule_script/tree/master/rule/Clash/Copilot"
   ],
   "aiGroup": "🤖 AI优先原生",
-  "nativeProxies": ["voyra-direct", "voyra-anytls-direct", "voyra-hy2-direct"],
-  "warpProxies": ["voyra-warp", "voyra-hy2-warp"],
   "privateRules": [
     "GEOSITE,private,DIRECT",
     "GEOIP,private,DIRECT,no-resolve",

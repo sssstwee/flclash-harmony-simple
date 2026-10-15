@@ -33,27 +33,44 @@ function defaultTarget(config) {
   return [...groups].find(([name, group]) => name !== policy.aiGroup && !group.hidden && hasProxy(name))?.[0];
 }
 
+function filterAiGroups(config) {
+  const aiGroups = (config['proxy-groups'] ?? []).filter(group => group.name === policy.aiGroup || aiName(group.name));
+  for (const group of aiGroups) {
+    group.proxies = (group.proxies ?? []).filter(name => !/warp/i.test(name));
+    if (!group.proxies.length) throw new Error(`AI group "${group.name}" has no members after removing WARP nodes`);
+  }
+  return aiGroups;
+}
+
+// Validate and sanitize before a push writes configuration or backup rows.
+export function normalizePushedAiContent(content) {
+  const config = parse(content, { logLevel: 'silent', prettyErrors: false });
+  const aiGroups = filterAiGroups(config);
+  if (!aiGroups.length) return content;
+  const names = new Set(aiGroups.map(group => group.name));
+  const aiRules = [];
+  const remaining = [];
+  for (const rule of config.rules ?? []) {
+    const parts = rule.split(',').map(value => value.trim());
+    const target = parts.at(-1) === 'no-resolve' ? parts.at(-2) : parts.at(-1);
+    (names.has(target) ? aiRules : remaining).push(rule);
+  }
+  const boundary = remaining.findIndex(rule => /^(?:GEOIP,|GEOSITE,cn,)/i.test(rule.trim()));
+  remaining.splice(boundary < 0 ? 0 : boundary, 0, ...aiRules);
+  config.rules = remaining;
+  return stringify(config, { lineWidth: 0 });
+}
+
 export function applyRoutingPolicy(input) {
   const config = structuredClone(input);
   const target = defaultTarget(config);
   if (!target) throw new Error('No usable overseas proxy group');
-  const nodes = new Map((config.proxies ?? []).map(node => [node.name, node]));
-  const aiProxies = [...policy.nativeProxies, ...policy.warpProxies].filter(name => {
-    const node = nodes.get(name);
-    return node && ['vless', 'hysteria2', 'anytls'].includes(node.type) && !node['dialer-proxy'];
-  });
-  const aiGroup = name => aiProxies.length ? {
-    name, type: 'fallback', proxies: aiProxies,
-    url: 'https://api.openai.com/v1/models', 'expected-status': 401,
-    interval: 90, lazy: false, timeout: 5000, 'max-failed-times': 2,
-  } : { name, type: 'select', proxies: ['REJECT'] };
-  config['proxy-groups'] = (config['proxy-groups'] ?? [])
-    .filter(group => group.name !== policy.aiGroup)
-    .map(group => aiName(group.name) ? aiGroup(group.name) : group);
-  config['proxy-groups'].push(aiGroup(policy.aiGroup));
+  const aiGroups = filterAiGroups(config);
+  if (!aiGroups.length) throw new Error('Subscription requires an AI proxy group; no fallback members are added');
+  const aiTarget = aiGroups.find(group => group.name === policy.aiGroup)?.name ?? aiGroups[0].name;
   const { hasProxy } = graph(config);
   for (const group of config['proxy-groups']) {
-    if (hasProxy(group.name) && Array.isArray(group.proxies)) {
+    if (!aiGroups.includes(group) && hasProxy(group.name) && Array.isArray(group.proxies)) {
       group.proxies = group.proxies.filter(name => hasProxy(name));
     }
   }
@@ -61,25 +78,25 @@ export function applyRoutingPolicy(input) {
   for (const rule of config.rules ?? []) {
     const parts = rule.split(',').map(value => value.trim());
     if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'GEOSITE'].includes(parts[0]) || parts.length !== 3) continue;
-    if (hasProxy(parts[2]) || aiName(parts[2])) preserved.push(`${parts[0]},${parts[1]},${aiName(parts[2]) ? policy.aiGroup : target}`);
+    if (hasProxy(parts[2]) || aiName(parts[2])) preserved.push(`${parts[0]},${parts[1]},${aiName(parts[2]) ? parts[2] : target}`);
   }
   config.rules = [...new Set([
     ...policy.privateRules,
     ...policy.domesticAiDomains.map(domain => `DOMAIN-SUFFIX,${domain},DIRECT`),
-    ...policy.aiRules.map(rule => `${rule},${policy.aiGroup}`),
+    ...policy.aiRules.map(rule => `${rule},${aiTarget}`),
     ...policy.overseasRules.map(rule => `${rule},${target}`),
-    'GEOSITE,cn,DIRECT', ...preserved,
+    ...preserved.filter(rule => aiGroups.some(group => rule.endsWith(`,${group.name}`))),
+    'GEOSITE,cn,DIRECT', ...preserved.filter(rule => !aiGroups.some(group => rule.endsWith(`,${group.name}`))),
     `GEOSITE,geolocation-!cn,${target}`, 'GEOIP,CN,DIRECT', `MATCH,${target}`,
   ])];
   const dns = config.dns ?? {};
   const nameserverPolicy = { ...(dns['nameserver-policy'] ?? {}) };
-  const aiDns = `https://1.1.1.1/dns-query#${policy.aiGroup}`;
   for (const rule of config.rules) {
     const [type, payload, ruleTarget] = rule.split(',');
-    if (ruleTarget !== policy.aiGroup) continue;
-    if (type === 'DOMAIN') nameserverPolicy[payload] = aiDns;
-    if (type === 'DOMAIN-SUFFIX') nameserverPolicy[`+.${payload}`] = aiDns;
-    if (type === 'GEOSITE') nameserverPolicy[`geosite:${payload}`] = aiDns;
+    if (!aiGroups.some(group => group.name === ruleTarget)) continue;
+    if (type === 'DOMAIN') nameserverPolicy[payload] = `https://1.1.1.1/dns-query#${ruleTarget}`;
+    if (type === 'DOMAIN-SUFFIX') nameserverPolicy[`+.${payload}`] = `https://1.1.1.1/dns-query#${ruleTarget}`;
+    if (type === 'GEOSITE') nameserverPolicy[`geosite:${payload}`] = `https://1.1.1.1/dns-query#${ruleTarget}`;
   }
   for (const domain of policy.domesticAiDomains) nameserverPolicy[`+.${domain}`] = policy.directDns;
   nameserverPolicy['geosite:private'] = ['system://'];

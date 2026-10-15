@@ -1,3 +1,4 @@
+import { normalizePushedAiContent } from '../src/routing_policy.mjs';
 import { configUpsertSql } from '../src/config_write.mjs';
 import { executeSql, isMain, parseOptions, quoteSql, readPrivateJson, resolveConfig, runCli } from './operations.mjs';
 
@@ -55,7 +56,7 @@ export async function syncConfig(args, dependencies = {}) {
     if (/^(Subscription returned (HTTP \d+|an empty body)|Configuration exceeds the 90 KB SQL import limit)$/.test(error.message)) throw error;
     throw new Error('Could not download the subscription. Check its URL, connectivity, and the 30-second timeout.');
   }
-  const content = Buffer.concat(chunks).toString('utf8');
+  let content = Buffer.concat(chunks).toString('utf8');
   let config;
   try {
     const parse = dependencies.parse ?? (await import('yaml')).parse;
@@ -71,6 +72,7 @@ export async function syncConfig(args, dependencies = {}) {
     throw new Error('Expected a Clash/Mihomo configuration with nonempty proxies or proxy-providers');
   }
   if (content.includes('\0')) throw new Error('Configuration must not contain NUL characters');
+  content = normalizePushedAiContent(content);
   await dependencies.validateContent?.(content, config);
   const sql = configUpsertSql([scope, scopeKey, content, new Date().toISOString()].map(quoteSql));
   if (Buffer.byteLength(sql) > 99_000) throw new Error('Configuration exceeds the SQL import limit');
