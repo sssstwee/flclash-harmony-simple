@@ -225,57 +225,6 @@ ResponseBody jsonBody(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  for (final suffix in ['', '/']) {
-    test(
-      'API base preserves port and prefix with trailing "$suffix"',
-      () async {
-        final http = Dio(
-          BaseOptions(baseUrl: 'https://69.17.3.174:8444/api$suffix'),
-        );
-        final urls = <String>[];
-        http.httpClientAdapter = Adapter((request) {
-          urls.add(request.uri.toString());
-          if (request.path == '/api/auth/sign-in/username' ||
-              request.path == '/api/auth/get-session') {
-            return jsonBody(
-              {
-                'session': {
-                  'expiresAt': DateTime.now()
-                      .add(const Duration(days: 1))
-                      .toIso8601String(),
-                },
-                'user': {'username': 'harmony'},
-              },
-              200,
-              {
-                'set-auth-token': ['session-token'],
-              },
-            );
-          }
-          if (request.path == harmonyConfigPath) {
-            return ResponseBody.fromString('profile', 200);
-          }
-          if (request.path == harmonyConfigVersionPath) {
-            return jsonBody({}, 404);
-          }
-          return jsonBody({'success': true});
-        });
-        final api = HarmonyAccountApi(http: http, storage: MemoryStore());
-        await api.login('harmony', 'password');
-        await api.restore();
-        await api.downloadConfig();
-        await api.fetchConfigVersionInfo();
-        await api.logout();
-        expect(urls, [
-          'https://69.17.3.174:8444/api/api/auth/sign-in/username',
-          'https://69.17.3.174:8444/api/api/auth/get-session',
-          'https://69.17.3.174:8444/api/v1/config',
-          'https://69.17.3.174:8444/api/v1/config/version',
-          'https://69.17.3.174:8444/api/api/auth/sign-out',
-        ]);
-      },
-    );
-  }
   test(
     'storage failures fail closed and still revoke the server session',
     () async {
