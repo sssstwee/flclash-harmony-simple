@@ -846,8 +846,8 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: awake
-                      ? const Color(0xff1e49ed)
-                      : const Color(0xff122c8e),
+                      ? const Color(0xff1765f6)
+                      : const Color(0xff0e3d94),
                   border: Border.all(color: ringColor, width: 1.5),
                 ),
                 child: Stack(

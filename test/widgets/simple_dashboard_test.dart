@@ -351,7 +351,7 @@ void main() {
         );
         expect(
           (disc.decoration! as BoxDecoration).color,
-          awake ? const Color(0xff1e49ed) : const Color(0xff122c8e),
+          awake ? const Color(0xff1765f6) : const Color(0xff0e3d94),
         );
         expect(tester.getSize(primaryConnectionControl), const Size(64, 64));
         await tester.tap(primaryConnectionControl);

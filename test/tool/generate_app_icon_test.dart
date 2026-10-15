@@ -64,7 +64,7 @@ Future<void> main() async {
     expect(background, contains('<rect width="512" height="512"'));
     expect(background, isNot(contains('rx=')));
     expect(background, isNot(contains('<path')));
-    expect(background, contains('fill="#1E49ED"'));
+    expect(background, contains('fill="#1765F6"'));
     expect(foreground, isNot(contains('<rect')));
     final guardian = File('assets/images/cc_guardian.svg').readAsStringSync();
     final artwork = RegExp(r'<g id="cc-guardian">[\s\S]*?</g>');
@@ -77,7 +77,7 @@ Future<void> main() async {
       expect(source, isNot(contains('linearGradient')));
       expect(
         RegExp(r'#[0-9a-fA-F]{6}').allMatches(source).map((m) => m.group(0)),
-        everyElement(isIn(['#1E49ED', '#F8FBFF'])),
+        everyElement(isIn(['#1765F6', '#F8FBFF'])),
       );
     }
     final layeredImage = jsonDecode(
@@ -130,7 +130,7 @@ Future<void> main() async {
         expect(_pixel(foregroundData, 432, point.$1, point.$2).last, 0);
       }
       expect(_pixel(foregroundData, 432, 216, 216).last, 255);
-      expect(_pixel(backgroundData, 512, 256, 256), [30, 73, 237, 255]);
+      expect(_pixel(backgroundData, 512, 256, 256), [23, 101, 246, 255]);
 
       // Layering must leave the background visible outside the shield.
       final recorder = ui.PictureRecorder();
