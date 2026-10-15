@@ -291,7 +291,7 @@ void main() {
         );
         expect(
           (disc.decoration! as BoxDecoration).color,
-          harmonyColorScheme.surface,
+          awake ? const Color(0xff1e49ed) : const Color(0xff122c8e),
         );
         expect(tester.getSize(primaryConnectionControl), const Size(64, 64));
         await tester.tap(primaryConnectionControl);
