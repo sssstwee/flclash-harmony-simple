@@ -1,7 +1,7 @@
 name: fl_clash
 description: CC保镖, a HarmonyOS proxy client for protecting connections to Claude and Codex, based on ClashMeta, open-source and ad-free.
 publish_to: 'none'
-version: 0.8.94+2026101503
+version: 0.8.94+2026101504
 environment:
   sdk: '>=3.8.0 <4.0.0'
 

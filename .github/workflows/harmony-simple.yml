@@ -127,12 +127,10 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           dart run tool/generate_app_icon.dart
 
-      - name: Check generated sources and formatting
+      - name: Check generated Dart sources and formatting
         run: |
-          git diff --exit-code -- lib test tool assets/images/icon.png \
-            ohos/AppScope/resources/base/media/background.png \
-            ohos/AppScope/resources/base/media/foreground.png \
-            ohos/entry/src/main/resources/base/media/icon.png
+          # PNG encoding varies by SVG renderer; rendered icon layers are verified in tests.
+          git diff --exit-code -- lib test tool
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos
