@@ -231,11 +231,15 @@ class HarmonySimple extends _$HarmonySimple {
         _api.session == null) {
       return;
     }
+    final token = _api.session!.token;
     try {
-      if (await _api.restore() == null) {
+      final session = await _api.restore();
+      if (!ref.mounted || state.session?.token != token) return;
+      if (session == null) {
         await logout(expired: true);
       }
     } on HarmonyAccountError catch (error) {
+      if (!ref.mounted || state.session?.token != token) return;
       if (error == HarmonyAccountError.expired) {
         await logout(expired: true);
       }
@@ -341,6 +345,8 @@ class HarmonySimple extends _$HarmonySimple {
   Future<void> logout({bool expired = false}) async {
     final operation = ++_operation;
     _stopBackgroundTasks();
+    _lastVersionCheckAt = null;
+    _versionCheckFailures = 0;
     state = state.copyWith(busy: true, clearError: true, clearIssue: true);
     final installations = List.of(_profileInstalls);
     final profiles = <int, Profile>{
@@ -352,6 +358,7 @@ class HarmonySimple extends _$HarmonySimple {
       remoteRuntime: const {},
       clearSession: true,
       usingCachedConfig: false,
+      homeStatus: HarmonyHomeStatus(networkKind: state.homeStatus.networkKind),
     );
     try {
       final logout = _api.logout().catchError((Object _) {
@@ -447,17 +454,9 @@ class HarmonySimple extends _$HarmonySimple {
     required String token,
   }) async {
     final setup = ref.read(setupActionProvider.notifier);
-    final freshness = state.homeStatus.configFreshness;
-    final checkedAt = freshness.lastCheckedAt;
-    final recentlyVerified =
-        !state.usingCachedConfig &&
-        (freshness.kind == HarmonyConfigFreshnessKind.upToDate ||
-            freshness.kind == HarmonyConfigFreshnessKind.autoUpdated) &&
-        checkedAt != null &&
-        DateTime.now().difference(checkedAt) < _minCheckInterval;
-    final verified = recentlyVerified
-        ? await _verifiedCachedProfile(await _api.readConfigCache())
-        : null;
+    // A version probe must not block VPN startup. The cache is still bound to
+    // this account and checked against its installed file hash on every start.
+    final verified = await _verifiedCachedProfile(await _api.readConfigCache());
     _ensureCurrent(operation, token);
     if (verified == null || verified.id != state.remoteProfile?.id) {
       await _syncRemoteProfile(
@@ -566,13 +565,15 @@ class HarmonySimple extends _$HarmonySimple {
       return;
     }
     if (!force && !_isVersionCheckDue()) return;
+    final operation = _operation;
+    final token = _api.session!.token;
     _versionCheckInFlight = true;
     _bindConfigFetchRoute();
     try {
       final localVersion = await _api.readConfigVersion();
-      if (!ref.mounted) return;
+      _ensureCurrent(operation, token);
       final remote = await _api.fetchConfigVersionInfo();
-      if (!ref.mounted) return;
+      _ensureCurrent(operation, token);
       if (remote != null) {
         final configured =
             (state.remoteRuntime['parameters'] as Map?)?['checkSeconds'];
@@ -582,6 +583,7 @@ class HarmonySimple extends _$HarmonySimple {
               )
             : remote.minCheckInterval;
         await _api.saveMinCheckInterval(_minCheckInterval);
+        _ensureCurrent(operation, token);
       }
       var needsDownload = false;
       if (remote != null) {
@@ -589,10 +591,14 @@ class HarmonySimple extends _$HarmonySimple {
       } else {
         needsDownload = !await _api.probeConfigNotModified();
       }
-      if (!ref.mounted) return;
+      _ensureCurrent(operation, token);
       _versionCheckFailures = 0;
       _lastVersionCheckAt = DateTime.now();
-      _markConfigUpToDate(checkedAt: _lastVersionCheckAt);
+      await _markConfigUpToDate(
+        operation: operation,
+        checkedAt: _lastVersionCheckAt,
+      );
+      _ensureCurrent(operation, token);
       if (needsDownload) {
         _setConfigFreshness(
           state.homeStatus.configFreshness.copyWith(
@@ -604,10 +610,13 @@ class HarmonySimple extends _$HarmonySimple {
           fallbackOnNetworkError: true,
           background: true,
           hotApplyWhenConnected: true,
+          operation: operation,
         );
       }
+    } on _SupersededHarmonyOperation {
+      // A later connect, login or logout owns the state now.
     } on HarmonyAccountError catch (error) {
-      if (!ref.mounted) return;
+      if (!ref.mounted || operation != _operation) return;
       if (error == HarmonyAccountError.expired) {
         await logout(expired: true);
         return;
@@ -616,7 +625,7 @@ class HarmonySimple extends _$HarmonySimple {
       _lastVersionCheckAt = DateTime.now();
       _markConfigCheckFailed(error);
     } catch (_) {
-      if (!ref.mounted) return;
+      if (!ref.mounted || operation != _operation) return;
       _versionCheckFailures++;
       _lastVersionCheckAt = DateTime.now();
       _markConfigCheckFailed(HarmonyAccountError.unavailable);
@@ -641,10 +650,13 @@ class HarmonySimple extends _$HarmonySimple {
     }
   }
 
-  Future<void> _markConfigUpToDate({DateTime? checkedAt}) async {
-    if (!ref.mounted) return;
+  Future<void> _markConfigUpToDate({
+    required int operation,
+    DateTime? checkedAt,
+  }) async {
+    if (!ref.mounted || operation != _operation) return;
     final version = shortConfigVersionLabel(await _api.readConfigVersion());
-    if (!ref.mounted) return;
+    if (!ref.mounted || operation != _operation) return;
     _setConfigFreshness(
       state.homeStatus.configFreshness.copyWith(
         kind: HarmonyConfigFreshnessKind.upToDate,
@@ -818,7 +830,7 @@ class HarmonySimple extends _$HarmonySimple {
             remoteProfile: current,
             usingCachedConfig: false,
           );
-          await _markConfigUpToDate(checkedAt: DateTime.now());
+          await _markConfigUpToDate(operation: op, checkedAt: DateTime.now());
           return;
         }
         download = await _api.downloadConfig();
@@ -1009,7 +1021,7 @@ class HarmonySimple extends _$HarmonySimple {
       }
       rethrow;
     } finally {
-      if (background) {
+      if (background && ref.mounted && _api.session?.token == session.token) {
         state = state.copyWith(
           homeStatus: state.homeStatus.copyWith(
             configSyncInProgress: false,

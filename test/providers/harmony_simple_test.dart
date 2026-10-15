@@ -53,6 +53,8 @@ class _Api extends HarmonyAccountApi {
   Object? logoutFailure;
   Object? commitFailure;
   Object? restoreFailure;
+  Object? versionFailure;
+  Future<HarmonyConfigVersionInfo?> Function()? versionHook;
   int logouts = 0;
   int commits = 0;
   bool reconnectOnLaunch = false;
@@ -146,7 +148,10 @@ class _Api extends HarmonyAccountApi {
   Future<String?> readConfigVersion() async => null;
 
   @override
-  Future<HarmonyConfigVersionInfo?> fetchConfigVersionInfo() async => null;
+  Future<HarmonyConfigVersionInfo?> fetchConfigVersionInfo() async {
+    if (versionFailure != null) throw versionFailure!;
+    return versionHook?.call();
+  }
 
   @override
   Future<bool> probeConfigNotModified() async => true;
@@ -789,6 +794,9 @@ void main() {
       expect(harness.state.session, isNull);
       expect(harness.state.remoteProfile, isNull);
       expect(harness.state.usingCachedConfig, isFalse);
+      expect(harness.state.homeStatus.configFreshness.lastCheckedAt, isNull);
+      expect(harness.state.homeStatus.lastConfigSyncAt, isNull);
+      expect(harness.state.homeStatus.autoReconnectArmed, isFalse);
       expect(harness.api.isAuthorized, isFalse);
       expect(harness.files.deleted, contains(7));
     },
@@ -1010,6 +1018,92 @@ void main() {
       expect(harness.container.read(isStartProvider), isFalse);
       expect(harness.state.homeStatus.autoReconnectArmed, isFalse);
       expect(harness.api.reconnectWrites, isEmpty);
+    },
+  );
+
+  test(
+    'first connect after relogin uses verified config while the server is unreachable',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      await harness.notifier.logout();
+      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+      await harness.notifier.login('alice', 'password');
+      harness.api.versionFailure = HarmonyAccountError.unavailable;
+      await harness.notifier.checkConfigVersion(force: true);
+      harness.installRoute();
+      final blockedDownload = Completer<HarmonyConfigDownload>();
+      harness.api.downloads.add(blockedDownload.future);
+      final connecting = harness.notifier.toggleConnect();
+      try {
+        await connecting.timeout(const Duration(seconds: 1));
+        expect(harness.api.requests, hasLength(2));
+        expect(harness.setup.starts, hasLength(1));
+        expect(harness.container.read(isStartProvider), isTrue);
+        expect(harness.state.error, isNull);
+        expect(harness.state.busy, isFalse);
+      } finally {
+        blockedDownload.complete(
+          const HarmonyConfigDownload(notModified: true),
+        );
+        await connecting;
+      }
+    },
+  );
+
+  test(
+    'a version probe from before logout cannot expire a new login',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      final entered = Completer<void>();
+      final response = Completer<HarmonyConfigVersionInfo?>();
+      harness.api.versionHook = () {
+        entered.complete();
+        return response.future;
+      };
+      final checking = harness.notifier.checkConfigVersion(force: true);
+      await entered.future;
+      await harness.notifier.logout();
+      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+      await harness.notifier.login('bob', 'password');
+      response.completeError(HarmonyAccountError.expired);
+      await checking;
+      expect(harness.api.logouts, 1);
+      expect(harness.state.session?.username, 'bob');
+      expect(harness.state.remoteProfile, isNotNull);
+      expect(harness.state.error, isNull);
+    },
+  );
+
+  test(
+    'a session probe from before logout cannot expire a new login',
+    () async {
+      final harness = _Harness(initial: [_profile()]);
+      harness.cache();
+      harness.api.downloads.add(const HarmonyConfigDownload(notModified: true));
+      await harness.notifier.bootstrap();
+      final entered = Completer<void>();
+      final response = Completer<HarmonySession?>();
+      harness.api.restoreHook = () {
+        entered.complete();
+        return response.future;
+      };
+      final checking = harness.notifier.checkSession();
+      await entered.future;
+      await harness.notifier.logout();
+      harness.api.downloads.add(HarmonyConfigDownload(bytes: _config));
+      await harness.notifier.login('bob', 'password');
+      response.completeError(HarmonyAccountError.expired);
+      await checking;
+      expect(harness.api.logouts, 1);
+      expect(harness.state.session?.username, 'bob');
+      expect(harness.state.remoteProfile, isNotNull);
+      expect(harness.state.error, isNull);
     },
   );
 
