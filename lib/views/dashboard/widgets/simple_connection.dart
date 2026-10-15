@@ -845,7 +845,9 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                 height: 64,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white,
+                  color: awake
+                      ? const Color(0xff1e49ed)
+                      : const Color(0xff122c8e),
                   border: Border.all(color: ringColor, width: 1.5),
                 ),
                 child: Stack(
@@ -856,7 +858,7 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                         dimension: 56,
                         child: CircularProgressIndicator(
                           value: reducedMotion ? 0.65 : null,
-                          color: Colors.black,
+                          color: scheme.onSurface,
                           strokeWidth: 3,
                         ),
                       ),
@@ -874,27 +876,30 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                           child: child,
                         ),
                       ),
-                      child: SvgPicture.asset(
-                        awake
-                            ? 'assets/images/cat_awake.svg'
-                            : 'assets/images/cat_sleeping.svg',
+                      child: Opacity(
                         key: ValueKey(
-                          awake ? 'harmony_cat_awake' : 'harmony_cat_sleeping',
+                          awake
+                              ? 'harmony_guardian_active'
+                              : 'harmony_guardian_idle',
                         ),
-                        width: 44,
-                        height: 44,
-                        excludeFromSemantics: true,
+                        opacity: awake ? 1 : 0.6,
+                        child: SvgPicture.asset(
+                          'assets/images/cc_guardian.svg',
+                          width: 56,
+                          height: 56,
+                          excludeFromSemantics: true,
+                        ),
                       ),
                     ),
                     if (errored)
-                      const Positioned(
+                      Positioned(
                         right: 3,
                         bottom: 3,
                         child: Icon(
                           Icons.error_rounded,
-                          key: Key('harmony_connection_error'),
+                          key: const Key('harmony_connection_error'),
                           size: 18,
-                          color: Colors.black,
+                          color: scheme.error,
                         ),
                       ),
                   ],

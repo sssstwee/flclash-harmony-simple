@@ -16,7 +16,7 @@ struct WidgetCard {
     .width('100%')
     .backgroundColor($r('sys.color.comp_background_primary'))
     .onAppear(() => {
-      this.title = '小猫AI加速'
+      this.title = 'CC保镖'
       postCardAction(this, {  
         action: 'call',
         bundleName: 'com.follow.clash.simple',

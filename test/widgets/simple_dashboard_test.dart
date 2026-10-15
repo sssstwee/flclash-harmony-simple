@@ -205,7 +205,7 @@ void main() {
     (tester) async {
       final api = SignedOutApi();
       await renderLogin(tester, api);
-      expect(find.text('小猫AI加速'), findsOneWidget);
+      expect(find.text('CC保镖'), findsOneWidget);
       expect(find.byType(TextFormField), findsNWidgets(2));
       expect(find.text('导入订阅'), findsNothing);
       expect(find.text('连接'), findsNothing);
@@ -271,7 +271,9 @@ void main() {
             phase == ConnectionPhase.connecting;
         expect(
           find.byKey(
-            ValueKey(awake ? 'harmony_cat_awake' : 'harmony_cat_sleeping'),
+            ValueKey(
+              awake ? 'harmony_guardian_active' : 'harmony_guardian_idle',
+            ),
           ),
           findsOneWidget,
         );
@@ -287,7 +289,10 @@ void main() {
             matching: find.byType(AnimatedContainer),
           ),
         );
-        expect((disc.decoration! as BoxDecoration).color, Colors.white);
+        expect(
+          (disc.decoration! as BoxDecoration).color,
+          awake ? const Color(0xff1e49ed) : const Color(0xff122c8e),
+        );
         expect(tester.getSize(primaryConnectionControl), const Size(64, 64));
         await tester.tap(primaryConnectionControl);
         expect(toggles, busy ? 0 : 1);

@@ -1,5 +1,5 @@
 name: fl_clash
-description: 小猫AI代理 / Xiaomao AI Proxy, a multi-platform proxy client based on ClashMeta, simple and easy to use, open-source and ad-free.
+description: CC保镖, a HarmonyOS proxy client for protecting connections to Claude and Codex, based on ClashMeta, open-source and ad-free.
 publish_to: 'none'
 version: 0.8.94+2026101503
 environment:

@@ -11,6 +11,7 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/svg.dart';
 
 class SimpleDashboardView extends ConsumerStatefulWidget {
   const SimpleDashboardView({super.key});
@@ -160,10 +161,11 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                       shrinkWrap: true,
                       padding: const EdgeInsets.all(24),
                       children: [
-                        Icon(
-                          Icons.shield_outlined,
-                          size: 64,
-                          color: context.colorScheme.primary,
+                        SvgPicture.asset(
+                          'assets/images/cc_guardian.svg',
+                          width: 64,
+                          height: 64,
+                          excludeFromSemantics: true,
                         ),
                         const SizedBox(height: 24),
                         Text(

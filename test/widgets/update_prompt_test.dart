@@ -25,7 +25,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
     globalState.packageInfo = PackageInfo(
-      appName: '小猫AI加速',
+      appName: 'CC保镖',
       packageName: 'com.follow.clash.simple',
       version: '0.8.94',
       buildNumber: '2026101502',

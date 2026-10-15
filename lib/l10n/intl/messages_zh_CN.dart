@@ -425,7 +425,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyLatency": MessageLookupByLibrary.simpleMessage("延迟"),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("登录"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
-      "登录后自动获取线路，无需手动添加订阅。",
+      "守护 Claude 与 Codex，登录后自动获取线路。",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("退出登录"),
     "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage("移动数据"),

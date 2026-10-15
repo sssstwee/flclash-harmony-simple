@@ -1,4 +1,4 @@
-name: 小猫AI代理 HarmonyOS
+name: CC保镖 HarmonyOS
 
 # Package only HarmonyOS/OHOS. Other platforms must not be added to build jobs or matrices.
 
@@ -202,9 +202,9 @@ jobs:
           SHORT="${GITHUB_SHA::7}"
           BRANCH="${{ github.head_ref || github.ref_name }}"
           if [[ "$BRANCH" == "cursor/zero-config-harmony-proxy-31c4" ]]; then
-            echo "name=xiaomao-ai-proxy-cursor-pr3-${SHORT}" >> "$GITHUB_OUTPUT"
+            echo "name=cc-bodyguard-cursor-pr3-${SHORT}" >> "$GITHUB_OUTPUT"
           else
-            echo "name=xiaomao-ai-proxy-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "name=cc-bodyguard-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload packages

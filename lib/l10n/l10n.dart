@@ -4674,10 +4674,10 @@ class AppLocalizations {
     return Intl.message('Sign in', name: 'harmonyLogin', desc: '', args: []);
   }
 
-  /// `Sign in to download your connection settings automatically.`
+  /// `Protecting Claude and Codex. Sign in to get your connection settings automatically.`
   String get harmonyLoginHint {
     return Intl.message(
-      'Sign in to download your connection settings automatically.',
+      'Protecting Claude and Codex. Sign in to get your connection settings automatically.',
       name: 'harmonyLoginHint',
       desc: '',
       args: [],
