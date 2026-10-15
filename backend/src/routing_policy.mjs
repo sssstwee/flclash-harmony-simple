@@ -6,6 +6,13 @@ const blocked = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS', 'GLOBAL']);
 const localTypes = new Set(['direct', 'reject', 'reject-drop', 'pass']);
 const aiName = name => /🤖|智能|(?:^|[^a-z])ai(?:[^a-z]|$)|openai|chatgpt|claude|gemini|gpt/i.test(name);
 
+function hasDynamicMembers(group, nodes, providers) {
+  return (group.use ?? []).some(name => providers.has(name)) ||
+    (group['include-all'] && (nodes.size > 0 || providers.size > 0)) ||
+    (group['include-all-proxies'] && nodes.size > 0) ||
+    (group['include-all-providers'] && providers.size > 0);
+}
+
 function graph(config) {
   const nodes = new Set((config.proxies ?? []).filter(node => !localTypes.has(node.type)).map(node => node.name));
   const groups = new Map((config['proxy-groups'] ?? []).map(group => [group.name, group]));
@@ -15,10 +22,7 @@ function graph(config) {
     if (nodes.has(name)) return true;
     const group = groups.get(name);
     if (!group || group.type === 'relay') return false;
-    if ((group.use ?? []).some(name => providers.has(name)) ||
-        (group['include-all'] && (nodes.size || providers.size)) ||
-        (group['include-all-proxies'] && nodes.size) ||
-        (group['include-all-providers'] && providers.size)) return true;
+    if (hasDynamicMembers(group, nodes, providers)) return true;
     return (group.proxies ?? []).some(child => hasProxy(child, new Set([...visited, name])));
   }
   return { groups, hasProxy };
@@ -33,27 +37,57 @@ function defaultTarget(config) {
   return [...groups].find(([name, group]) => name !== policy.aiGroup && !group.hidden && hasProxy(name))?.[0];
 }
 
+function filterAiGroups(config) {
+  const aiGroups = (config['proxy-groups'] ?? []).filter(group => group.name === policy.aiGroup || aiName(group.name));
+  const nodes = new Set((config.proxies ?? []).filter(node => !localTypes.has(node.type) && !/warp/i.test(node.name)).map(node => node.name));
+  const providers = new Set(Object.keys(config['proxy-providers'] ?? {}));
+  for (const group of aiGroups) {
+    if (group.proxies) group.proxies = group.proxies.filter(name => !/warp/i.test(name));
+    const dynamic = hasDynamicMembers(group, nodes, providers);
+    if (!group.proxies?.length && !dynamic) throw new Error(`AI group "${group.name}" has no members after removing WARP nodes`);
+    if (dynamic) {
+      // Mihomo separates independent exclude expressions with a backtick.
+      const filters = (group['exclude-filter'] ?? '').split('`').filter(Boolean);
+      if (!filters.includes('(?i)warp')) filters.push('(?i)warp');
+      group['exclude-filter'] = filters.join('`');
+    }
+  }
+  return aiGroups;
+}
+
+// Validate and sanitize before a push writes configuration or backup rows.
+export function normalizePushedAiContent(content) {
+  const config = parse(content, { logLevel: 'silent', prettyErrors: false });
+  const aiGroups = filterAiGroups(config);
+  if (!aiGroups.length) return content;
+  const names = new Set(aiGroups.map(group => group.name));
+  const rules = config.rules ?? [];
+  const boundary = rules.findIndex(rule => {
+    const [type, payload] = rule.split(',').map(value => value.trim().toUpperCase());
+    return ['GEOIP', 'GEOSITE'].includes(type) && payload === 'CN';
+  });
+  if (boundary < 0) return stringify(config, { lineWidth: 0 });
+  const aiRules = [];
+  const remaining = [];
+  for (const rule of rules.slice(boundary)) {
+    const parts = rule.split(',').map(value => value.trim());
+    const target = parts.at(-1) === 'no-resolve' ? parts.at(-2) : parts.at(-1);
+    (names.has(target) ? aiRules : remaining).push(rule);
+  }
+  config.rules = [...rules.slice(0, boundary), ...aiRules, ...remaining];
+  return stringify(config, { lineWidth: 0 });
+}
+
 export function applyRoutingPolicy(input) {
   const config = structuredClone(input);
   const target = defaultTarget(config);
   if (!target) throw new Error('No usable overseas proxy group');
-  const nodes = new Map((config.proxies ?? []).map(node => [node.name, node]));
-  const aiProxies = [...policy.nativeProxies, ...policy.warpProxies].filter(name => {
-    const node = nodes.get(name);
-    return node && ['vless', 'hysteria2', 'anytls'].includes(node.type) && !node['dialer-proxy'];
-  });
-  const aiGroup = name => aiProxies.length ? {
-    name, type: 'fallback', proxies: aiProxies,
-    url: 'https://api.openai.com/v1/models', 'expected-status': 401,
-    interval: 90, lazy: false, timeout: 5000, 'max-failed-times': 2,
-  } : { name, type: 'select', proxies: ['REJECT'] };
-  config['proxy-groups'] = (config['proxy-groups'] ?? [])
-    .filter(group => group.name !== policy.aiGroup)
-    .map(group => aiName(group.name) ? aiGroup(group.name) : group);
-  config['proxy-groups'].push(aiGroup(policy.aiGroup));
+  const aiGroups = filterAiGroups(config);
+  if (!aiGroups.length) throw new Error('Subscription requires an AI proxy group; no fallback members are added');
+  const aiTarget = aiGroups.find(group => group.name === policy.aiGroup)?.name ?? aiGroups[0].name;
   const { hasProxy } = graph(config);
   for (const group of config['proxy-groups']) {
-    if (hasProxy(group.name) && Array.isArray(group.proxies)) {
+    if (!aiGroups.includes(group) && hasProxy(group.name) && Array.isArray(group.proxies)) {
       group.proxies = group.proxies.filter(name => hasProxy(name));
     }
   }
@@ -61,25 +95,25 @@ export function applyRoutingPolicy(input) {
   for (const rule of config.rules ?? []) {
     const parts = rule.split(',').map(value => value.trim());
     if (!['DOMAIN', 'DOMAIN-SUFFIX', 'DOMAIN-KEYWORD', 'DOMAIN-WILDCARD', 'GEOSITE'].includes(parts[0]) || parts.length !== 3) continue;
-    if (hasProxy(parts[2]) || aiName(parts[2])) preserved.push(`${parts[0]},${parts[1]},${aiName(parts[2]) ? policy.aiGroup : target}`);
+    if (hasProxy(parts[2]) || aiName(parts[2])) preserved.push(`${parts[0]},${parts[1]},${aiName(parts[2]) ? parts[2] : target}`);
   }
   config.rules = [...new Set([
     ...policy.privateRules,
     ...policy.domesticAiDomains.map(domain => `DOMAIN-SUFFIX,${domain},DIRECT`),
-    ...policy.aiRules.map(rule => `${rule},${policy.aiGroup}`),
+    ...policy.aiRules.map(rule => `${rule},${aiTarget}`),
     ...policy.overseasRules.map(rule => `${rule},${target}`),
-    'GEOSITE,cn,DIRECT', ...preserved,
+    ...preserved.filter(rule => aiGroups.some(group => rule.endsWith(`,${group.name}`))),
+    'GEOSITE,cn,DIRECT', ...preserved.filter(rule => !aiGroups.some(group => rule.endsWith(`,${group.name}`))),
     `GEOSITE,geolocation-!cn,${target}`, 'GEOIP,CN,DIRECT', `MATCH,${target}`,
   ])];
   const dns = config.dns ?? {};
   const nameserverPolicy = { ...(dns['nameserver-policy'] ?? {}) };
-  const aiDns = `https://1.1.1.1/dns-query#${policy.aiGroup}`;
   for (const rule of config.rules) {
     const [type, payload, ruleTarget] = rule.split(',');
-    if (ruleTarget !== policy.aiGroup) continue;
-    if (type === 'DOMAIN') nameserverPolicy[payload] = aiDns;
-    if (type === 'DOMAIN-SUFFIX') nameserverPolicy[`+.${payload}`] = aiDns;
-    if (type === 'GEOSITE') nameserverPolicy[`geosite:${payload}`] = aiDns;
+    if (!aiGroups.some(group => group.name === ruleTarget)) continue;
+    if (type === 'DOMAIN') nameserverPolicy[payload] = `https://1.1.1.1/dns-query#${ruleTarget}`;
+    if (type === 'DOMAIN-SUFFIX') nameserverPolicy[`+.${payload}`] = `https://1.1.1.1/dns-query#${ruleTarget}`;
+    if (type === 'GEOSITE') nameserverPolicy[`geosite:${payload}`] = `https://1.1.1.1/dns-query#${ruleTarget}`;
   }
   for (const domain of policy.domesticAiDomains) nameserverPolicy[`+.${domain}`] = policy.directDns;
   nameserverPolicy['geosite:private'] = ['system://'];

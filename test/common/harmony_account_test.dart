@@ -227,6 +227,63 @@ ResponseBody jsonBody(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final suffix in ['', '/']) {
+    for (final versionStatus in [200, 404]) {
+      test('VPS prefix$suffix supports version HTTP $versionStatus', () async {
+        final paths = <String>[];
+        final http = Dio(
+          BaseOptions(baseUrl: 'https://api.example.test/api$suffix'),
+        );
+        http.httpClientAdapter = Adapter((request) {
+          paths.add(request.uri.path);
+          switch (request.path) {
+            case '/api/auth/sign-in/username':
+              return jsonBody(
+                {
+                  'user': {'username': 'harmony'},
+                  'session': {
+                    'expiresAt': DateTime.now()
+                        .add(const Duration(days: 1))
+                        .toIso8601String(),
+                  },
+                },
+                200,
+                {
+                  'set-auth-token': ['signed-token'],
+                },
+              );
+            case harmonyConfigPath:
+              return ResponseBody.fromString('proxies: []', 200);
+            case harmonyConfigVersionPath:
+              return jsonBody({'version': 'current'}, versionStatus);
+            default:
+              return jsonBody({'success': true});
+          }
+        });
+        final api = HarmonyAccountApi(http: http, storage: MemoryStore());
+
+        await api.login('harmony', 'password');
+        expect(utf8.decode((await api.downloadConfig()).bytes!), 'proxies: []');
+        final version = await api.fetchConfigVersionInfo();
+        if (versionStatus == 404) {
+          expect(version, isNull);
+          expect(await api.fetchConfigVersionInfo(), isNull);
+          expect(api.versionEndpointSupported, isFalse);
+        } else {
+          expect(version?.version, 'current');
+        }
+        await api.logout();
+
+        expect(paths, [
+          '/api/api/auth/sign-in/username',
+          '/api/v1/config',
+          '/api/v1/config/version',
+          '/api/api/auth/sign-out',
+        ]);
+      });
+    }
+  }
+
   test(
     'login diagnostics identify the failure without exposing secrets',
     () async {

@@ -1,6 +1,7 @@
 name: CC保镖 HarmonyOS
 
-# Package only HarmonyOS/OHOS. Other platforms must not be added to build jobs or matrices.
+# Package only HarmonyOS/OHOS, through an authorized manual run on main.
+# Pushes and pull requests validate code without producing client packages.
 
 on:
   push:
@@ -153,7 +154,7 @@ jobs:
         run: go test -mod=mod -run TestDelayHonorsConfiguredHTTPStatus -count=1 .
 
       - name: Set up HarmonyOS Go
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
           OHOS_GO_DIR="$RUNNER_TOOL_CACHE/ohos-go"
@@ -170,12 +171,12 @@ jobs:
           echo "$OHOS_GO_DIR/bin" >> "$GITHUB_PATH"
 
       - name: Build unsigned HarmonyOS packages
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         env:
           CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
         run: |
           set -euo pipefail
-          API_URL="${CLASH_HARMONY_API_URL:-https://auth.example.com}"
+          API_URL="${CLASH_HARMONY_API_URL:-https://69.17.3.174:8444/api}"
           cp env.json.example env.json
           API_URL="$API_URL" python3 - <<'PY'
           import json, os
@@ -189,24 +190,18 @@ jobs:
           dart setup.dart ohos --env stable -v
 
       - name: Checksums
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         run: |
           cd dist
           find . -type f \( -name '*.hap' -o -name '*.app' \) -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 
       - name: Resolve package artifact name
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         id: pkg
-        run: |
-          SHORT="${GITHUB_SHA::7}"
-          BRANCH="${{ github.head_ref || github.ref_name }}"
-          if [[ "$BRANCH" == "cursor/zero-config-harmony-proxy-31c4" ]]; then
-            echo "name=cc-bodyguard-cursor-pr3-${SHORT}" >> "$GITHUB_OUTPUT"
-          else
-            echo "name=cc-bodyguard-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
-          fi
+        run: echo "name=cc-bodyguard-HarmonyOS-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
       - name: Upload packages
-        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.pkg.outputs.name }}

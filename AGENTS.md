@@ -21,6 +21,7 @@ Read these only when the task touches their area:
 
 ## Highest Priority Rules
 
+- Use GitHub Actions for client builds and packaging by default. Local work may run tests and static checks; do not build client packages locally unless the user explicitly requests it.
 - Ask the user before every new client build/package run. Make and validate code changes first, reuse existing verified artifacts for release/install, and avoid triggering duplicate CI package builds while syncing branches.
 - Use a temporary branch and PR for code changes; merge and close the PR when the work is complete. Before deleting any branch, verify that its latest remote commit is included in `main`. Keep only `main` in the repository, without a long-lived `dev` branch.
 - Keep routing configuration driven: domains, node order, failover and DNS belong to the hosted configuration/backend. HarmonyOS clients validate and execute it without embedded business policy or automatic selector rewrites. Prefer the smallest cloud-only change; change/release clients only when parsing, protocol support, validation or a client defect requires it.

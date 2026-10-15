@@ -4,9 +4,15 @@ CC保镖 is a proxy client for HarmonyOS. CC stands for Claude and Codex, whose 
 
 Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/releases). If unsigned, sign it with a HarmonyOS debug certificate and profile containing your phone’s UDID, then install it using DevEco Studio with developer mode and USB debugging enabled on your HarmonyOS phone.
 
+## 客户端 API 入口
+
+客户端默认通过 `https://69.17.3.174:8444/api` 访问 VPS HTTPS 反向代理，再由 VPS 转发到 Cloudflare。账号校验、会话和配置存储仍在 Worker / D1。VPS 转发需移除入口的 `/api` 前缀，客户端必须保留该前缀拼接登录、配置和版本接口。
+
+安装包默认由 GitHub Actions 从 `main` 手动构建和上传，本机仅进行测试和静态检查；推送、PR 和临时分支仅运行验证。每次打包仍须先获得用户授权。
+
 ## VPS 推送订阅（D1）
 
-VPS 上的完整 YAML 订阅文件是分流配置的唯一来源。电脑直接订阅该文件，文件监听任务将同一份内容推送到 Worker，手机登录后从 Worker 下载。导入、推送、存储和下载均保留原始内容；Worker 只校验配置和访问权限，不改写规则、代理组、节点顺序或 DNS，避免两端产生不同策略。`routing-policy.json` 和 `src/routing_policy.mjs` 仅保留为离线迁移工具，不参与自动下发链路。
+VPS 上的完整 YAML 订阅文件是分流配置的来源。电脑直接订阅该文件，文件监听任务将同一份内容推送到 Worker，手机登录后从 Worker 下载。推送和导入时保留订阅已有 AI 组及成员顺序，移除其中名称包含 WARP 的成员；动态 `use` / `include-all*` 成员由 Mihomo 原生 `exclude-filter` 排除 WARP，并保留原有过滤条件。没有静态成员或可用动态来源的 AI 组会拒绝写入。仅将国内兜底规则之后的已有 AI 规则提前到该兜底之前，其他优先级不变；没有国内兜底时保留规则顺序。不会补充新的 AI 节点或回退成员，其余规则、代理组和 DNS 由订阅决定。`applyRoutingPolicy` 仅供离线迁移使用。
 
 HarmonyOS 客户端校验并原样执行下发的规则、代理组和 DNS，不生成分流规则、排序节点或追加本地 DNS。各端仅覆盖 VPN、监听端口等必要的平台运行参数；连接健康检查不改动代理组选择。
 
@@ -14,7 +20,7 @@ HarmonyOS 客户端校验并原样执行下发的规则、代理组和 DNS，不
 
 客户端清理鸿蒙旧版保存的节点选择，不再通过缓存强制覆盖云端代理组。连接健康检查在 VPN 启动后运行并遵循云端 URL 和预期状态码，失败只更新状态，不阻止启动或停止内核；故障切换及恢复由云端代理组执行。配置安装等待应用完成内核初始化，避免重复预热造成竞争；连接优先复用当前账号已校验且本地哈希一致的配置，启动后再后台检查更新，避免账号服务器暂时不可达时阻塞首次连接。配置缺失、损坏或不属于当前账号时仍先重新同步。退出登录清理配置状态，旧会话检查和版本请求的迟到结果不能影响新登录。
 
-国内和内网（含 `100.64.0.0/10`）直连；国内 AI 直连；已知海外 AI、Google、YouTube、GitHub 和开发站点先按域名分流，再判断国内 IP。海外 AI 使用独立 `fallback` 组，依次尝试清单内经过核验的原生节点，然后尝试 WARP。该组只允许已知协议的叶子节点，拒绝链式代理；没有合格节点时使用 `REJECT`，没有本地 `DIRECT` 兜底。AI 健康检查要求 OpenAI `/v1/models` 返回 401（无需 API 密钥），不以普通测速成功作为可用依据。更新节点拓扑时必须重新核验实际出口并维护清单。
+国内和内网（含 `100.64.0.0/10`）直连；国内 AI 直连；已知海外 AI、Google、YouTube、GitHub 和开发站点先按域名分流，再判断国内 IP。海外 AI 组及故障切换顺序来自 VPS 订阅，推送阶段排除 AI 组内名称包含 WARP 的成员。节点实际出口和健康检查地址、预期状态码仍需在源配置中核验和维护。
 
 Worker 已取消 Cron 和 URL 拉取，无需 `SUBSCRIPTION_URL`。私有 Wrangler 配置也应设置 `"triggers": { "crons": [] }`。先应用 migrations（含 0004 原子备份、0005 限流表），再设置 Worker secret `SUBSCRIPTION_PUSH_TOKEN`（建议随机 base64url 字符串）；此处不执行部署。
 
