@@ -165,7 +165,7 @@ class ApplicationState extends ConsumerState<Application> {
           title: appDisplayName,
           locale: utils.getLocaleForString(locale),
           supportedLocales: AppLocalizations.delegate.supportedLocales,
-          themeMode: themeProps.themeMode,
+          themeMode: system.isOhos ? ThemeMode.dark : themeProps.themeMode,
           theme: ThemeData(
             useMaterial3: true,
             pageTransitionsTheme: _pageTransitionsTheme,

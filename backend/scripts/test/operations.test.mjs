@@ -148,6 +148,13 @@ test('Wrangler is bound to selected config and its failures never echo captured 
   }
 });
 
+test('remote SQL-file upload progress does not turn a successful write into a reported failure', () => {
+  const response = { status: 0, stdout: '├ Checking if file needs uploading\n│ Uploading complete.\n[\n  {"success":true,"results":[{"Rows written":1}]}\n]\n' };
+  assert.equal(runD1({ remote: true, config: '/private/config.jsonc' }, ['--file', '/private/input.sql'], () => response)[0].results[0]['Rows written'], 1);
+  response.stdout = '├ Uploading complete.\n[{"success":false,"error":"private-fixture"}]';
+  assert.throws(() => runD1({}, [], () => response), error => !error.message.includes('private-fixture'));
+});
+
 test('private SQL files have restrictive permissions and are cleaned up on failure', async () => {
   let path;
   await assert.rejects(executeSql('fixture SQL', {}, async (options, input) => {

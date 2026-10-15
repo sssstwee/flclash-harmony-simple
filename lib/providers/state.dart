@@ -1,5 +1,6 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/harmony_theme.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -528,6 +529,7 @@ ColorScheme genColorScheme(
   Color? color,
   bool ignoreConfig = false,
 }) {
+  if (system.isOhos) return harmonyColorScheme;
   final vm2 = ref.watch(
     themeSettingProvider.select(
       (state) => VM2(state.primaryColor, state.schemeVariant),
@@ -556,6 +558,7 @@ ColorScheme genColorScheme(
 
 @riverpod
 Brightness currentBrightness(Ref ref) {
+  if (system.isOhos) return Brightness.dark;
   final themeMode = ref.watch(
     themeSettingProvider.select((state) => state.themeMode),
   );

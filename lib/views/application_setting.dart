@@ -285,7 +285,7 @@ class ApplicationSettingView extends StatelessWidget {
         const AutoLaunchItem(),
         const SilentLaunchItem(),
       ],
-      const AutoRunItem(),
+      if (!system.isOhos) const AutoRunItem(),
       if (system.isAndroid || system.isOhos) ...[const HiddenItem()],
       const AnimateTabItem(),
       const OpenLogsItem(),

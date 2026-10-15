@@ -174,7 +174,6 @@ class HarmonySimple extends _$HarmonySimple {
       clearError: true,
       clearIssue: true,
     );
-    var shouldReconnect = false;
     try {
       final session = await _api.restore();
       if (!ref.mounted || operation != _operation) {
@@ -188,10 +187,9 @@ class HarmonySimple extends _$HarmonySimple {
           operation: operation,
         );
         _ensureCurrent(operation, session.token);
-        shouldReconnect = await _api.readReconnectOnLaunch();
         state = state.copyWith(
           homeStatus: state.homeStatus.copyWith(
-            autoReconnectArmed: shouldReconnect,
+            autoReconnectArmed: ref.read(isStartProvider),
           ),
         );
         _configRefreshInterval = await _api.readConfigRefreshInterval();
@@ -224,11 +222,6 @@ class HarmonySimple extends _$HarmonySimple {
       _restoring = false;
       if (operation == _operation && ref.mounted) {
         state = state.copyWith(bootstrapping: false);
-        if (shouldReconnect &&
-            _api.session != null &&
-            !ref.read(isStartProvider)) {
-          unawaited(toggleConnect());
-        }
       }
     }
   }
@@ -399,7 +392,6 @@ class HarmonySimple extends _$HarmonySimple {
     );
     try {
       if (running) {
-        await _api.setReconnectOnLaunch(false);
         state = state.copyWith(
           homeStatus: state.homeStatus.copyWith(autoReconnectArmed: false),
         );
@@ -481,7 +473,6 @@ class HarmonySimple extends _$HarmonySimple {
       );
       return;
     }
-    await _api.setReconnectOnLaunch(true);
     state = state.copyWith(
       clearIssue: true,
       clearError: true,
@@ -680,8 +671,7 @@ class HarmonySimple extends _$HarmonySimple {
     if (operation != null && token != null) {
       _ensureCurrent(operation, token);
     }
-    final rules =
-        system.isOhos && !config.containsKey(HarmonyRemoteConfig.marker)
+    final rules = system.isOhos
         ? defaultRoutingRules(config)
         : List<String>.from(config['rules'] ?? const <String>[]);
     final group = connectionGroup(groups, rules);
@@ -1043,7 +1033,8 @@ class HarmonySimple extends _$HarmonySimple {
       .where(
         (p) =>
             p.url.isEmpty &&
-            (p.label == appDisplayName || p.label == legacyAppDisplayName),
+            (p.label == appDisplayName ||
+                legacyAppDisplayNames.contains(p.label)),
       )
       .toList();
 
@@ -1104,7 +1095,7 @@ class HarmonySimple extends _$HarmonySimple {
     }
     final token = _api.session?.token;
     if (accepted != null &&
-        accepted.label == legacyAppDisplayName &&
+        legacyAppDisplayNames.contains(accepted.label) &&
         token != null) {
       final renamed = accepted.copyWith(label: appDisplayName);
       // Track label-only DB writes too: logout must join them before deleting

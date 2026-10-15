@@ -193,7 +193,7 @@ class SetupAction extends _$SetupAction {
     }
     final status = isStart == true
         ? true
-        : ref.read(appSettingProvider).autoRun;
+        : !system.isOhos && ref.read(appSettingProvider).autoRun;
     if (status == true) {
       await updateStatus(true, isInit: true);
     } else {

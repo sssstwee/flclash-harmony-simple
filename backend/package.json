@@ -1,21 +1,22 @@
 {
   "name": "clash-harmony-api",
   "version": "1.0.0",
-  "description": "Cloudflare login and protected configuration service for 小猫AI代理",
+  "description": "Cloudflare login and protected configuration service for \u5c0f\u732bAI\u4ee3\u7406",
   "private": true,
   "type": "module",
   "scripts": {
     "types": "wrangler types --config wrangler.jsonc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --dir test",
-    "check": "node --check gateway/public/_worker.js && node --check scripts/account.mjs && node --check scripts/config.mjs && node --check scripts/operations.mjs && npm run typecheck && npm test && npm run test:scripts",
+    "check": "bash -n scripts/vps-push-subscription.sh && node --check gateway/public/_worker.js && node --check scripts/account.mjs && node --check scripts/config.mjs && node --check src/config_write.mjs && node --check scripts/sync-subscription.mjs && node --check scripts/operations.mjs && npm run typecheck && npm test && npm run test:scripts",
     "deploy": "wrangler deploy --config wrangler.local.jsonc",
     "account": "node scripts/account.mjs",
     "config": "node scripts/config.mjs",
-    "test:scripts": "node --test scripts/test/*.test.mjs",
+    "test:scripts": "node ../tool/generate_routing_policy.mjs --check && node --test scripts/test/*.test.mjs",
     "bundle-check": "wrangler deploy --dry-run --config wrangler.jsonc",
     "secret": "wrangler secret put BETTER_AUTH_SECRET --config wrangler.local.jsonc",
-    "migrate": "wrangler d1 migrations apply DB --remote --config wrangler.local.jsonc"
+    "migrate": "wrangler d1 migrations apply DB --remote --config wrangler.local.jsonc",
+    "sync-subscription": "node scripts/sync-subscription.mjs"
   },
   "keywords": [],
   "author": "",

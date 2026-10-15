@@ -4869,123 +4869,128 @@ class AppLocalizations {
     );
   }
 
-  /// `Automatically picked the lowest-latency route`
+  /// `Route`
+  String get harmonyRouteLabel {
+    return Intl.message('Route', name: 'harmonyRouteLabel', desc: '', args: []);
+  }
+
+  /// `AI`
+  String get harmonyAiRoutingLabel {
+    return Intl.message(
+      'AI',
+      name: 'harmonyAiRoutingLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Health check`
+  String get harmonyHealthLabel {
+    return Intl.message(
+      'Health check',
+      name: 'harmonyHealthLabel',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Automatic · lowest latency first`
   String get harmonyRouteReasonAuto {
     return Intl.message(
-      'Automatically picked the lowest-latency route',
+      'Automatic · lowest latency first',
       name: 'harmonyRouteReasonAuto',
       desc: '',
       args: [],
     );
   }
 
-  /// `UDP looks blocked; preferring TCP nodes`
+  /// `Stable connection first`
   String get harmonyRouteReasonTcp {
     return Intl.message(
-      'UDP looks blocked; preferring TCP nodes',
+      'Stable connection first',
       name: 'harmonyRouteReasonTcp',
       desc: '',
       args: [],
     );
   }
 
-  /// `Selected the best node from latency tests`
+  /// `Selected by latency tests`
   String get harmonyRouteReasonManual {
     return Intl.message(
-      'Selected the best node from latency tests',
+      'Selected by latency tests',
       name: 'harmonyRouteReasonManual',
       desc: '',
       args: [],
     );
   }
 
-  /// `AI sites use the “{groupName}” group`
-  String harmonyAiRoutingHint(String groupName) {
+  /// `Route acceleration`
+  String get harmonyAiRoutingHint {
     return Intl.message(
-      'AI sites use the “$groupName” group',
+      'Route acceleration',
       name: 'harmonyAiRoutingHint',
       desc: '',
-      args: [groupName],
+      args: [],
     );
   }
 
-  /// `Network: Wi‑Fi`
+  /// `Wi-Fi`
   String get harmonyNetworkWifi {
     return Intl.message(
-      'Network: Wi‑Fi',
+      'Wi-Fi',
       name: 'harmonyNetworkWifi',
       desc: '',
       args: [],
     );
   }
 
-  /// `Network: cellular`
+  /// `Cellular`
   String get harmonyNetworkCellular {
     return Intl.message(
-      'Network: cellular',
+      'Cellular',
       name: 'harmonyNetworkCellular',
       desc: '',
       args: [],
     );
   }
 
-  /// `Network: other`
+  /// `Other connection`
   String get harmonyNetworkOther {
     return Intl.message(
-      'Network: other',
+      'Other connection',
       name: 'harmonyNetworkOther',
       desc: '',
       args: [],
     );
   }
 
-  /// `Network: unknown`
+  /// `Not identified`
   String get harmonyNetworkUnknown {
     return Intl.message(
-      'Network: unknown',
+      'Not identified',
       name: 'harmonyNetworkUnknown',
       desc: '',
       args: [],
     );
   }
 
-  /// `Route healthy (checked {time})`
+  /// `Healthy · {time}`
   String harmonyHealthCheckOk(String time) {
     return Intl.message(
-      'Route healthy (checked $time)',
+      'Healthy · $time',
       name: 'harmonyHealthCheckOk',
       desc: '',
       args: [time],
     );
   }
 
-  /// `Route check failed ({time}); trying another node`
+  /// `Failed · {time}`
   String harmonyHealthCheckFailed(String time) {
     return Intl.message(
-      'Route check failed ($time); trying another node',
+      'Failed · $time',
       name: 'harmonyHealthCheckFailed',
       desc: '',
       args: [time],
-    );
-  }
-
-  /// `Will reconnect automatically next time you open the app`
-  String get harmonyAutoReconnectOn {
-    return Intl.message(
-      'Will reconnect automatically next time you open the app',
-      name: 'harmonyAutoReconnectOn',
-      desc: '',
-      args: [],
-    );
-  }
-
-  /// `Will stay disconnected after a manual disconnect`
-  String get harmonyAutoReconnectOff {
-    return Intl.message(
-      'Will stay disconnected after a manual disconnect',
-      name: 'harmonyAutoReconnectOff',
-      desc: '',
-      args: [],
     );
   }
 
@@ -5139,20 +5144,20 @@ class AppLocalizations {
     );
   }
 
-  /// `The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.`
+  /// `The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.`
   String get harmonyIssueDetailOfflineCached {
     return Intl.message(
-      'The account server is unreachable; using your last saved profile. Tap Connect to try anyway; we will refresh when the network is back.',
+      'The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.',
       name: 'harmonyIssueDetailOfflineCached',
       desc: '',
       args: [],
     );
   }
 
-  /// `Next: tap Connect`
+  /// `Next: tap the icon above to connect`
   String get harmonyIssueActionOfflineCached {
     return Intl.message(
-      'Next: tap Connect',
+      'Next: tap the icon above to connect',
       name: 'harmonyIssueActionOfflineCached',
       desc: '',
       args: [],
@@ -5169,20 +5174,20 @@ class AppLocalizations {
     );
   }
 
-  /// `The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.`
+  /// `The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.`
   String get harmonyIssueDetailSubscription {
     return Intl.message(
-      'The server did not return a new profile. If a cached copy exists, tap Connect; otherwise retry later.',
+      'The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.',
       name: 'harmonyIssueDetailSubscription',
       desc: '',
       args: [],
     );
   }
 
-  /// `Next: tap Connect or retry later`
+  /// `Next: tap the icon above to connect or retry later`
   String get harmonyIssueActionSubscription {
     return Intl.message(
-      'Next: tap Connect or retry later',
+      'Next: tap the icon above to connect or retry later',
       name: 'harmonyIssueActionSubscription',
       desc: '',
       args: [],
@@ -5229,20 +5234,20 @@ class AppLocalizations {
     );
   }
 
-  /// `The system VPN failed to start. Allow the VPN permission, then tap Connect again.`
+  /// `The system VPN failed to start. Allow the VPN permission, then tap the icon above to reconnect.`
   String get harmonyIssueDetailVpnFailed {
     return Intl.message(
-      'The system VPN failed to start. Allow the VPN permission, then tap Connect again.',
+      'The system VPN failed to start. Allow the VPN permission, then tap the icon above to reconnect.',
       name: 'harmonyIssueDetailVpnFailed',
       desc: '',
       args: [],
     );
   }
 
-  /// `Next: tap Connect and allow VPN`
+  /// `Next: tap the icon above to connect and allow VPN`
   String get harmonyIssueActionVpnFailed {
     return Intl.message(
-      'Next: tap Connect and allow VPN',
+      'Next: tap the icon above to connect and allow VPN',
       name: 'harmonyIssueActionVpnFailed',
       desc: '',
       args: [],
@@ -5259,20 +5264,20 @@ class AppLocalizations {
     );
   }
 
-  /// `None of the saved nodes responded. Try Connect again later or wait for a config refresh.`
+  /// `None of the saved nodes responded. Tap the icon above to reconnect later or wait for a config refresh.`
   String get harmonyIssueDetailNoRoute {
     return Intl.message(
-      'None of the saved nodes responded. Try Connect again later or wait for a config refresh.',
+      'None of the saved nodes responded. Tap the icon above to reconnect later or wait for a config refresh.',
       name: 'harmonyIssueDetailNoRoute',
       desc: '',
       args: [],
     );
   }
 
-  /// `Next: try Connect again later`
+  /// `Next: tap the icon above to reconnect later`
   String get harmonyIssueActionNoRoute {
     return Intl.message(
-      'Next: try Connect again later',
+      'Next: tap the icon above to reconnect later',
       name: 'harmonyIssueActionNoRoute',
       desc: '',
       args: [],
@@ -5289,20 +5294,20 @@ class AppLocalizations {
     );
   }
 
-  /// `Cannot reach the account server. Check your network; you can still try Connect with a cached profile.`
+  /// `Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.`
   String get harmonyIssueDetailService {
     return Intl.message(
-      'Cannot reach the account server. Check your network; you can still try Connect with a cached profile.',
+      'Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.',
       name: 'harmonyIssueDetailService',
       desc: '',
       args: [],
     );
   }
 
-  /// `Next: check network, then Connect`
+  /// `Next: check your network, then tap the icon above to connect`
   String get harmonyIssueActionService {
     return Intl.message(
-      'Next: check network, then Connect',
+      'Next: check your network, then tap the icon above to connect',
       name: 'harmonyIssueActionService',
       desc: '',
       args: [],

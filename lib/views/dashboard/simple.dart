@@ -4,8 +4,6 @@ import 'package:fl_clash/common/harmony_remote_ui.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -80,60 +78,6 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
         .login(_username.text, password);
   }
 
-  Future<void> _showNodeSwitcher() async {
-    final groups = ref.read(groupsProvider);
-    final profile = ref.read(currentProfileProvider);
-    final groupName = profile?.currentGroupName;
-    final group = groups.getGroup(groupName ?? '');
-    if (group == null || group.type != GroupType.Selector) return;
-    if (!mounted) return;
-    final texts = context.appLocalizations;
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  remoteHarmonyText(
-                    ref,
-                    'harmonySwitchNode',
-                    texts.harmonySwitchNode,
-                  ),
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-              for (final proxy in group.all)
-                if (proxy.type.toUpperCase() != 'DIRECT' &&
-                    !proxy.type.toUpperCase().startsWith('REJECT'))
-                  ListTile(
-                    title: Text(proxy.name),
-                    subtitle: Text(proxy.type),
-                    onTap: () => Navigator.pop(context, proxy.name),
-                  ),
-            ],
-          ),
-        );
-      },
-    );
-    if (!mounted || selected == null || groupName == null) return;
-    if (ref.read(currentProfileProvider)?.id != profile?.id ||
-        ref.read(harmonySimpleProvider).busy ||
-        !ref.read(isStartProvider)) {
-      return;
-    }
-    await ref
-        .read(proxiesActionProvider.notifier)
-        .changeProxy(groupName: groupName, proxyName: selected);
-    ref
-        .read(profilesActionProvider.notifier)
-        .updateCurrentSelectedMap(groupName, selected);
-  }
-
   String? _activeNodeName() {
     final profile = ref.watch(currentProfileProvider);
     final groupName = profile?.currentGroupName;
@@ -169,7 +113,6 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     final nodeDelay = _activeDelay(nodeName);
     final phase = _phase(ui, running);
     final features = ui.remoteRuntime['features'] as Map? ?? {};
-    final defaults = ui.remoteRuntime['defaults'] as Map? ?? {};
 
     return CommonScaffold(
       title: appDisplayName,
@@ -186,8 +129,6 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   nodeDelayMs: nodeDelay,
                   homeStatus: ui.homeStatus,
                   issue: ui.issue,
-                  showReconnectHint:
-                      !running && defaults['showReconnectHint'] != false,
                   onToggle: ready && !ui.bootstrapping
                       ? () => ref
                             .read(harmonySimpleProvider.notifier)
@@ -197,9 +138,6 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                       ref.read(harmonySimpleProvider.notifier).logout(),
                   onRetry: () =>
                       ref.read(harmonySimpleProvider.notifier).retryConnect(),
-                  onSwitchNode: running && features['nodeSwitcher'] != false
-                      ? _showNodeSwitcher
-                      : null,
                   configFreshness: ui.homeStatus.configFreshness,
                   onConfigRefresh: features['manualRefresh'] == false
                       ? null
