@@ -857,7 +857,7 @@ class HarmonyAccountApi {
         login: login,
         responseType: responseType,
         headers: headers,
-        configPath: configPath,
+        allowProxyFallback: configPath || path == harmonyHomeDisplayPath,
       );
     } on DioException catch (error) {
       final status = error.response?.statusCode;
@@ -889,7 +889,7 @@ class HarmonyAccountApi {
     required bool login,
     required ResponseType responseType,
     Map<String, String>? headers,
-    required bool configPath,
+    required bool allowProxyFallback,
   }) async {
     try {
       return await _dioRequest(
@@ -902,7 +902,7 @@ class HarmonyAccountApi {
         viaLocalProxy: false,
       );
     } on DioException catch (error) {
-      if (!configPath ||
+      if (!allowProxyFallback ||
           localMixedProxyPort == null ||
           !_isRetryableTransportError(error)) {
         rethrow;

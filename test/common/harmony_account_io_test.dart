@@ -76,12 +76,16 @@ class _Transport extends HttpOverrides {
     if (route == 'STALE_PROXY') {
       throw const SocketException('test stale proxy has stopped');
     }
-    if (url.path == harmonyConfigPath) {
+    if (url.path == harmonyConfigPath || url.path == harmonyHomeDisplayPath) {
       if (route == 'DIRECT' && !directConfigFailed) {
         directConfigFailed = true;
         throw const SocketException('test direct route unavailable');
       }
-      return _Request({'config': 'test'});
+      return _Request(
+        url.path == harmonyHomeDisplayPath
+            ? {'schemaVersion': 1}
+            : {'config': 'test'},
+      );
     }
     return _Request({
       'user': {'username': 'harmony'},
@@ -148,6 +152,21 @@ class _LoopbackClient extends Mock implements HttpClient {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('homepage retries the local proxy after a direct failure', () async {
+    final transport = _Transport();
+    await HttpOverrides.runWithHttpOverrides(() async {
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+        ..localMixedProxyPort = 7890;
+      expect((await api.fetchHomeDisplay()).data, {'schemaVersion': 1});
+      expect(transport.routes, [
+        (path: harmonyHomeDisplayPath, route: 'DIRECT'),
+        (path: harmonyHomeDisplayPath, route: 'PROXY localhost:7890'),
+      ]);
+      http.close(force: true);
+    }, transport);
+  });
 
   test(
     'a direct config transport failure opens a fresh direct request',
