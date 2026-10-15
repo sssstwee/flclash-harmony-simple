@@ -11,10 +11,10 @@ import 'package:fl_clash/common/harmony_remote_config.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/services.dart';
 
-/// Production builds must set [CLASH_HARMONY_API_URL] (see `env.json.example`).
+/// Override the API base with CLASH_HARMONY_API_URL (see `env.json.example`).
 const harmonyApiUrl = String.fromEnvironment(
   'CLASH_HARMONY_API_URL',
-  defaultValue: 'https://auth.example.com',
+  defaultValue: 'https://69.17.3.174:8444/api',
 );
 
 const harmonyConfigPath = '/v1/config';

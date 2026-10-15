@@ -175,7 +175,7 @@ jobs:
           CLASH_HARMONY_API_URL: ${{ vars.CLASH_HARMONY_API_URL }}
         run: |
           set -euo pipefail
-          API_URL="${CLASH_HARMONY_API_URL:-https://auth.example.com}"
+          API_URL="${CLASH_HARMONY_API_URL:-https://69.17.3.174:8444/api}"
           cp env.json.example env.json
           API_URL="$API_URL" python3 - <<'PY'
           import json, os
