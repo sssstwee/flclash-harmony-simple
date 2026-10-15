@@ -8,7 +8,6 @@ import {
   etagMatches,
 } from './config_meta';
 import { RemoteConfigInvalid, loadRemoteConfig, type RemoteConfigDocument } from './remote_config';
-import { normalizeRoutingContent } from './routing_policy.mjs';
 
 const authRoutes = new Map([
   ['/api/auth/sign-in/username', 'POST'],
@@ -170,7 +169,7 @@ async function loadConfigFor(user: AuthenticatedUser, env: Env): Promise<Authori
   const config = await resolveProxyConfig(env.DB, session.user.id, configGroup);
   if (!config) return { ok: false, response: failure('CONFIG_UNAVAILABLE', 503) };
 
-  return { ok: true, session, config: { ...config, content: normalizeRoutingContent(config.content) }, remote: null };
+  return { ok: true, session, config, remote: null };
 }
 
 export default {
@@ -353,8 +352,6 @@ async function pushSubscription(request: Request, env: Env): Promise<Response> {
   try {
     content = new TextDecoder('utf-8', { fatal: true }).decode(body);
     validateSubscription(content);
-    content = normalizeRoutingContent(content);
-    if (new TextEncoder().encode(content).byteLength > SUBSCRIPTION_MAX_BYTES) return failure('BODY_TOO_LARGE', 413);
   } catch { return failure('INVALID_SUBSCRIPTION', 400); }
 
   // D1 batch is a transaction; the existing trigger backs up a changed row.

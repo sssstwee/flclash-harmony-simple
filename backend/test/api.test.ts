@@ -1,8 +1,9 @@
 import { env, exports } from 'cloudflare:workers';
 import { hashPassword } from 'better-auth/crypto';
 import { beforeEach, expect, test } from 'vitest';
-import { normalizeRoutingContent } from '../src/routing_policy.mjs';
+import { createExecutionContext } from 'cloudflare:test';
 import { parse } from 'yaml';
+import worker from '../src/index';
 
 const password = 'Test-password-42!';
 const config = 'proxies:\n  - name: example\n    type: ss\n    server: example.org\n    port: 443\n    cipher: aes-128-gcm\n    password: test\n';
@@ -108,24 +109,27 @@ test('expired and tampered signed tokens cannot download settings', async () => 
   expect((await request('/v1/config', { headers: bearer(token) })).status).toBe(401);
 });
 
-test('existing D1 subscriptions receive routing guards and a stable representation version', async () => {
+test('VPS push, storage and authenticated download preserve the exact source configuration', async () => {
   const token = await login();
-  const legacy = config + 'proxy-groups:\n  - name: Main\n    type: select\n    proxies: [example, DIRECT]\nrules: ["MATCH,DIRECT"]\n';
-  await seedDefaultConfig(legacy);
+  const source = config + '# VPS owns routing, group order and DNS.\nproxy-groups:\n  - name: Main\n    type: fallback\n    proxies: [example]\nrules: ["DOMAIN-SUFFIX,deepseek.com,DIRECT", "MATCH,Main"]\ndns:\n  nameserver-policy:\n    +.corp.test: [system://]\nharmony-runtime: {}\n';
+  const pushed = await worker.fetch(new Request(url('/v1/admin/subscription'), {
+    method: 'POST', headers: { Authorization: 'Bearer source-test-token' }, body: source,
+  }) as Request<unknown, IncomingRequestCfProperties>, { ...env, SUBSCRIPTION_PUSH_TOKEN: 'source-test-token' }, createExecutionContext());
+  expect(pushed.status).toBe(200);
+  expect((await env.DB.prepare("SELECT content FROM proxy_config WHERE scope='default' AND scope_key=''").first())?.content).toBe(source);
   const response = await request('/v1/config', { headers: bearer(token) });
   expect(response.status).toBe(200);
   const body = await response.text();
-  expect(body).toBe(normalizeRoutingContent(legacy));
+  expect(body).toBe(source);
   const document = parse(body);
   expect(document['harmony-runtime']).toEqual({});
-  expect(document.rules).toContain('DOMAIN-SUFFIX,deepseek.com,DIRECT');
-  expect(document.rules).toContain('DOMAIN-SUFFIX,claude.com,🤖 AI优先原生');
-  expect(document.rules.at(-1)).toBe('MATCH,Main');
-  expect(document['proxy-groups'].find((group: { name: string }) => group.name === '🤖 AI优先原生').proxies).toEqual(['REJECT']);
+  expect(document.rules).toEqual(['DOMAIN-SUFFIX,deepseek.com,DIRECT', 'MATCH,Main']);
+  expect(document['proxy-groups']).toEqual([{ name: 'Main', type: 'fallback', proxies: ['example'] }]);
+  expect(document.dns['nameserver-policy']).toEqual({ '+.corp.test': ['system://'] });
   const version = response.headers.get('X-Config-Version');
+  expect((await pushed.json() as { newVersion: string }).newVersion).toBe(version);
   const poll = await request('/v1/config/version', { headers: bearer(token) });
   expect((await poll.json() as { version: string }).version).toBe(version);
-  await env.DB.prepare('UPDATE proxy_config SET content=?').bind(body).run();
   const unchanged = await request('/v1/config', { headers: { ...bearer(token), 'If-None-Match': response.headers.get('ETag')! } });
   expect(unchanged.status).toBe(304);
 });
