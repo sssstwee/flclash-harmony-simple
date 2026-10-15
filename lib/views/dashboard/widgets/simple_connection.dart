@@ -858,7 +858,7 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                         dimension: 56,
                         child: CircularProgressIndicator(
                           value: reducedMotion ? 0.65 : null,
-                          color: scheme.onSurface,
+                          color: const Color(0xfff8fbff),
                           strokeWidth: 3,
                         ),
                       ),
@@ -892,14 +892,14 @@ class _ConnectionIndicatorState extends State<ConnectionIndicator>
                       ),
                     ),
                     if (errored)
-                      Positioned(
+                      const Positioned(
                         right: 3,
                         bottom: 3,
                         child: Icon(
                           Icons.error_rounded,
-                          key: const Key('harmony_connection_error'),
+                          key: Key('harmony_connection_error'),
                           size: 18,
-                          color: scheme.error,
+                          color: Color(0xfff8fbff),
                         ),
                       ),
                   ],

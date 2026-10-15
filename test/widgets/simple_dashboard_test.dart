@@ -79,8 +79,20 @@ class IdleHarmonySimple extends HarmonySimple {
 Finder get primaryConnectionControl =>
     find.byKey(const Key('harmony_primary_connect'));
 
-Widget app(Widget child, {bool disableAnimations = true}) => MaterialApp(
-  theme: ThemeData(useMaterial3: true, colorScheme: harmonyColorScheme),
+Widget app(
+  Widget child, {
+  bool disableAnimations = true,
+  ThemeMode themeMode = ThemeMode.system,
+}) => MaterialApp(
+  themeMode: themeMode,
+  theme: ThemeData(
+    useMaterial3: true,
+    colorScheme: harmonyColorScheme(Brightness.light),
+  ),
+  darkTheme: ThemeData(
+    useMaterial3: true,
+    colorScheme: harmonyColorScheme(Brightness.dark),
+  ),
   locale: const Locale('zh', 'CN'),
   localizationsDelegates: const [
     AppLocalizations.delegate,
@@ -116,6 +128,54 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
     await AppLocalizations.load(const Locale('zh', 'CN'));
+  });
+
+  testWidgets('home follows system appearance and keeps brand contrast', (
+    tester,
+  ) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.connecting,
+            username: 'harmony',
+            onToggle: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    ColorScheme scheme() => Theme.of(
+      tester.element(find.byType(SimpleConnectionPanel)),
+    ).colorScheme;
+
+    expect(scheme().brightness, Brightness.light);
+    expect(scheme().surface, Colors.white);
+    expect(scheme().onSurface, Colors.black);
+    expect(
+      tester
+          .widget<CircularProgressIndicator>(
+            find.byType(CircularProgressIndicator),
+          )
+          .color,
+      const Color(0xfff8fbff),
+    );
+
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    await tester.pumpAndSettle();
+    expect(scheme().brightness, Brightness.dark);
+    expect(scheme().surface.computeLuminance(), lessThan(0.01));
+    expect(scheme().onSurface, Colors.white);
+    expect(
+      find.byKey(const ValueKey('harmony_guardian_active')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   Future<void> renderLogin(WidgetTester tester, SignedOutApi api) async {
