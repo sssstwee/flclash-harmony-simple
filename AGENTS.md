@@ -21,6 +21,7 @@ Read these only when the task touches their area:
 
 ## Highest Priority Rules
 
+- Ask the user before every new client build/package run. Make and validate code changes first, reuse existing verified artifacts for release/install, and avoid triggering duplicate CI package builds while syncing branches.
 - Keep routing configuration driven: domains, node order, failover and DNS belong to the hosted configuration/backend. HarmonyOS clients validate and execute it without embedded business policy or automatic selector rewrites. Prefer the smallest cloud-only change; change/release clients only when parsing, protocol support, validation or a client defect requires it.
 - Use `flutter test`, not `dart test`, because models pull in Flutter types.
 - Run code generation after modifying models, providers, or database schema.
