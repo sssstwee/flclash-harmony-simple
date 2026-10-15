@@ -5034,6 +5034,26 @@ class AppLocalizations {
     );
   }
 
+  /// `Config has not been checked yet`
+  String get harmonyConfigFreshUnknown {
+    return Intl.message(
+      'Config has not been checked yet',
+      name: 'harmonyConfigFreshUnknown',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Preparing connection settings…`
+  String get harmonyConfigPreparing {
+    return Intl.message(
+      'Preparing connection settings…',
+      name: 'harmonyConfigPreparing',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Config updated automatically`
   String get harmonyConfigFreshAutoUpdated {
     return Intl.message(
@@ -5164,20 +5184,20 @@ class AppLocalizations {
     );
   }
 
-  /// `Cannot fetch latest config`
+  /// `Connection settings unavailable`
   String get harmonyIssueTitleSubscription {
     return Intl.message(
-      'Cannot fetch latest config',
+      'Connection settings unavailable',
       name: 'harmonyIssueTitleSubscription',
       desc: '',
       args: [],
     );
   }
 
-  /// `The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.`
+  /// `You are signed in, but connection settings are not ready. Tap the icon above to retry. Cached settings can still be used if available.`
   String get harmonyIssueDetailSubscription {
     return Intl.message(
-      'The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.',
+      'You are signed in, but connection settings are not ready. Tap the icon above to retry. Cached settings can still be used if available.',
       name: 'harmonyIssueDetailSubscription',
       desc: '',
       args: [],

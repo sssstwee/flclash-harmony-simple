@@ -7,6 +7,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
+import 'package:fl_clash/common/harmony_user_issue.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -517,6 +518,62 @@ void main() {
     );
     expect(harness.state.busy, isFalse);
     expect(harness.state.session, isNull);
+  });
+
+  for (final failure in ['download', 'validation', 'cache']) {
+    test(
+      'login config $failure failure keeps the authenticated session',
+      () async {
+        final harness = _Harness();
+        harness.api.session = null;
+        harness.api.downloads.add(
+          failure == 'download'
+              ? HarmonyAccountError.unavailable
+              : HarmonyConfigDownload(bytes: _config),
+        );
+        if (failure == 'validation') {
+          harness.files.saveFailure = StateError('validation failed');
+        }
+        if (failure == 'cache') {
+          harness.api.commitFailure = StateError('persistence failed');
+        }
+
+        await harness.notifier.login('alice', 'password');
+
+        expect(harness.state.session?.username, 'alice');
+        expect(harness.api.isAuthorized, isTrue);
+        expect(harness.state.issue, HarmonyUserIssue.subscriptionUnreachable);
+        expect(harness.state.busy, isFalse);
+        expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+        expect(harness.state.remoteProfile, isNull);
+        expect(harness.api.metadata, isNull);
+        expect(harness.setup.starts, isEmpty);
+      },
+    );
+  }
+
+  test('login prepares configuration before enabling connection', () async {
+    final harness = _Harness();
+    harness.api.session = null;
+    final downloading = Completer<void>();
+    final response = Completer<HarmonyConfigDownload>();
+    harness.api.downloadStarted = downloading.complete;
+    harness.api.downloads.add(response.future);
+
+    final login = harness.notifier.login('alice', 'password');
+    await downloading.future;
+
+    expect(harness.state.session?.username, 'alice');
+    expect(harness.state.busy, isTrue);
+    expect(harness.state.homeStatus.configSyncInProgress, isTrue);
+    expect(harness.setup.starts, isEmpty);
+
+    response.complete(HarmonyConfigDownload(bytes: _config));
+    await login;
+    expect(harness.state.homeStatus.configSyncInProgress, isFalse);
+    expect(harness.state.remoteProfile, isNotNull);
+    expect(harness.state.error, isNull);
+    expect(harness.setup.starts, isEmpty);
   });
 
   test(

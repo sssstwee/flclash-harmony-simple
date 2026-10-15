@@ -337,10 +337,14 @@ class MessageLookup extends MessageLookupByLibrary {
       "配置已自动更新",
     ),
     "harmonyConfigFreshCheckFailed": m10,
+    "harmonyConfigFreshUnknown": MessageLookupByLibrary.simpleMessage(
+      "尚未完成配置检查",
+    ),
     "harmonyConfigFreshUpToDate": m11,
     "harmonyConfigFreshUpdating": MessageLookupByLibrary.simpleMessage(
       "发现新配置，正在更新…",
     ),
+    "harmonyConfigPreparing": MessageLookupByLibrary.simpleMessage("正在准备连接配置…"),
     "harmonyConfigRefreshDebounced": MessageLookupByLibrary.simpleMessage(
       "请稍后再试",
     ),
@@ -400,7 +404,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "无法连接账号服务器。请检查网络；若已有缓存配置，仍可点上方图标尝试连接。",
     ),
     "harmonyIssueDetailSubscription": MessageLookupByLibrary.simpleMessage(
-      "服务器暂时不可用或未返回配置。若已有缓存，可点上方图标连接；也可稍后重试。",
+      "登录已成功，但线路配置尚未准备好。请点上方图标重试。若有缓存配置，仍可尝试连接。",
     ),
     "harmonyIssueDetailVpnFailed": MessageLookupByLibrary.simpleMessage(
       "系统 VPN 没有成功启动。请确认已允许 VPN 权限，然后点上方图标重新连接。",
@@ -417,7 +421,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "harmonyIssueTitleService": MessageLookupByLibrary.simpleMessage("服务暂时不可用"),
     "harmonyIssueTitleSubscription": MessageLookupByLibrary.simpleMessage(
-      "无法获取最新订阅",
+      "连接配置暂不可用",
     ),
     "harmonyIssueTitleVpnFailed": MessageLookupByLibrary.simpleMessage(
       "VPN 未能启动",

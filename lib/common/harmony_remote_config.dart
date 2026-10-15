@@ -32,6 +32,8 @@ class HarmonyRemoteConfig {
     'harmonyConfigFreshCheckFailed',
     'harmonyConfigFreshUpToDate',
     'harmonyConfigFreshUpdating',
+    'harmonyConfigFreshUnknown',
+    'harmonyConfigPreparing',
     'harmonyConfigRefreshTooltip',
     'harmonyConfigSyncedAt',
     'harmonyConnecting',

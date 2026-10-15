@@ -8,6 +8,7 @@ import 'package:dio/io.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
 import 'package:fl_clash/common/harmony_connect.dart';
 import 'package:fl_clash/common/harmony_remote_config.dart';
+import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/services.dart';
 
@@ -346,6 +347,19 @@ class HarmonyAccountApi {
     }
   }
 
+  void _logFailure(String stage, Object error) {
+    final detail = switch (error) {
+      DioException() =>
+        'transport=${error.type.name} status=${error.response?.statusCode} '
+            'cause=${error.error.runtimeType}',
+      HarmonyAccountError() => error.name,
+      _ => '${error.runtimeType}',
+    };
+    // Never include exception messages, headers or bodies: these can contain
+    // credentials, session tokens or downloaded proxy configuration.
+    commonPrint.log('Harmony $stage failed ($detail)');
+  }
+
   Future<String?> readConfigLastModified() =>
       _store(_storage.readConfigLastModified);
 
@@ -515,12 +529,14 @@ class HarmonyAccountApi {
     _restoreBlocked = true;
     session = null;
     String? issuedToken;
+    var stage = 'clear-session';
     try {
       await _store(() async {
         _checkGeneration(generation);
         await _storage.clearAll();
       });
       _checkGeneration(generation);
+      stage = 'sign-in';
       final response = await _request(
         '/api/auth/sign-in/username',
         method: 'POST',
@@ -533,10 +549,12 @@ class HarmonyAccountApi {
         throw HarmonyAccountError.unavailable;
       }
       final data = response.data;
+      stage = 'validate-session';
       final value = data is Map && data['session'] is Map
           ? _sessionFromResponse(token, data)
           : await _validate(token);
       _checkGeneration(generation);
+      stage = 'persist-session';
       await _store(() async {
         _checkGeneration(generation);
         await _storage.write(token);
@@ -550,6 +568,7 @@ class HarmonyAccountApi {
       return session = value;
     } catch (error) {
       if (_generation == generation) {
+        _logFailure('login/$stage', error);
         try {
           await clear();
         } catch (_) {}
@@ -677,7 +696,8 @@ class HarmonyAccountApi {
       }
     } on HarmonyAccountError {
       rethrow;
-    } catch (_) {
+    } catch (error) {
+      _logFailure('config-body', error);
       throw HarmonyAccountError.unavailable;
     }
     _checkGeneration(generation);
@@ -702,7 +722,8 @@ class HarmonyAccountApi {
         }
         configVersion = remote.version;
         bytes = remote.profileBytes;
-      } catch (_) {
+      } catch (error) {
+        _logFailure('decode-config', error);
         throw HarmonyAccountError.config;
       }
     }
@@ -784,6 +805,7 @@ class HarmonyAccountApi {
         configPath: configPath,
       );
     } on DioException catch (error) {
+      _logFailure('request $path', error);
       final status = error.response?.statusCode;
       if (status == 401 || status == 403) {
         throw login
@@ -888,20 +910,23 @@ class HarmonyAccountApi {
     required bool viaLocalProxy,
   }) async {
     final port = localMixedProxyPort;
-    final previousAdapter = _http.httpClientAdapter;
-    _http.httpClientAdapter = IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        if (viaLocalProxy && port != null) {
-          client.findProxy = (_) => 'PROXY localhost:$port';
-        } else {
-          client.findProxy = (_) => 'DIRECT';
-        }
-        return client;
-      },
+    // An old config retry can overlap logout/login or a session check. Keep its
+    // route on its own Dio instance instead of replacing a shared adapter.
+    final http = _http.clone(
+      httpClientAdapter: IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          if (viaLocalProxy && port != null) {
+            client.findProxy = (_) => 'PROXY localhost:$port';
+          } else {
+            client.findProxy = (_) => 'DIRECT';
+          }
+          return client;
+        },
+      ),
     );
     try {
-      return await _http.request<dynamic>(
+      return await http.request<dynamic>(
         path,
         data: data,
         options: Options(
@@ -919,7 +944,8 @@ class HarmonyAccountApi {
         ),
       );
     } finally {
-      _http.httpClientAdapter = previousAdapter;
+      // Non-forced close lets an active streamed response finish normally.
+      http.close();
     }
   }
 }

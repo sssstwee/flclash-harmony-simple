@@ -636,6 +636,8 @@
     }
   },
   "harmonyConfigFreshUpdating": "New config found, updating…",
+  "harmonyConfigFreshUnknown": "Config has not been checked yet",
+  "harmonyConfigPreparing": "Preparing connection settings…",
   "harmonyConfigFreshAutoUpdated": "Config updated automatically",
   "harmonyConfigFreshCheckFailed": "Cannot check for updates; using cached config ({reason})",
   "@harmonyConfigFreshCheckFailed": {
@@ -654,8 +656,8 @@
   "harmonyIssueTitleOfflineCached": "Cannot refresh subscription",
   "harmonyIssueDetailOfflineCached": "The account server is unreachable; using your last saved profile. Tap the icon above to connect; we will refresh when the network is back.",
   "harmonyIssueActionOfflineCached": "Next: tap the icon above to connect",
-  "harmonyIssueTitleSubscription": "Cannot fetch latest config",
-  "harmonyIssueDetailSubscription": "The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.",
+  "harmonyIssueTitleSubscription": "Connection settings unavailable",
+  "harmonyIssueDetailSubscription": "You are signed in, but connection settings are not ready. Tap the icon above to retry. Cached settings can still be used if available.",
   "harmonyIssueActionSubscription": "Next: tap the icon above to connect or retry later",
   "harmonyIssueTitleAuthExpired": "Sign-in expired",
   "harmonyIssueDetailAuthExpired": "Your session expired. Sign out and log in again to refresh the subscription.",
