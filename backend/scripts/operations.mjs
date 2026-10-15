@@ -70,7 +70,9 @@ export function runD1(options, input, run = spawnSync) {
   }
   let data;
   try {
-    data = JSON.parse(result.stdout);
+    // Remote SQL-file imports print upload progress before their JSON result.
+    const jsonStart = result.stdout.search(/^\[/m);
+    data = JSON.parse(jsonStart < 0 ? result.stdout : result.stdout.slice(jsonStart));
   } catch {
     throw new Error('D1 returned an unreadable result. Verify database state before retrying.');
   }
