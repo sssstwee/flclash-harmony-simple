@@ -6,7 +6,7 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "workers_dev": false,
+  "workers_dev": true,
   "triggers": { "crons": [] },
   "vars": {
     "AUTH_ORIGIN": "https://YOUR-PAGES-OR-WORKERS-ORIGIN.example"

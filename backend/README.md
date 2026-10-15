@@ -16,6 +16,8 @@ Worker 已取消 Cron 和 URL 拉取，无需 `SUBSCRIPTION_URL`。私有 Wrangl
 
 沿用非空 proxies / proxy-groups / rules 校验，禁止 rule-providers / RULE-SET，规则目标须存在。仅原始内容变化时写入，事务内保存上一版到 `proxy_config_backup`；版本沿用 scope、key、内容的 SHA-256 前 16 位。已有 KV 配置仍优先于 D1。
 
+VPS 推送地址应使用 Worker 的直接域名或自定义路由，私有配置需保留 `"workers_dev": true`（或等价的公开路由）。Pages 网关只转发客户端接口，不转发 `/v1/admin/subscription`。部署时应保留既有 `SUBSCRIPTION_PUSH_TOKEN`，并验证推送入口无凭据时返回 401。
+
 VPS 安装脚本到 `/usr/local/bin/vps-push-subscription`，在 `/etc/subscription-push.env`（chmod 600）配置：
 ```sh
 SUBSCRIPTION_FILE=/var/lib/subscription/config.yaml
