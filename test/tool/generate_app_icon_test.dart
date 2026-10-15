@@ -77,7 +77,7 @@ Future<void> main() async {
       expect(source, isNot(contains('linearGradient')));
       expect(
         RegExp(r'#[0-9a-fA-F]{6}').allMatches(source).map((m) => m.group(0)),
-        everyElement(isIn(['#1E49ED', '#F8FBFF', '#E2EAFF'])),
+        everyElement(isIn(['#1E49ED', '#F8FBFF'])),
       );
     }
     final layeredImage = jsonDecode(
