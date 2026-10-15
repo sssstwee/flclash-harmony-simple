@@ -11,11 +11,15 @@ import 'package:flutter/material.dart';
 
 // Stable internal identity for existing data, launch entries and protocol compatibility.
 const appName = 'FlClash';
-const appDisplayName = '小猫AI加速';
+const appDisplayName = 'CC保镖';
 // Legacy managed-profile labels are persisted data, not current UI branding.
 const legacyAppDisplayName = 'Clash Harmony';
 const previousAppDisplayName = '小猫AI代理';
-const legacyAppDisplayNames = {legacyAppDisplayName, previousAppDisplayName};
+const legacyAppDisplayNames = {
+  legacyAppDisplayName,
+  previousAppDisplayName,
+  '小猫AI加速',
+};
 const appHelperService = 'FlClashHelperService';
 const coreName = 'clash.meta';
 const browserUa =

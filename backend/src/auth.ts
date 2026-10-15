@@ -5,7 +5,7 @@ import { D1Dialect } from 'kysely-d1';
 
 export function createAuth(env: Env) {
   return betterAuth({
-    appName: '小猫AI代理',
+    appName: 'CC保镖',
     baseURL: env.AUTH_ORIGIN,
     secret: env.BETTER_AUTH_SECRET,
     database: { dialect: new D1Dialect({ database: env.DB }), type: 'sqlite' },

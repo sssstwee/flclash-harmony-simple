@@ -1,4 +1,4 @@
-# 小猫AI代理 VERSION
+# CC保镖 VERSION
 
 This release provides only HarmonyOS / OHOS HAP and APP packages. Verify downloaded files against the accompanying SHA-256 checksums.
 

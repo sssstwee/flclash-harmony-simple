@@ -570,7 +570,7 @@
   "simpleNoRoute": "没有可用线路，请稍后点击连接重试。",
   "simpleConnectFailed": "启动失败，请检查 VPN 授权后重试。",
   "harmonyLogin": "登录",
-  "harmonyLoginHint": "登录后自动获取线路，无需手动添加订阅。",
+  "harmonyLoginHint": "守护 Claude 与 Codex，登录后自动获取线路。",
   "harmonyUsername": "用户名",
   "harmonyLogout": "退出登录",
   "harmonyRequired": "请填写此项。",

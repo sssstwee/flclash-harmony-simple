@@ -7,7 +7,7 @@ import 'package:path/path.dart' as p;
 // Change only the downloadable filename. app_name also controls native binary
 // lookup and installation identity in the pinned distributor.
 const artifactNameTemplate =
-    'xiaomao-ai-proxy-{{build_name}}-{{platform}}'
+    'cc-bodyguard-{{build_name}}-{{platform}}'
     '{{#description}}-{{description}}{{/description}}'
     '{{#is_installer}}-setup{{/is_installer}}'
     '{{#ext}}.{{ext}}{{/ext}}';

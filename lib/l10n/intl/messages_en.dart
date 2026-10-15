@@ -567,7 +567,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "harmonyLatency": MessageLookupByLibrary.simpleMessage("Latency"),
     "harmonyLogin": MessageLookupByLibrary.simpleMessage("Sign in"),
     "harmonyLoginHint": MessageLookupByLibrary.simpleMessage(
-      "Sign in to download your connection settings automatically.",
+      "Protecting Claude and Codex. Sign in to get your connection settings automatically.",
     ),
     "harmonyLogout": MessageLookupByLibrary.simpleMessage("Sign out"),
     "harmonyNetworkCellular": MessageLookupByLibrary.simpleMessage("Cellular"),

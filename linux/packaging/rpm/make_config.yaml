@@ -1,4 +1,4 @@
-display_name: 小猫AI代理
+display_name: CC保镖
 
 packager: chen08209
 packagerEmail: chen08209@gmail.com
@@ -11,12 +11,12 @@ essential: false
 icon: ./assets/images/icon.png
 
 keywords:
-  - 小猫AI代理
+  - CC保镖
   - Clash
   - ClashMeta
   - Proxy
 
-generic_name: 小猫AI代理
+generic_name: CC保镖
 
 group: Applications/Internet
 

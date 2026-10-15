@@ -41,7 +41,7 @@ export class State {
   startTip: string = "Starting VPN..."
   stopTip: string = "Stopping VPN..."
   crashlytics: boolean = true
-  currentProfileName: string = "小猫AI加速"
+  currentProfileName: string = "CC保镖"
   stopText: string = "Stop"
   onlyStatisticsProxy: boolean = false
   vpnOptions: VpnOptions | null = null

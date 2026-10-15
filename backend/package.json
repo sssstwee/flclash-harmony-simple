@@ -1,7 +1,7 @@
 {
   "name": "clash-harmony-api",
   "version": "1.0.0",
-  "description": "Cloudflare login and protected configuration service for \u5c0f\u732bAI\u4ee3\u7406",
+  "description": "Cloudflare login and protected configuration service for CC保镖",
   "private": true,
   "type": "module",
   "scripts": {

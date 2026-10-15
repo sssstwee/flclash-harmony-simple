@@ -1,4 +1,4 @@
-display_name: 小猫AI代理
+display_name: CC保镖
 package_name: FlClash
 maintainer:
   name: chen08209
@@ -15,12 +15,12 @@ dependencies:
   - libkeybinder-3.0-dev
 
 keywords:
-  - 小猫AI代理
+  - CC保镖
   - Clash
   - ClashMeta
   - Proxy
 
-generic_name: 小猫AI代理
+generic_name: CC保镖
 
 categories:
   - Network

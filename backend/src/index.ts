@@ -182,7 +182,7 @@ export default {
       }
 
       if (path === '/health' && request.method === 'GET') {
-        return Response.json({ status: 'ok', app: '小猫AI代理' });
+        return Response.json({ status: 'ok', app: 'CC保镖' });
       }
 
       if (authRoutes.get(path) === request.method) {

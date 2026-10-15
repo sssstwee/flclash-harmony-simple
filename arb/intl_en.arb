@@ -570,7 +570,7 @@
   "simpleNoRoute": "No route is available. Try connecting again later.",
   "simpleConnectFailed": "Could not start the proxy. Check VPN permission and try again.",
   "harmonyLogin": "Sign in",
-  "harmonyLoginHint": "Sign in to download your connection settings automatically.",
+  "harmonyLoginHint": "Protecting Claude and Codex. Sign in to get your connection settings automatically.",
   "harmonyUsername": "Username",
   "harmonyLogout": "Sign out",
   "harmonyRequired": "Please fill in this field.",

@@ -64,21 +64,20 @@ Future<void> main() async {
     expect(background, contains('<rect width="512" height="512"'));
     expect(background, isNot(contains('rx=')));
     expect(background, isNot(contains('<path')));
-    expect(background, contains('fill="#FFFFFF"'));
+    expect(background, contains('fill="#0B0B0B"'));
     expect(foreground, isNot(contains('<rect')));
-    final awake = File('assets/images/cat_awake.svg').readAsStringSync();
-    final sleeping = File('assets/images/cat_sleeping.svg').readAsStringSync();
-    final artwork = RegExp(r'<g id="cat">[\s\S]*?</g>');
-    final awakeArtwork = artwork.firstMatch(awake)?.group(0);
-    expect(awakeArtwork, isNotNull);
-    expect(artwork.firstMatch(full)?.group(0), awakeArtwork);
-    expect(artwork.firstMatch(foreground)?.group(0), awakeArtwork);
-    for (final source in [awake, sleeping, full, foreground, background]) {
+    final guardian = File('assets/images/cc_guardian.svg').readAsStringSync();
+    final artwork = RegExp(r'<g id="cc-guardian">[\s\S]*?</g>');
+    final guardianArtwork = artwork.firstMatch(guardian)?.group(0);
+    expect(guardianArtwork, isNotNull);
+    expect(artwork.firstMatch(full)?.group(0), guardianArtwork);
+    expect(artwork.firstMatch(foreground)?.group(0), guardianArtwork);
+    for (final source in [guardian, full, foreground, background]) {
       expect(source, isNot(contains('currentColor')));
       expect(source, isNot(contains('linearGradient')));
       expect(
         RegExp(r'#[0-9a-fA-F]{6}').allMatches(source).map((m) => m.group(0)),
-        everyElement(isIn(['#FFFFFF', '#000000'])),
+        everyElement(isIn(['#155B8A', '#59BFFF', '#DDF1FF', '#0B0B0B'])),
       );
     }
     final layeredImage = jsonDecode(
@@ -131,10 +130,9 @@ Future<void> main() async {
         expect(_pixel(foregroundData, 432, point.$1, point.$2).last, 0);
       }
       expect(_pixel(foregroundData, 432, 216, 216).last, 255);
-      expect(_pixel(backgroundData, 512, 256, 256), [255, 255, 255, 255]);
-      expect(_pixel(foregroundData, 432, 216, 297), [0, 0, 0, 255]);
+      expect(_pixel(backgroundData, 512, 256, 256), [11, 11, 11, 255]);
 
-      // Layering must leave the white background visible outside the cat.
+      // Layering must leave the background visible outside the shield.
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
       canvas.drawImage(background, ui.Offset.zero, ui.Paint());
