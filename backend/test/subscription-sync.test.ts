@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { env } from 'cloudflare:workers';
 import { createExecutionContext } from 'cloudflare:test';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -82,4 +83,19 @@ test('failed replacement rolls back config and backup without leaking secrets', 
     log.mockRestore();
     await env.DB.prepare('DROP TRIGGER test_abort_sync').run();
   }
+});
+
+test('push filters WARP and places AI rules before CN; empty AI replacement leaves data intact', async () => {
+  const ai = content.replace('proxies: [node]', 'proxies: [node]\n  - name: AI\n    type: select\n    proxies: [node, Custom-WaRp]')
+    .replace('rules:\n', 'rules:\n  - GEOSITE,cn,DIRECT\n  - GEOIP,CN,DIRECT\n  - DOMAIN,ai.example,AI\n');
+  expect((await push(ai)).status).toBe(200);
+  const first = await current();
+  const document = parse(first?.content as string);
+  expect(document['proxy-groups'][1]).toEqual({ name: 'AI', type: 'select', proxies: ['node'] });
+  expect(document.rules.indexOf('DOMAIN,ai.example,AI')).toBeLessThan(document.rules.indexOf('GEOSITE,cn,DIRECT'));
+  const response = await push(ai.replace('[node, Custom-WaRp]', '[Custom-WaRp]'));
+  expect(response.status).toBe(400);
+  expect(JSON.stringify(await response.json())).toContain('AI_GROUP_EMPTY_AFTER_WARP_REMOVAL');
+  expect(await current()).toEqual(first);
+  expect(await backup()).toBeNull();
 });

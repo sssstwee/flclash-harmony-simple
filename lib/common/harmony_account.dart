@@ -13,10 +13,10 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter/services.dart';
 import 'package:retry/retry.dart';
 
-/// Production builds must set [CLASH_HARMONY_API_URL] (see `env.json.example`).
+/// Override the API base with CLASH_HARMONY_API_URL (see `env.json.example`).
 const harmonyApiUrl = String.fromEnvironment(
   'CLASH_HARMONY_API_URL',
-  defaultValue: 'https://auth.example.com',
+  defaultValue: 'https://69.17.3.174:8444/api',
 );
 
 const harmonyConfigPath = '/v1/config';
@@ -844,10 +844,13 @@ class HarmonyAccountApi {
         configPath: configPath,
       );
     } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      if (path == harmonyConfigVersionPath && status == 404) {
+        return error.response!;
+      }
       _logFailure('request $path', error);
       // Config GET callers retry the entire transfer, including stream reads.
       if (configPath && _isRetryableTransportError(error)) rethrow;
-      final status = error.response?.statusCode;
       if (status == 401 || status == 403) {
         throw login
             ? HarmonyAccountError.credentials

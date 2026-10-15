@@ -51,3 +51,12 @@ test('invalid YAML, missing groups, and rule providers/sets never reach storage'
     })));
   }
 });
+
+test('WARP-only AI groups fail before database reads, backups or writes', async () => {
+  const content = yaml.replace('name: auto', 'name: AI').replace('proxies: [fixture]', 'proxies: [Custom-WaRp]');
+  await assert.rejects(syncSubscription([], deps({
+    fetch: async () => new Response(content),
+    runD1: async () => assert.fail('unexpected database read'),
+    executeSql: async () => assert.fail('unexpected write'),
+  })), /AI group "AI" has no members after removing WARP nodes/);
+});
