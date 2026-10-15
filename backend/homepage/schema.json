@@ -1,0 +1,159 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CC保镖首页显示配置",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "announcement": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "texts": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "homeTitle",
+          "ready",
+          "running",
+          "connecting",
+          "disconnecting",
+          "error",
+          "login",
+          "switchNode",
+          "retry",
+          "logout",
+          "harmonyAccount",
+          "harmonyAccountValue",
+          "harmonyLatencyValue",
+          "harmonySpeedValue",
+          "harmonyConfigRefreshSuccess",
+          "harmonyConfigRefreshFailed",
+          "harmonyConfigRefreshDebounced",
+          "harmonyRouteLabel",
+          "harmonyAiRoutingLabel",
+          "network",
+          "harmonyHealthLabel",
+          "harmonyCredentialsError",
+          "harmonySessionExpired",
+          "harmonyRateLimited",
+          "harmonyServiceError",
+          "harmonyConfigError",
+          "simpleConnectFailed",
+          "harmonyConfigCheckReasonOffline",
+          "harmonyConfigCheckReasonRateLimit",
+          "harmonyAiRoutingHint",
+          "harmonyAutoReconnectOff",
+          "harmonyAutoReconnectOn",
+          "harmonyConfigCheckReasonServer",
+          "harmonyConfigFreshAutoUpdated",
+          "harmonyConfigFreshCheckFailed",
+          "harmonyConfigFreshUpToDate",
+          "harmonyConfigFreshUpdating",
+          "harmonyConfigFreshUnknown",
+          "harmonyConfigPreparing",
+          "harmonyConfigRefreshTooltip",
+          "harmonyConfigSyncedAt",
+          "harmonyConnecting",
+          "harmonyCurrentNode",
+          "harmonyDisconnecting",
+          "harmonyDownload",
+          "harmonyHealthCheckFailed",
+          "harmonyHealthCheckOk",
+          "harmonyIssueActionAuthExpired",
+          "harmonyIssueActionNoRoute",
+          "harmonyIssueActionOfflineCached",
+          "harmonyIssueActionRateLimit",
+          "harmonyIssueActionService",
+          "harmonyIssueActionSubscription",
+          "harmonyIssueActionVpnFailed",
+          "harmonyIssueDetailAuthExpired",
+          "harmonyIssueDetailNoRoute",
+          "harmonyIssueDetailOfflineCached",
+          "harmonyIssueDetailRateLimit",
+          "harmonyIssueDetailService",
+          "harmonyIssueDetailSubscription",
+          "harmonyIssueDetailVpnFailed",
+          "harmonyIssueTitleAuthExpired",
+          "harmonyIssueTitleNoRoute",
+          "harmonyIssueTitleOfflineCached",
+          "harmonyIssueTitleRateLimit",
+          "harmonyIssueTitleService",
+          "harmonyIssueTitleSubscription",
+          "harmonyIssueTitleVpnFailed",
+          "harmonyLatency",
+          "harmonyLogin",
+          "harmonyLoginHint",
+          "harmonyLogout",
+          "harmonyNetworkCellular",
+          "harmonyNetworkOther",
+          "harmonyNetworkUnknown",
+          "harmonyNetworkWifi",
+          "harmonyRequired",
+          "harmonyRetry",
+          "harmonyRouteReasonAuto",
+          "harmonyRouteReasonManual",
+          "harmonyRouteReasonTcp",
+          "harmonySessionTraffic",
+          "harmonyStatusSection",
+          "harmonySwitchNode",
+          "harmonyUpload",
+          "harmonyUsername",
+          "password",
+          "simpleAutoRoute",
+          "simpleConnect",
+          "simpleDisconnect",
+          "simpleErrorState",
+          "simpleReady",
+          "simpleRunning"
+        ]
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 256
+      }
+    },
+    "home": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sections": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "announcement",
+              "connection",
+              "config",
+              "issue",
+              "node",
+              "insights",
+              "traffic",
+              "account"
+            ]
+          },
+          "uniqueItems": true,
+          "contains": {
+            "const": "connection"
+          }
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "route",
+              "ai",
+              "network",
+              "health"
+            ]
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

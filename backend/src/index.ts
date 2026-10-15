@@ -9,6 +9,7 @@ import {
   etagMatches,
 } from './config_meta';
 import { RemoteConfigInvalid, loadRemoteConfig, type RemoteConfigDocument } from './remote_config';
+import { DEFAULT_HOME_DISPLAY, HOME_DISPLAY_KEY, parseHomeDisplay } from './home_display.mjs';
 
 const authRoutes = new Map([
   ['/api/auth/sign-in/username', 'POST'],
@@ -177,6 +178,25 @@ export default {
   async fetch(request, env, ctx) {
     try {
       const path = new URL(request.url).pathname;
+
+      // Public presentation data only: no sessions, proxy profiles or credentials.
+      if (path === '/v1/home' && request.method === 'GET') {
+        const stored = await env.CONFIGS?.get(HOME_DISPLAY_KEY, 'text');
+        const document = parseHomeDisplay(stored ?? DEFAULT_HOME_DISPLAY);
+        const body = JSON.stringify(document);
+        const meta = await configRowMeta({ scope: 'ui', scope_key: HOME_DISPLAY_KEY, content: body });
+        const headers = {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=60',
+          'X-Content-Type-Options': 'nosniff',
+          ETag: meta.etag,
+        };
+        const notModified = etagMatches(request.headers.get('If-None-Match'), meta.etag);
+        return new Response(notModified ? null : body, {
+          status: notModified ? 304 : 200,
+          headers,
+        });
+      }
 
       if (path === '/v1/admin/subscription' && request.method === 'POST') {
         return await pushSubscription(request, env);

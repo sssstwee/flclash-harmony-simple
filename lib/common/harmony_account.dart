@@ -12,6 +12,7 @@ import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/services.dart';
 import 'package:retry/retry.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Override the API base with CLASH_HARMONY_API_URL (see `env.json.example`).
 const harmonyApiUrl = String.fromEnvironment(
@@ -22,6 +23,7 @@ const harmonyApiUrl = String.fromEnvironment(
 const harmonyConfigPath = '/v1/config';
 
 const harmonyConfigVersionPath = '/v1/config/version';
+const harmonyHomeDisplayPath = '/v1/home';
 
 const harmonyConfigMaxBytes = 1024 * 1024;
 
@@ -303,6 +305,7 @@ class HarmonyConfigDownload {
 }
 
 class HarmonyAccountApi {
+  static const _homeDisplayCacheKey = 'harmony_home_display';
   final Dio _http;
   final HarmonySessionStore _storage;
   HarmonySession? session;
@@ -330,6 +333,19 @@ class HarmonyAccountApi {
       _storage = storage ?? HarmonySessionStore();
 
   bool get isAuthorized => session?.expiresAt.isAfter(DateTime.now()) == true;
+
+  Future<String?> readHomeDisplayCache() async =>
+      (await SharedPreferences.getInstance()).getString(_homeDisplayCacheKey);
+
+  Future<void> writeHomeDisplayCache(String value) async {
+    final preferences = await SharedPreferences.getInstance();
+    if (!await preferences.setString(_homeDisplayCacheKey, value)) {
+      throw StateError('Home display cache unavailable');
+    }
+  }
+
+  Future<Response<dynamic>> fetchHomeDisplay({String? etag}) =>
+      _request(harmonyHomeDisplayPath, headers: {'If-None-Match': ?etag});
 
   // Serialize persistence only. Network requests never hold the storage queue,
   // so logout can invalidate an in-flight login/restore immediately.
@@ -841,7 +857,7 @@ class HarmonyAccountApi {
         login: login,
         responseType: responseType,
         headers: headers,
-        configPath: configPath,
+        allowProxyFallback: configPath || path == harmonyHomeDisplayPath,
       );
     } on DioException catch (error) {
       final status = error.response?.statusCode;
@@ -873,7 +889,7 @@ class HarmonyAccountApi {
     required bool login,
     required ResponseType responseType,
     Map<String, String>? headers,
-    required bool configPath,
+    required bool allowProxyFallback,
   }) async {
     try {
       return await _dioRequest(
@@ -886,7 +902,7 @@ class HarmonyAccountApi {
         viaLocalProxy: false,
       );
     } on DioException catch (error) {
-      if (!configPath ||
+      if (!allowProxyFallback ||
           localMixedProxyPort == null ||
           !_isRetryableTransportError(error)) {
         rethrow;
@@ -980,7 +996,9 @@ class HarmonyAccountApi {
           validateStatus: (status) =>
               status != null &&
               (status >= 200 && status < 300 ||
-                  path == harmonyConfigPath && status == 304),
+                  (path == harmonyConfigPath ||
+                          path == harmonyHomeDisplayPath) &&
+                      status == 304),
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
             ...?headers,

@@ -1,5 +1,7 @@
 # 数据层远程更新（不部署示例）
 
+首页日常调整优先使用独立的 [首页 JSON 配置](../homepage/README.md)。`/v1/home` 与线路下载分开，可在登录前加载并独立更新、缓存；下面的 `runtime` 仍兼容已有版本化配置。
+
 首次需要发包安装支持本协议的客户端。之后沿用 HTTPS `/v1/config/version` 轮询、`/v1/config` 条件 GET（ETag/304），每个数据包使用唯一 `version`。账户鉴权和下载仍由 harmony_account.dart 负责，节点更新复用 ProfilesAction.updateProfile，在线更新通过 SetupAction.applyProfile 应用，不下载 Dart/JS/原生可执行代码。
 
 ## 配置格式与发布
@@ -37,7 +39,7 @@ node backend/remote-config/package-config.mjs private-config-payload.json 2026-1
 
 远程发布回滚时，将旧 payload 以**新 version**发布，确保客户端能检测到。文件系统或安全存储本身不可写时不能保证持久化回滚，需要恢复存储后重新同步。
 
-仍需打包：新增字段及其行为、其他页面的文案接线、新语言支持、页面布局和控件、业务逻辑/新功能、Flutter/Dart/原生代码、插件、VPN 权限和通知能力、内核或新协议、内置资源、API 根地址及信任机制。禁止把可执行代码作为配置下发。
+已有首页文案以及区块显示、隐藏和排列顺序可由首页 JSON 更新。仍需打包：新增字段及其行为、其他页面的文案接线、新语言支持、新的页面控件、业务逻辑/新功能、Flutter/Dart/原生代码、插件、VPN 权限和通知能力、内核或新协议、内置资源、API 根地址及信任机制。禁止把可执行代码作为配置下发。
 
 示例验证：`node --test backend/remote-config/worker.test.mjs`；客户端验证：`flutter test test/common/harmony_remote_config_test.dart test/providers/harmony_simple_test.dart`。
 

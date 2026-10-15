@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "texts": {
+    "homeTitle": "CC保镖",
+    "simpleReady": "轻点盾牌，开始保护",
+    "harmonySessionTraffic": "本次保护流量",
+    "harmonyConfigFreshUpToDate": "连接配置已就绪 · {time}"
+  },
+  "home": {
+    "sections": ["connection", "traffic", "config", "account"]
+  }
+}

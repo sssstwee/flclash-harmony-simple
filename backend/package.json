@@ -12,6 +12,7 @@
     "deploy": "wrangler deploy --config wrangler.local.jsonc",
     "account": "node scripts/account.mjs",
     "config": "node scripts/config.mjs",
+    "home:publish": "node scripts/home-display.mjs",
     "test:scripts": "node --test scripts/test/*.test.mjs",
     "bundle-check": "wrangler deploy --dry-run --config wrangler.jsonc",
     "secret": "wrangler secret put BETTER_AUTH_SECRET --config wrangler.local.jsonc",
@@ -22,6 +23,7 @@
   "author": "",
   "license": "GPL-3.0-only",
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
     "better-auth": "^1.7.7",
     "kysely-d1": "^0.4.0",
     "yaml": "^2.9.1"
