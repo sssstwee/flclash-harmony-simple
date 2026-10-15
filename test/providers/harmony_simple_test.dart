@@ -364,7 +364,7 @@ class _CommonActions extends CommonAction {
   int updateChecks = 0;
 
   @override
-  Future<void> autoCheckUpdate() async {
+  Future<void> autoCheckUpdate({bool retry = false}) async {
     updateChecks++;
   }
 }

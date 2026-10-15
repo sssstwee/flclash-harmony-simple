@@ -76,6 +76,31 @@ test('login, protected configuration, session inspection and logout work end to 
   expect((await request('/v1/config', { headers: bearer(token) })).status).toBe(401);
 });
 
+test('login includes only the created session expiry and retains signed bearer authentication', async () => {
+  const response = await request('/api/auth/sign-in/username', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'tester', password }),
+  });
+  expect(response.status).toBe(200);
+  const token = response.headers.get('set-auth-token')!;
+  expect(token).toBeTruthy();
+  const body = await response.json() as { session: { expiresAt: string }; user: { username: string } };
+  expect(body.user.username).toBe('tester');
+  expect(Object.keys(body.session)).toEqual(['expiresAt']);
+  expect(Date.parse(body.session.expiresAt)).toBeGreaterThan(Date.now());
+  const inspected = await request('/api/auth/get-session', { headers: bearer(token) });
+  const session = await inspected.json() as { session: { expiresAt: string } };
+  expect(body.session.expiresAt).toBe(session.session.expiresAt);
+
+  const invalid = await request('/api/auth/sign-in/username', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'tester', password: 'wrong-password' }),
+  });
+  expect(invalid.status).toBe(401);
+  expect(invalid.headers.get('set-auth-token')).toBeNull();
+  expect(await invalid.json()).not.toHaveProperty('session');
+});
+
 test('expired and tampered signed tokens cannot download settings', async () => {
   const token = await login();
   expect((await request('/v1/config', { headers: bearer(`${token}wrong`) })).status).toBe(401);

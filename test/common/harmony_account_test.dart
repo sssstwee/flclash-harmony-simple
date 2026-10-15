@@ -316,6 +316,71 @@ void main() {
   );
 
   test(
+    'login reuses server-created session metadata without a second request',
+    () async {
+      final store = MemoryStore();
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      final calls = <String>[];
+      final expiresAt = DateTime.now().add(const Duration(days: 7));
+      http.httpClientAdapter = Adapter((request) {
+        calls.add(request.path);
+        return jsonBody(
+          {
+            'token': 'unsigned-body-token',
+            'user': {'username': 'harmony'},
+            'session': {'expiresAt': expiresAt.toIso8601String()},
+          },
+          200,
+          {
+            'set-auth-token': ['signed-session'],
+          },
+        );
+      });
+      final api = HarmonyAccountApi(http: http, storage: store);
+      final session = await api.login('harmony', 'password');
+      expect(calls, ['/api/auth/sign-in/username']);
+      expect(session.token, 'signed-session');
+      expect(session.expiresAt, expiresAt);
+      expect(store.token, 'signed-session');
+      await api.restore();
+      expect(calls.last, '/api/auth/get-session');
+    },
+  );
+
+  for (final expiry in ['invalid', '2000-01-01T00:00:00.000Z']) {
+    test('invalid inline session expiry $expiry fails closed', () async {
+      final store = MemoryStore();
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      var signOuts = 0;
+      http.httpClientAdapter = Adapter((request) {
+        if (request.path == '/api/auth/sign-out') {
+          signOuts++;
+          return jsonBody({'success': true});
+        }
+        expect(request.path, '/api/auth/sign-in/username');
+        return jsonBody(
+          {
+            'user': {'username': 'harmony'},
+            'session': {'expiresAt': expiry},
+          },
+          200,
+          {
+            'set-auth-token': ['signed-session'],
+          },
+        );
+      });
+      final api = HarmonyAccountApi(http: http, storage: store);
+      await expectLater(
+        api.login('harmony', 'password'),
+        throwsA(HarmonyAccountError.expired),
+      );
+      expect(api.isAuthorized, isFalse);
+      expect(store.token, isNull);
+      expect(signOuts, 1);
+    });
+  }
+
+  test(
     'incorrect credentials do not create a session and expired persisted tokens are removed',
     () async {
       final store = MemoryStore();

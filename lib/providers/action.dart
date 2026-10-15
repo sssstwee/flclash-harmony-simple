@@ -21,7 +21,7 @@ part 'generated/action.g.dart';
 
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
-  bool _checkingUpdate = false;
+  Future<void>? _checkingUpdate;
   String? _notifiedUpdateTag;
 
   @override
@@ -69,11 +69,16 @@ class CommonAction extends _$CommonAction {
         .getTotalTraffic(onlyStatisticsProxy);
   }
 
-  Future<void> autoCheckUpdate() async {
-    if (_checkingUpdate || !ref.read(appSettingProvider).autoCheckUpdate) {
-      return;
+  Future<void> autoCheckUpdate({bool retry = false}) async {
+    final pending = _checkingUpdate;
+    if (pending != null) {
+      if (!retry) return;
+      await pending;
+      if (!ref.mounted) return;
     }
-    _checkingUpdate = true;
+    if (!ref.read(appSettingProvider).autoCheckUpdate) return;
+    final done = Completer<void>();
+    _checkingUpdate = done.future;
     try {
       final res = await request.checkForUpdate();
       if (!ref.mounted ||
@@ -85,7 +90,8 @@ class CommonAction extends _$CommonAction {
       _notifiedUpdateTag = res['tag_name'] as String?;
       await checkUpdateResultHandle(data: res);
     } finally {
-      _checkingUpdate = false;
+      _checkingUpdate = null;
+      done.complete();
     }
   }
 

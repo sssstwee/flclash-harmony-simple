@@ -62,3 +62,9 @@ WantedBy=timers.target
 ```
 
 执行 `systemctl daemon-reload && systemctl enable --now subscription-push.path subscription-push.timer`。更新程序应原子替换 YAML 文件。备份包含敏感配置，勿公开。
+
+## 登录与客户端更新
+
+登录响应通过 Better Auth 的官方 after hook 附带新建会话的 `session.expiresAt`，客户端继续使用 `set-auth-token` 的签名令牌，可省去紧接登录的一次 `get-session` 往返。旧服务端缺少该字段时，新客户端仍查询会话；恢复已有登录仍在线校验会话。过期或无效的响应不保存凭据。
+
+鸿蒙客户端在启动、返回前台和 VPN 连通后检查 GitHub Releases。同版本号下增加构建号也会提示；启动查询尚未完成时，VPN 连通后的补查会等待后重试。同一版本在本次运行内只提示一次，取消不会关闭后续版本提醒。1502 及更早版本需要手动安装一次 1503 或更新版本以启用提示。

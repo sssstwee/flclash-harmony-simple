@@ -87,10 +87,13 @@ void main() {
     container.listen(appSettingProvider, (_, _) {});
     await render(tester, container);
     container.read(commonActionProvider);
-    await tester.runAsync(action.autoCheckUpdate);
-    expect(requests, 1);
-    expect(action.notices, isEmpty);
-    await tester.runAsync(action.autoCheckUpdate);
+    // VPN can connect before a blocked startup request has finished.
+    await tester.runAsync(() async {
+      final startup = action.autoCheckUpdate();
+      final connected = action.autoCheckUpdate(retry: true);
+      await Future.wait([startup, connected]);
+    });
+    expect(requests, 2);
     expect(action.notices, [release]);
     await tester.runAsync(action.autoCheckUpdate);
     expect(action.notices, [release]);

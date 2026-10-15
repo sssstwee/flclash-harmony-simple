@@ -532,7 +532,10 @@ class HarmonyAccountApi {
       if (token == null || token.isEmpty) {
         throw HarmonyAccountError.unavailable;
       }
-      final value = await _validate(token);
+      final data = response.data;
+      final value = data is Map && data['session'] is Map
+          ? _sessionFromResponse(token, data)
+          : await _validate(token);
       _checkGeneration(generation);
       await _store(() async {
         _checkGeneration(generation);
@@ -570,7 +573,10 @@ class HarmonyAccountApi {
 
   Future<HarmonySession> _validate(String token) async {
     final response = await _request('/api/auth/get-session', token: token);
-    final data = response.data;
+    return _sessionFromResponse(token, response.data);
+  }
+
+  HarmonySession _sessionFromResponse(String token, Object? data) {
     if (data is! Map || data['session'] is! Map || data['user'] is! Map) {
       throw HarmonyAccountError.expired;
     }

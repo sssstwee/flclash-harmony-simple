@@ -501,7 +501,9 @@ class HarmonySimple extends _$HarmonySimple {
     _scheduleHealthCheck();
     _scheduleVersionCheck();
     unawaited(checkConfigVersion(force: true));
-    unawaited(ref.read(commonActionProvider.notifier).autoCheckUpdate());
+    unawaited(
+      ref.read(commonActionProvider.notifier).autoCheckUpdate(retry: true),
+    );
   }
 
   Future<bool> forceRefreshConfig() async {
