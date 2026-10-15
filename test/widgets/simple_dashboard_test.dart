@@ -130,6 +130,49 @@ void main() {
     await AppLocalizations.load(const Locale('zh', 'CN'));
   });
 
+  testWidgets('initial config preparation is distinct from VPN connection', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          const SimpleConnectionPanel(
+            phase: ConnectionPhase.connecting,
+            username: 'alice',
+            homeStatus: HarmonyHomeStatus(configSyncInProgress: true),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('正在准备连接配置…'), findsWidgets);
+    expect(find.text('正在连接…'), findsNothing);
+    expect(find.textContaining('配置已是最新'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('unknown config freshness does not claim an up-to-date config', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      scoped(
+        api: SignedOutApi(),
+        child: app(
+          const SimpleConnectionPanel(
+            phase: ConnectionPhase.error,
+            username: 'alice',
+            issue: HarmonyUserIssue.subscriptionUnreachable,
+          ),
+        ),
+      ),
+    );
+    expect(find.text('尚未完成配置检查'), findsOneWidget);
+    expect(find.text('连接配置暂不可用'), findsWidgets);
+    expect(find.textContaining('配置已是最新'), findsNothing);
+    expect(find.text('服务暂时不可用'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('home follows system appearance and keeps brand contrast', (
     tester,
   ) async {

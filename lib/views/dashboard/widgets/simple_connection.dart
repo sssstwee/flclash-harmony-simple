@@ -80,6 +80,12 @@ class SimpleConnectionPanel extends ConsumerWidget {
             'simpleReady',
             texts.simpleReady,
           ),
+          ConnectionPhase.connecting when homeStatus.configSyncInProgress =>
+            remoteHarmonyText(
+              ref,
+              'harmonyConfigPreparing',
+              texts.harmonyConfigPreparing,
+            ),
           ConnectionPhase.connecting => remoteHarmonyText(
             ref,
             'harmonyConnecting',
@@ -285,6 +291,14 @@ class _ConfigFreshnessRow extends ConsumerWidget {
   }
 
   String _message(AppLocalizations texts, WidgetRef ref) {
+    if (configSyncInProgress &&
+        freshness.kind == HarmonyConfigFreshnessKind.unknown) {
+      return remoteHarmonyText(
+        ref,
+        'harmonyConfigPreparing',
+        texts.harmonyConfigPreparing,
+      );
+    }
     final kind = freshness.displayKind;
     return switch (kind) {
       HarmonyConfigFreshnessKind.discoveringUpdate => remoteHarmonyText(
@@ -309,8 +323,12 @@ class _ConfigFreshnessRow extends ConsumerWidget {
               ),
         ),
       ),
-      HarmonyConfigFreshnessKind.upToDate ||
       HarmonyConfigFreshnessKind.unknown => remoteHarmonyText(
+        ref,
+        'harmonyConfigFreshUnknown',
+        texts.harmonyConfigFreshUnknown,
+      ),
+      HarmonyConfigFreshnessKind.upToDate => remoteHarmonyText(
         ref,
         'harmonyConfigFreshUpToDate',
         texts.harmonyConfigFreshUpToDate(

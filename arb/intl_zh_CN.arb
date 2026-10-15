@@ -636,6 +636,8 @@
     }
   },
   "harmonyConfigFreshUpdating": "发现新配置，正在更新…",
+  "harmonyConfigFreshUnknown": "尚未完成配置检查",
+  "harmonyConfigPreparing": "正在准备连接配置…",
   "harmonyConfigFreshAutoUpdated": "配置已自动更新",
   "harmonyConfigFreshCheckFailed": "无法检查更新，正在使用缓存配置（{reason}）",
   "@harmonyConfigFreshCheckFailed": {
@@ -654,8 +656,8 @@
   "harmonyIssueTitleOfflineCached": "暂时无法更新订阅",
   "harmonyIssueDetailOfflineCached": "账号服务器暂时连不上，正在使用上次保存的线路。可先点上方图标连接；网络恢复后会自动更新配置。",
   "harmonyIssueActionOfflineCached": "下一步：点上方图标连接",
-  "harmonyIssueTitleSubscription": "无法获取最新订阅",
-  "harmonyIssueDetailSubscription": "服务器暂时不可用或未返回配置。若已有缓存，可点上方图标连接；也可稍后重试。",
+  "harmonyIssueTitleSubscription": "连接配置暂不可用",
+  "harmonyIssueDetailSubscription": "登录已成功，但线路配置尚未准备好。请点上方图标重试。若有缓存配置，仍可尝试连接。",
   "harmonyIssueActionSubscription": "下一步：点上方图标连接或稍后再试",
   "harmonyIssueTitleAuthExpired": "登录已失效",
   "harmonyIssueDetailAuthExpired": "你的登录状态已过期，需要重新登录才能更新订阅。",

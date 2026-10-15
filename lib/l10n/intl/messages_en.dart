@@ -469,9 +469,15 @@ class MessageLookup extends MessageLookupByLibrary {
       "Config updated automatically",
     ),
     "harmonyConfigFreshCheckFailed": m10,
+    "harmonyConfigFreshUnknown": MessageLookupByLibrary.simpleMessage(
+      "Config has not been checked yet",
+    ),
     "harmonyConfigFreshUpToDate": m11,
     "harmonyConfigFreshUpdating": MessageLookupByLibrary.simpleMessage(
       "New config found, updating…",
+    ),
+    "harmonyConfigPreparing": MessageLookupByLibrary.simpleMessage(
+      "Preparing connection settings…",
     ),
     "harmonyConfigRefreshDebounced": MessageLookupByLibrary.simpleMessage(
       "Please wait a moment",
@@ -538,7 +544,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Cannot reach the account server. Check your network; with a cached profile, you can still tap the icon above to connect.",
     ),
     "harmonyIssueDetailSubscription": MessageLookupByLibrary.simpleMessage(
-      "The server did not return a new profile. If a cached copy exists, tap the icon above to connect; otherwise retry later.",
+      "You are signed in, but connection settings are not ready. Tap the icon above to retry. Cached settings can still be used if available.",
     ),
     "harmonyIssueDetailVpnFailed": MessageLookupByLibrary.simpleMessage(
       "The system VPN failed to start. Allow the VPN permission, then tap the icon above to reconnect.",
@@ -559,7 +565,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Service unavailable",
     ),
     "harmonyIssueTitleSubscription": MessageLookupByLibrary.simpleMessage(
-      "Cannot fetch latest config",
+      "Connection settings unavailable",
     ),
     "harmonyIssueTitleVpnFailed": MessageLookupByLibrary.simpleMessage(
       "VPN did not start",

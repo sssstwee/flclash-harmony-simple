@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/harmony_account.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -225,6 +226,67 @@ ResponseBody jsonBody(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'login diagnostics identify the failure without exposing secrets',
+    () async {
+      final messages = <String>[];
+      final previousDebugPrint = debugPrint;
+      debugPrint = (message, {wrapWidth}) {
+        if (message != null) messages.add(message);
+      };
+      addTearDown(() => debugPrint = previousDebugPrint);
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter(
+        (request) => throw DioException.connectionError(
+          requestOptions: request,
+          reason: 'private-password private-token',
+          error: StateError('private-password private-token'),
+        ),
+      );
+      final api = HarmonyAccountApi(http: http, storage: MemoryStore());
+      await expectLater(
+        api.login('private-username', 'private-password'),
+        throwsA(HarmonyAccountError.unavailable),
+      );
+      final diagnostic = messages.join('\n');
+      expect(diagnostic, contains('transport=connectionError'));
+      expect(diagnostic, contains('login/sign-in'));
+      expect(diagnostic, isNot(contains('private-username')));
+      expect(diagnostic, isNot(contains('private-password')));
+      expect(diagnostic, isNot(contains('private-token')));
+    },
+  );
+
+  test('stream failures retain a safe diagnostic after HTTP success', () async {
+    final messages = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) {
+      if (message != null) messages.add(message);
+    };
+    addTearDown(() => debugPrint = previousDebugPrint);
+    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+    http.httpClientAdapter = Adapter(
+      (_) => ResponseBody(
+        Stream<Uint8List>.error(StateError('private-config-secret')),
+        200,
+      ),
+    );
+    final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+      ..session = HarmonySession(
+        'private-token',
+        'alice',
+        DateTime.now().add(const Duration(days: 1)),
+      );
+    await expectLater(
+      api.downloadConfig(),
+      throwsA(HarmonyAccountError.unavailable),
+    );
+    expect(messages.join('\n'), contains('config-body'));
+    expect(messages.join('\n'), isNot(contains('private-config-secret')));
+    expect(messages.join('\n'), isNot(contains('private-token')));
+  });
+
   test(
     'storage failures fail closed and still revoke the server session',
     () async {
