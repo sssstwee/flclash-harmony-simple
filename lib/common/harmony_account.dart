@@ -11,6 +11,7 @@ import 'package:fl_clash/common/harmony_remote_config.dart';
 import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/services.dart';
+import 'package:retry/retry.dart';
 
 /// Production builds must set [CLASH_HARMONY_API_URL] (see `env.json.example`).
 const harmonyApiUrl = String.fromEnvironment(
@@ -615,9 +616,8 @@ class HarmonyAccountApi {
     if (versionEndpointSupported == false) return null;
     if (!isAuthorized) throw HarmonyAccountError.expired;
     try {
-      final response = await _request(
-        harmonyConfigVersionPath,
-        token: session!.token,
+      final response = await _readConfigWithRetry(
+        () => _request(harmonyConfigVersionPath, token: session!.token),
       );
       if (response.statusCode == 404) {
         versionEndpointSupported = false;
@@ -644,6 +644,42 @@ class HarmonyAccountApi {
   }
 
   Future<HarmonyConfigDownload> downloadConfig({
+    String? ifNoneMatch,
+    String? ifModifiedSince,
+  }) => _readConfigWithRetry(
+    () => _downloadConfig(
+      ifNoneMatch: ifNoneMatch,
+      ifModifiedSince: ifModifiedSince,
+    ),
+  );
+
+  Future<T> _readConfigWithRetry<T>(Future<T> Function() read) async {
+    final generation = _generation;
+    final token = session?.token;
+    try {
+      return await const RetryOptions(maxAttempts: 2).retry(
+        () {
+          _checkGeneration(generation);
+          if (session?.token != token || !isAuthorized) {
+            throw HarmonyAccountError.expired;
+          }
+          return read();
+        },
+        // A running VPN already has route fallback. Retry initial direct reads
+        // once, including the body, without replaying auth or invalid configs.
+        retryIf: (error) =>
+            localMixedProxyPort == null &&
+            error is DioException &&
+            _isRetryableTransportError(error),
+        onRetry: (error) => _logFailure('config-retry', error),
+      );
+    } on DioException catch (error) {
+      _logFailure('config-transfer', error);
+      throw HarmonyAccountError.unavailable;
+    }
+  }
+
+  Future<HarmonyConfigDownload> _downloadConfig({
     String? ifNoneMatch,
     String? ifModifiedSince,
   }) async {
@@ -695,6 +731,9 @@ class HarmonyAccountApi {
         builder.add(chunk);
       }
     } on HarmonyAccountError {
+      rethrow;
+    } on DioException catch (error) {
+      _logFailure('config-body', error);
       rethrow;
     } catch (error) {
       _logFailure('config-body', error);
@@ -806,6 +845,8 @@ class HarmonyAccountApi {
       );
     } on DioException catch (error) {
       _logFailure('request $path', error);
+      // Config GET callers retry the entire transfer, including stream reads.
+      if (configPath && _isRetryableTransportError(error)) rethrow;
       final status = error.response?.statusCode;
       if (status == 401 || status == 403) {
         throw login
@@ -844,7 +885,7 @@ class HarmonyAccountApi {
     } on DioException catch (error) {
       if (!configPath ||
           localMixedProxyPort == null ||
-          !_shouldRetryViaProxy(error)) {
+          !_isRetryableTransportError(error)) {
         rethrow;
       }
     }
@@ -892,7 +933,7 @@ class HarmonyAccountApi {
     );
   }
 
-  bool _shouldRetryViaProxy(DioException error) {
+  bool _isRetryableTransportError(DioException error) {
     if (error.response != null) return false;
     return error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout ||
