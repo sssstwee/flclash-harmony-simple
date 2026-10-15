@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { parse, stringify } from 'yaml';
-import { applyRoutingPolicy, normalizeRoutingContent, routingPolicy } from '../../src/routing_policy.mjs';
+import { applyRoutingPolicy, normalizePushedAiContent, normalizeRoutingContent, routingPolicy } from '../../src/routing_policy.mjs';
 
 const fixture = () => ({
   proxies: [
@@ -44,6 +44,49 @@ test('each empty AI group rejects normalization without adding available fallbac
     assert.throws(() => normalizeRoutingContent(stringify(config)), /AI group "AI" has no members after removing WARP nodes/);
     assert.deepEqual(config['proxy-groups'][3].proxies, members);
   }
+});
+
+test('pushed rules retain priority without a CN boundary and recognize spaced CN rules', () => {
+  for (const boundary of [null, 'GEOSITE, cn, DIRECT', 'geoip, CN, DIRECT, no-resolve']) {
+    const config = fixture();
+    const earlyAi = 'DOMAIN,early.example,AI';
+    const exception = 'DOMAIN,private.example,DIRECT';
+    const lateAi = 'DOMAIN-SUFFIX,late.example,AI';
+    config.rules = [earlyAi, exception, 'GEOIP,US,Main', ...(boundary ? [boundary] : []), lateAi, 'MATCH,Main'];
+    const output = parse(normalizePushedAiContent(stringify(config)));
+    assert.deepEqual(output.rules, boundary
+      ? [earlyAi, exception, 'GEOIP,US,Main', lateAi, boundary, 'MATCH,Main']
+      : config.rules);
+    assert.equal(normalizePushedAiContent(stringify(output)), stringify(output, { lineWidth: 0 }));
+  }
+});
+
+test('AI groups retain dynamic sources and exclude WARP through Mihomo filters', () => {
+  for (const membership of [{ use: ['remote'] }, { 'include-all': true }, { 'include-all-providers': true }, { 'include-all-proxies': true }]) {
+    for (const proxies of [undefined, ['voyra-warp'], ['voyra-direct', 'voyra-warp']]) {
+      const config = fixture();
+      config['proxy-providers'] = { remote: { type: 'http', url: 'https://example.org/nodes' } };
+      const group = { name: 'AI', type: 'select', ...membership, 'exclude-filter': 'expired`offline' };
+      if (proxies) group.proxies = proxies;
+      config['proxy-groups'][3] = group;
+      const once = normalizePushedAiContent(stringify(config));
+      const output = parse(once)['proxy-groups'][3];
+      assert.deepEqual(output, {
+        ...group,
+        ...(proxies ? { proxies: proxies.filter(name => !/warp/i.test(name)) } : {}),
+        'exclude-filter': 'expired`offline`(?i)warp',
+      });
+      assert.equal(normalizePushedAiContent(once), once);
+      assert.deepEqual(applyRoutingPolicy(config)['proxy-groups'][3], output);
+    }
+  }
+});
+
+test('empty dynamic AI sources still reject when only WARP proxies remain', () => {
+  const config = fixture();
+  config.proxies = [{ name: 'only-WARP', type: 'vless' }];
+  config['proxy-groups'][3] = { name: 'AI', type: 'select', 'include-all-proxies': true };
+  assert.throws(() => normalizePushedAiContent(stringify(config)), /AI group "AI" has no members/);
 });
 
 test('missing AI groups reject; existing aliases do not gain a synthetic group', () => {

@@ -6,6 +6,13 @@ const blocked = new Set(['DIRECT', 'REJECT', 'REJECT-DROP', 'PASS', 'GLOBAL']);
 const localTypes = new Set(['direct', 'reject', 'reject-drop', 'pass']);
 const aiName = name => /🤖|智能|(?:^|[^a-z])ai(?:[^a-z]|$)|openai|chatgpt|claude|gemini|gpt/i.test(name);
 
+function hasDynamicMembers(group, nodes, providers) {
+  return (group.use ?? []).some(name => providers.has(name)) ||
+    (group['include-all'] && (nodes.size > 0 || providers.size > 0)) ||
+    (group['include-all-proxies'] && nodes.size > 0) ||
+    (group['include-all-providers'] && providers.size > 0);
+}
+
 function graph(config) {
   const nodes = new Set((config.proxies ?? []).filter(node => !localTypes.has(node.type)).map(node => node.name));
   const groups = new Map((config['proxy-groups'] ?? []).map(group => [group.name, group]));
@@ -15,10 +22,7 @@ function graph(config) {
     if (nodes.has(name)) return true;
     const group = groups.get(name);
     if (!group || group.type === 'relay') return false;
-    if ((group.use ?? []).some(name => providers.has(name)) ||
-        (group['include-all'] && (nodes.size || providers.size)) ||
-        (group['include-all-proxies'] && nodes.size) ||
-        (group['include-all-providers'] && providers.size)) return true;
+    if (hasDynamicMembers(group, nodes, providers)) return true;
     return (group.proxies ?? []).some(child => hasProxy(child, new Set([...visited, name])));
   }
   return { groups, hasProxy };
@@ -35,9 +39,18 @@ function defaultTarget(config) {
 
 function filterAiGroups(config) {
   const aiGroups = (config['proxy-groups'] ?? []).filter(group => group.name === policy.aiGroup || aiName(group.name));
+  const nodes = new Set((config.proxies ?? []).filter(node => !localTypes.has(node.type) && !/warp/i.test(node.name)).map(node => node.name));
+  const providers = new Set(Object.keys(config['proxy-providers'] ?? {}));
   for (const group of aiGroups) {
-    group.proxies = (group.proxies ?? []).filter(name => !/warp/i.test(name));
-    if (!group.proxies.length) throw new Error(`AI group "${group.name}" has no members after removing WARP nodes`);
+    if (group.proxies) group.proxies = group.proxies.filter(name => !/warp/i.test(name));
+    const dynamic = hasDynamicMembers(group, nodes, providers);
+    if (!group.proxies?.length && !dynamic) throw new Error(`AI group "${group.name}" has no members after removing WARP nodes`);
+    if (dynamic) {
+      // Mihomo separates independent exclude expressions with a backtick.
+      const filters = (group['exclude-filter'] ?? '').split('`').filter(Boolean);
+      if (!filters.includes('(?i)warp')) filters.push('(?i)warp');
+      group['exclude-filter'] = filters.join('`');
+    }
   }
   return aiGroups;
 }
@@ -48,16 +61,20 @@ export function normalizePushedAiContent(content) {
   const aiGroups = filterAiGroups(config);
   if (!aiGroups.length) return content;
   const names = new Set(aiGroups.map(group => group.name));
+  const rules = config.rules ?? [];
+  const boundary = rules.findIndex(rule => {
+    const [type, payload] = rule.split(',').map(value => value.trim().toUpperCase());
+    return ['GEOIP', 'GEOSITE'].includes(type) && payload === 'CN';
+  });
+  if (boundary < 0) return stringify(config, { lineWidth: 0 });
   const aiRules = [];
   const remaining = [];
-  for (const rule of config.rules ?? []) {
+  for (const rule of rules.slice(boundary)) {
     const parts = rule.split(',').map(value => value.trim());
     const target = parts.at(-1) === 'no-resolve' ? parts.at(-2) : parts.at(-1);
     (names.has(target) ? aiRules : remaining).push(rule);
   }
-  const boundary = remaining.findIndex(rule => /^(?:GEOIP,|GEOSITE,cn,)/i.test(rule.trim()));
-  remaining.splice(boundary < 0 ? 0 : boundary, 0, ...aiRules);
-  config.rules = remaining;
+  config.rules = [...rules.slice(0, boundary), ...aiRules, ...remaining];
   return stringify(config, { lineWidth: 0 });
 }
 

@@ -12,7 +12,7 @@ Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/re
 
 ## VPS 推送订阅（D1）
 
-VPS 上的完整 YAML 订阅文件是分流配置的来源。电脑直接订阅该文件，文件监听任务将同一份内容推送到 Worker，手机登录后从 Worker 下载。推送和导入时保留订阅已有 AI 组及成员顺序，移除其中名称包含 WARP 的成员，并将已有 AI 规则放在国内兜底规则之前；过滤后 AI 组为空则拒绝写入。不会补充新的 AI 节点或回退成员，其余规则、代理组和 DNS 由订阅决定。`applyRoutingPolicy` 仅供离线迁移使用。
+VPS 上的完整 YAML 订阅文件是分流配置的来源。电脑直接订阅该文件，文件监听任务将同一份内容推送到 Worker，手机登录后从 Worker 下载。推送和导入时保留订阅已有 AI 组及成员顺序，移除其中名称包含 WARP 的成员；动态 `use` / `include-all*` 成员由 Mihomo 原生 `exclude-filter` 排除 WARP，并保留原有过滤条件。没有静态成员或可用动态来源的 AI 组会拒绝写入。仅将国内兜底规则之后的已有 AI 规则提前到该兜底之前，其他优先级不变；没有国内兜底时保留规则顺序。不会补充新的 AI 节点或回退成员，其余规则、代理组和 DNS 由订阅决定。`applyRoutingPolicy` 仅供离线迁移使用。
 
 HarmonyOS 客户端校验并原样执行下发的规则、代理组和 DNS，不生成分流规则、排序节点或追加本地 DNS。各端仅覆盖 VPN、监听端口等必要的平台运行参数；连接健康检查不改动代理组选择。
 

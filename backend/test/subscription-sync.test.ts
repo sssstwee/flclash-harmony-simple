@@ -1,4 +1,4 @@
-import { parse } from 'yaml';
+import { parse, stringify } from 'yaml';
 import { env } from 'cloudflare:workers';
 import { createExecutionContext } from 'cloudflare:test';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -97,5 +97,22 @@ test('push filters WARP and places AI rules before CN; empty AI replacement leav
   expect(response.status).toBe(400);
   expect(JSON.stringify(await response.json())).toContain('AI_GROUP_EMPTY_AFTER_WARP_REMOVAL');
   expect(await current()).toEqual(first);
+  expect(await backup()).toBeNull();
+});
+
+test.each([null, 'GEOSITE, cn, DIRECT', 'geoip, CN, DIRECT, no-resolve'])('push accepts provider-only AI membership and retains rule exceptions: %s', async boundary => {
+  const document = parse(content);
+  document['proxy-providers'] = { remote: { type: 'http', url: 'https://example.org/nodes' } };
+  document['proxy-groups'].push({ name: 'AI', type: 'select', use: ['remote'], 'exclude-filter': 'expired' });
+  const exception = 'DOMAIN,private.example,DIRECT';
+  const ai = 'DOMAIN-SUFFIX,example.org,AI';
+  document.rules = [exception, ...(boundary ? [boundary] : []), ai, 'MATCH,auto'];
+  expect((await push(stringify(document))).status).toBe(200);
+  const stored = parse((await current())?.content as string);
+  expect(stored['proxy-groups'][1]).toEqual({
+    name: 'AI', type: 'select', use: ['remote'], 'exclude-filter': 'expired`(?i)warp',
+  });
+  expect(stored.rules).toEqual([exception, ai, ...(boundary ? [boundary] : []), 'MATCH,auto']);
+  expect((await (await push(stringify(document))).json() as { changed: boolean }).changed).toBe(false);
   expect(await backup()).toBeNull();
 });
