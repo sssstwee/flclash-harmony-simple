@@ -8,7 +8,7 @@ Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/re
 
 客户端默认通过 `https://69.17.3.174:8444/api` 访问 VPS HTTPS 反向代理，再由 VPS 转发到 Cloudflare。账号校验、会话和配置存储仍在 Worker / D1。VPS 转发需移除入口的 `/api` 前缀，客户端必须保留该前缀拼接登录、配置和版本接口。
 
-只从 `main` 手动构建和上传 HarmonyOS 安装包；推送、PR 和临时分支仅运行验证。每次打包仍须先获得用户授权。
+安装包默认由 GitHub Actions 从 `main` 手动构建和上传，本机仅进行测试和静态检查；推送、PR 和临时分支仅运行验证。每次打包仍须先获得用户授权。
 
 ## VPS 推送订阅（D1）
 
