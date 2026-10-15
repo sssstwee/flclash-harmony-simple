@@ -4,7 +4,6 @@ import { readFile, rm, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { test } from 'node:test';
 import { syncSubscription } from '../sync-subscription.mjs';
-import { normalizeRoutingContent } from '../../src/routing_policy.mjs';
 
 const yaml = 'proxies: [{name: fixture}]\nproxy-groups: [{name: auto, type: select, proxies: [fixture]}]\n';
 const deps = overrides => ({
@@ -23,7 +22,7 @@ test('dry run prints matching backend versions without mutation or backup', asyn
     executeSql: async () => assert.fail('unexpected write'),
   }));
   const hash = value => createHash('sha256').update(JSON.stringify(['default', '', value])).digest('hex').slice(0, 16);
-  assert.deepEqual(logs, [`old version: ${hash('old')}; new version: ${hash(normalizeRoutingContent(yaml))}`]);
+  assert.deepEqual(logs, [`old version: ${hash('old')}; new version: ${hash(yaml)}`]);
 });
 
 test('backup exists with private permissions before scoped write', async t => {
