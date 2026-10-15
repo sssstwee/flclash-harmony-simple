@@ -149,6 +149,33 @@ class _LoopbackClient extends Mock implements HttpClient {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'a direct config transport failure opens a fresh direct request',
+    () async {
+      final transport = _Transport();
+      await HttpOverrides.runWithHttpOverrides(() async {
+        final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+        final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+          ..session = HarmonySession(
+            'signed-token',
+            'harmony',
+            DateTime.now().add(const Duration(days: 1)),
+          );
+        // The response is intentionally invalid; this test verifies real IO
+        // adapter routing before envelope validation.
+        await expectLater(
+          api.downloadConfig(),
+          throwsA(HarmonyAccountError.config),
+        );
+        expect(transport.routes, [
+          (path: harmonyConfigPath, route: 'DIRECT'),
+          (path: harmonyConfigPath, route: 'DIRECT'),
+        ]);
+        http.close(force: true);
+      }, transport);
+    },
+  );
+
   test('session validation stays direct during a config proxy retry', () async {
     final transport = _Transport();
     await HttpOverrides.runWithHttpOverrides(() async {

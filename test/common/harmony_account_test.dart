@@ -237,13 +237,15 @@ void main() {
       };
       addTearDown(() => debugPrint = previousDebugPrint);
       final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-      http.httpClientAdapter = Adapter(
-        (request) => throw DioException.connectionError(
+      var attempts = 0;
+      http.httpClientAdapter = Adapter((request) {
+        attempts++;
+        throw DioException.connectionError(
           requestOptions: request,
           reason: 'private-password private-token',
           error: StateError('private-password private-token'),
-        ),
-      );
+        );
+      });
       final api = HarmonyAccountApi(http: http, storage: MemoryStore());
       await expectLater(
         api.login('private-username', 'private-password'),
@@ -255,6 +257,7 @@ void main() {
       expect(diagnostic, isNot(contains('private-username')));
       expect(diagnostic, isNot(contains('private-password')));
       expect(diagnostic, isNot(contains('private-token')));
+      expect(attempts, 1);
     },
   );
 
@@ -601,7 +604,11 @@ void main() {
       'config HTTP $status retains its distinct error classification',
       () async {
         final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-        http.httpClientAdapter = Adapter((_) => jsonBody({}, status));
+        var attempts = 0;
+        http.httpClientAdapter = Adapter((_) {
+          attempts++;
+          return jsonBody({}, status);
+        });
         final api = HarmonyAccountApi(http: http, storage: MemoryStore())
           ..session = HarmonySession(
             'token',
@@ -615,20 +622,128 @@ void main() {
         };
 
         await expectLater(api.downloadConfig(), throwsA(expected));
+        expect(attempts, 1);
       },
     );
   }
 
-  test(
-    'transport errors are unavailable rather than invalid configuration',
-    () async {
+  for (final type in [
+    DioExceptionType.connectionTimeout,
+    DioExceptionType.connectionError,
+  ]) {
+    test('a first config $type recovers without another tap', () async {
+      final messages = <String>[];
+      final previousDebugPrint = debugPrint;
+      debugPrint = (message, {wrapWidth}) {
+        if (message != null) messages.add(message);
+      };
+      addTearDown(() => debugPrint = previousDebugPrint);
+      var attempts = 0;
       final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
-      http.httpClientAdapter = Adapter(
-        (request) => throw DioException(
-          requestOptions: request,
-          type: DioExceptionType.connectionError,
-        ),
+      http.httpClientAdapter = Adapter((request) {
+        expect(request.headers['Authorization'], 'Bearer private-token');
+        expect(request.headers['If-None-Match'], '"installed"');
+        expect(request.headers['If-Modified-Since'], 'old-date');
+        if (++attempts == 1) {
+          throw DioException(
+            requestOptions: request,
+            type: type,
+            message: 'private-password private-config-secret',
+          );
+        }
+        return ResponseBody.fromString('proxies: []', 200);
+      });
+      final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+        ..session = HarmonySession(
+          'private-token',
+          'harmony',
+          DateTime.now().add(const Duration(days: 1)),
+        );
+
+      final download = await api.downloadConfig(
+        ifNoneMatch: '"installed"',
+        ifModifiedSince: 'old-date',
       );
+
+      expect(utf8.decode(download.bytes!), 'proxies: []');
+      expect(attempts, 2);
+      final diagnostic = messages.join('\n');
+      expect(diagnostic, contains('config-retry'));
+      expect(diagnostic, isNot(contains('private-token')));
+      expect(diagnostic, isNot(contains('private-password')));
+      expect(diagnostic, isNot(contains('private-config-secret')));
+    });
+  }
+
+  test('a first version connection timeout retries the same GET', () async {
+    var attempts = 0;
+    final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+    http.httpClientAdapter = Adapter((request) {
+      expect(request.path, harmonyConfigVersionPath);
+      expect(request.method, 'GET');
+      if (++attempts == 1) {
+        throw DioException(
+          requestOptions: request,
+          type: DioExceptionType.connectionTimeout,
+        );
+      }
+      return jsonBody({'version': 'current'});
+    });
+    final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+      ..session = HarmonySession(
+        'token',
+        'harmony',
+        DateTime.now().add(const Duration(days: 1)),
+      );
+
+    expect((await api.fetchConfigVersionInfo())?.version, 'current');
+    expect(attempts, 2);
+  });
+
+  test(
+    'a config body timeout discards partial bytes before retrying',
+    () async {
+      var attempts = 0;
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter((request) {
+        if (++attempts == 1) {
+          final stream = () async* {
+            yield Uint8List.fromList(utf8.encode('partial config'));
+            throw DioException(
+              requestOptions: request,
+              type: DioExceptionType.receiveTimeout,
+            );
+          }();
+          return ResponseBody(stream, 200);
+        }
+        return ResponseBody.fromString('proxies: []', 200);
+      });
+      final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+        ..session = HarmonySession(
+          'token',
+          'harmony',
+          DateTime.now().add(const Duration(days: 1)),
+        );
+
+      final download = await api.downloadConfig();
+
+      expect(utf8.decode(download.bytes!), 'proxies: []');
+      expect(attempts, 2);
+    },
+  );
+
+  for (final type in [
+    DioExceptionType.cancel,
+    DioExceptionType.badCertificate,
+    DioExceptionType.unknown,
+  ]) {
+    test('config $type is not automatically retried', () async {
+      var attempts = 0;
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      http.httpClientAdapter = Adapter((request) {
+        attempts++;
+        throw DioException(requestOptions: request, type: type);
+      });
       final api = HarmonyAccountApi(http: http, storage: MemoryStore())
         ..session = HarmonySession(
           'token',
@@ -640,6 +755,77 @@ void main() {
         api.downloadConfig(),
         throwsA(HarmonyAccountError.unavailable),
       );
+      expect(attempts, 1);
+    });
+  }
+
+  for (final replaceSession in [false, true]) {
+    testWidgets(
+      '${replaceSession ? 'replacing a session' : 'logout'} cancels a scheduled config retry',
+      (tester) async {
+        var attempts = 0;
+        final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+        http.httpClientAdapter = Adapter((request) {
+          attempts++;
+          throw DioException(
+            requestOptions: request,
+            type: DioExceptionType.connectionTimeout,
+          );
+        });
+        final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+          ..session = HarmonySession(
+            'old-token',
+            'harmony',
+            DateTime.now().add(const Duration(days: 1)),
+          );
+        final result = api.downloadConfig().then<Object?>(
+          (value) => value,
+          onError: (Object error) => error,
+        );
+        await tester.pump(Duration.zero);
+        expect(attempts, 1);
+
+        if (replaceSession) {
+          api.session = HarmonySession(
+            'new-token',
+            'other-account',
+            DateTime.now().add(const Duration(days: 1)),
+          );
+        } else {
+          await api.clear();
+        }
+        await tester.pump(const Duration(seconds: 1));
+
+        expect(await result, HarmonyAccountError.expired);
+        expect(attempts, 1);
+      },
+    );
+  }
+
+  test(
+    'transport errors are unavailable rather than invalid configuration',
+    () async {
+      final http = Dio(BaseOptions(baseUrl: 'https://api.example.test'));
+      var attempts = 0;
+      http.httpClientAdapter = Adapter((request) {
+        attempts++;
+        throw DioException(
+          requestOptions: request,
+          type: DioExceptionType.connectionError,
+        );
+      });
+      final api = HarmonyAccountApi(http: http, storage: MemoryStore())
+        ..session = HarmonySession(
+          'token',
+          'harmony',
+          DateTime.now().add(const Duration(days: 1)),
+        );
+
+      await expectLater(
+        api.downloadConfig(),
+        throwsA(HarmonyAccountError.unavailable),
+      );
+      expect(attempts, 2);
     },
   );
 
