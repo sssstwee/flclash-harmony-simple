@@ -6,7 +6,6 @@ import 'package:archive/archive_io.dart';
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -119,13 +118,23 @@ Future<VM2<String, String>> _makeRealProfileTask(
   rawConfig['external-ui'] = '';
   rawConfig['interface-name'] = '';
   rawConfig['external-ui-url'] = '';
-  rawConfig['tcp-concurrent'] = realPatchConfig.tcpConcurrent;
-  rawConfig['unified-delay'] = realPatchConfig.unifiedDelay;
-  rawConfig['ipv6'] = realPatchConfig.ipv6;
-  rawConfig['log-level'] = realPatchConfig.logLevel.name;
+  for (final entry in <String, dynamic>{
+    'tcp-concurrent': realPatchConfig.tcpConcurrent,
+    'unified-delay': realPatchConfig.unifiedDelay,
+    'ipv6': realPatchConfig.ipv6,
+    'log-level': realPatchConfig.logLevel.name,
+    'keep-alive-interval': realPatchConfig.keepAliveInterval,
+    'mode': realPatchConfig.mode.name,
+    'geodata-loader': realPatchConfig.geodataLoader.name,
+    'geox-url': realPatchConfig.geoXUrl.raw,
+    'global-ua': realPatchConfig.globalUa ?? defaultUA,
+  }.entries) {
+    if (!isOhos || !rawConfig.containsKey(entry.key)) {
+      rawConfig[entry.key] = entry.value;
+    }
+  }
   rawConfig['port'] = 0;
   rawConfig['socks-port'] = 0;
-  rawConfig['keep-alive-interval'] = realPatchConfig.keepAliveInterval;
   rawConfig['mixed-port'] = realPatchConfig.mixedPort;
   rawConfig['port'] = realPatchConfig.port;
   rawConfig['socks-port'] = realPatchConfig.socksPort;
@@ -135,7 +144,6 @@ Future<VM2<String, String>> _makeRealProfileTask(
       ? FindProcessMode.off.name
       : realPatchConfig.findProcessMode.name;
   rawConfig['allow-lan'] = realPatchConfig.allowLan;
-  rawConfig['mode'] = realPatchConfig.mode.name;
   if (rawConfig['tun'] == null) {
     rawConfig['tun'] = {};
   }
@@ -145,7 +153,6 @@ Future<VM2<String, String>> _makeRealProfileTask(
   rawConfig['tun']['stack'] = realPatchConfig.tun.stack.name;
   rawConfig['tun']['route-address'] = realPatchConfig.tun.routeAddress;
   rawConfig['tun']['auto-route'] = realPatchConfig.tun.autoRoute;
-  rawConfig['geodata-loader'] = realPatchConfig.geodataLoader.name;
   if (rawConfig['sniffer']?['sniff'] != null) {
     for (final value in (rawConfig['sniffer']?['sniff'] as Map).values) {
       if (value['ports'] != null && value['ports'] is List) {
@@ -188,48 +195,45 @@ Future<VM2<String, String>> _makeRealProfileTask(
     }
   }
   rawConfig['profile']['store-selected'] = false;
-  rawConfig['geox-url'] = realPatchConfig.geoXUrl.raw;
-  rawConfig['global-ua'] = realPatchConfig.globalUa ?? defaultUA;
-  if (rawConfig['hosts'] == null) {
-    rawConfig['hosts'] = {};
-  }
-  for (final host in realPatchConfig.hosts.entries) {
-    rawConfig['hosts'][host.key] = host.value.splitByMultipleSeparators;
-  }
-  if (rawConfig['dns'] == null) {
-    rawConfig['dns'] = {};
-  }
-  final isEnableDns = rawConfig['dns']['enable'] == true;
-  const systemDns = 'system://';
-  if (overrideDns || !isEnableDns) {
-    final dns = switch (!isEnableDns) {
-      true => realPatchConfig.dns.copyWith(
-        nameserver: [...realPatchConfig.dns.nameserver, systemDns],
-      ),
-      false => realPatchConfig.dns,
-    };
-    rawConfig['dns'] = dns.toJson();
-    rawConfig['dns']['nameserver-policy'] = {};
-    for (final entry in dns.nameserverPolicy.entries) {
-      rawConfig['dns']['nameserver-policy'][entry.key] =
-          entry.value.splitByMultipleSeparators;
+  // HarmonyOS executes hosted routing and DNS without local overrides.
+  if (!isOhos) {
+    if (rawConfig['hosts'] == null) {
+      rawConfig['hosts'] = {};
     }
-  }
-  if (appendSystemDns) {
-    final List<String> nameserver = List<String>.from(
-      rawConfig['dns']['nameserver'] ?? [],
-    );
-    if (!nameserver.contains(systemDns)) {
-      rawConfig['dns']['nameserver'] = [...nameserver, systemDns];
+    for (final host in realPatchConfig.hosts.entries) {
+      rawConfig['hosts'][host.key] = host.value.splitByMultipleSeparators;
+    }
+    if (rawConfig['dns'] == null) {
+      rawConfig['dns'] = {};
+    }
+    final isEnableDns = rawConfig['dns']['enable'] == true;
+    const systemDns = 'system://';
+    if (overrideDns || !isEnableDns) {
+      final dns = switch (!isEnableDns) {
+        true => realPatchConfig.dns.copyWith(
+          nameserver: [...realPatchConfig.dns.nameserver, systemDns],
+        ),
+        false => realPatchConfig.dns,
+      };
+      rawConfig['dns'] = dns.toJson();
+      rawConfig['dns']['nameserver-policy'] = {};
+      for (final entry in dns.nameserverPolicy.entries) {
+        rawConfig['dns']['nameserver-policy'][entry.key] =
+            entry.value.splitByMultipleSeparators;
+      }
+    }
+    if (appendSystemDns) {
+      final List<String> nameserver = List<String>.from(
+        rawConfig['dns']['nameserver'] ?? [],
+      );
+      if (!nameserver.contains(systemDns)) {
+        rawConfig['dns']['nameserver'] = [...nameserver, systemDns];
+      }
     }
   }
   List<String> rules = [];
   if (isOhos || data.rules.isEmpty) {
-    if (isOhos) {
-      excludeDirectFromAutomaticGroups(rawConfig);
-      rules = defaultRoutingRules(rawConfig);
-      applyDefaultDns(rawConfig);
-    } else if (rawConfig['rules'] != null) {
+    if (rawConfig['rules'] != null) {
       rules = List<String>.from(rawConfig['rules']);
     }
     if (addedRules.isNotEmpty) {
@@ -271,6 +275,9 @@ Future<VM2<String, String>> _makeRealProfileTask(
     }
   } else {
     rules = data.rules.map((item) => item.rawValue).toList();
+  }
+  if (isOhos && rules.isEmpty) {
+    throw const FormatException('Missing hosted routing rules');
   }
   if (!isOhos && data.proxyGroups.isNotEmpty) {
     rawConfig['proxy-groups'] = data.proxyGroups;

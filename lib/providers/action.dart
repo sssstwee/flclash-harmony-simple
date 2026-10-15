@@ -21,6 +21,9 @@ part 'generated/action.g.dart';
 
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
+  Future<void>? _checkingUpdate;
+  String? _notifiedUpdateTag;
+
   @override
   void build() {}
 
@@ -66,10 +69,30 @@ class CommonAction extends _$CommonAction {
         .getTotalTraffic(onlyStatisticsProxy);
   }
 
-  Future<void> autoCheckUpdate() async {
+  Future<void> autoCheckUpdate({bool retry = false}) async {
+    final pending = _checkingUpdate;
+    if (pending != null) {
+      if (!retry) return;
+      await pending;
+      if (!ref.mounted) return;
+    }
     if (!ref.read(appSettingProvider).autoCheckUpdate) return;
-    final res = await request.checkForUpdate();
-    checkUpdateResultHandle(data: res);
+    final done = Completer<void>();
+    _checkingUpdate = done.future;
+    try {
+      final res = await request.checkForUpdate();
+      if (!ref.mounted ||
+          res == null ||
+          res['tag_name'] == _notifiedUpdateTag ||
+          globalState.navigatorKey.currentContext == null) {
+        return;
+      }
+      _notifiedUpdateTag = res['tag_name'] as String?;
+      await checkUpdateResultHandle(data: res);
+    } finally {
+      _checkingUpdate = null;
+      done.complete();
+    }
   }
 
   Future<void> checkUpdateResultHandle({
@@ -94,7 +117,9 @@ class CommonAction extends _$CommonAction {
           ],
         ),
         confirmText: currentAppLocalizations.goDownload,
-        cancelText: isUser ? null : currentAppLocalizations.noLongerRemind,
+        cancelText: isUser || system.isOhos
+            ? null
+            : currentAppLocalizations.noLongerRemind,
       );
       if (res == true) {
         launchUrl(
@@ -103,7 +128,7 @@ class CommonAction extends _$CommonAction {
               ? LaunchMode.externalApplication
               : LaunchMode.platformDefault,
         );
-      } else if (!isUser && res == false) {
+      } else if (!isUser && !system.isOhos && res == false) {
         ref
             .read(appSettingProvider.notifier)
             .update((state) => state.copyWith(autoCheckUpdate: false));
@@ -132,7 +157,10 @@ class SetupAction extends _$SetupAction {
     final testUrl = ref.read(
       appSettingProvider.select((state) => state.testUrl),
     );
-    return SetupParams(selectedMap: selectedMap, testUrl: testUrl);
+    return SetupParams(
+      selectedMap: system.isOhos ? const {} : selectedMap,
+      testUrl: testUrl,
+    );
   }
 
   void fullSetup() {

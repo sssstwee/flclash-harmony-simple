@@ -105,9 +105,22 @@ class HarmonyRemoteConfig {
     }
   }
 
-  static void _data(Object? value) {
+  static void _data(Object? value, {bool group = false}) {
     if (value is Map) {
       for (final entry in value.entries) {
+        // Health checks are ordinary HTTP requests, not external config/code.
+        if (group && entry.key == 'url') {
+          final uri = entry.value is String
+              ? Uri.tryParse(entry.value as String)
+              : null;
+          if (uri == null ||
+              !uri.hasAuthority ||
+              uri.host.isEmpty ||
+              !{'http', 'https'}.contains(uri.scheme)) {
+            throw const FormatException('Invalid health check URL');
+          }
+          continue;
+        }
         if (entry.key is! String ||
             RegExp(
               r'script|command|external|path|url|provider',
@@ -219,7 +232,15 @@ class HarmonyRemoteConfig {
     _keys(data, {'profile', 'runtime'});
     final profile = Map<String, dynamic>.from(data['profile'] as Map);
     _keys(profile, profileKeys);
-    _data(profile);
+    for (final entry in profile.entries) {
+      if (entry.key == 'proxy-groups' && entry.value is List) {
+        for (final group in entry.value as List) {
+          _data(group, group: true);
+        }
+      } else {
+        _data(entry.value);
+      }
+    }
     _keys(Map<String, dynamic>.from(profile['dns'] as Map), {
       'enable',
       'listen',
@@ -332,6 +353,7 @@ class HarmonyRemoteConfig {
         'timeout',
         'max-failed-times',
         'expected-status',
+        'url',
         'include-all-proxies',
       });
       if (!{

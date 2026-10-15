@@ -4,6 +4,7 @@ import 'package:fl_clash/common/harmony_remote_ui.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -82,12 +83,19 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     final profile = ref.watch(currentProfileProvider);
     final groupName = profile?.currentGroupName;
     if (groupName == null) return null;
-    return profile?.selectedMap[groupName];
+    final node = ref.watch(realSelectedProxyStateProvider(groupName)).proxyName;
+    return node.isEmpty ? null : node;
   }
 
   int? _activeDelay(String? proxyName) {
     if (proxyName == null) return null;
-    return ref.watch(delayProvider(proxyName: proxyName));
+    final groupName = ref.watch(currentProfileProvider)?.currentGroupName;
+    final group = ref.watch(groupsProvider).getGroup(groupName ?? '');
+    final url = group?.testUrl ?? ref.watch(appSettingProvider).testUrl;
+    final groupDelay = ref.watch(
+      delayDataSourceProvider.select((delays) => delays[url]?[groupName]),
+    );
+    return groupDelay ?? ref.watch(delayProvider(proxyName: proxyName));
   }
 
   ConnectionPhase _phase(HarmonySimpleState ui, bool running) {

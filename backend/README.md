@@ -6,7 +6,11 @@ Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/re
 
 ## VPS 推送订阅（D1）
 
-分流策略统一在 `routing-policy.json` 维护；修改后运行 `node tool/generate_routing_policy.mjs`（仓库根目录），生成客户端清单。D1 订阅导入、VPS 推送和下载响应都应用同一策略，HarmonyOS 客户端也会检查 YAML 和 JSON 配置，保留额外的服务端代理域名规则。
+分流策略只在云端维护：`routing-policy.json` 定义域名、节点顺序和 DNS，`src/routing_policy.mjs` 在 D1 订阅导入、VPS 推送和下载响应中统一应用。HarmonyOS 客户端校验并原样执行下发的规则、代理组和 DNS，不再生成分流规则、排序节点或追加本地 DNS。客户端仅覆盖 VPN、监听端口等必要的平台运行参数；连接健康检查不改动代理组选择。
+
+后续调整分流优先只改云端配置或后端策略，不为域名、节点顺序或 DNS 变更发布客户端。仅协议支持、配置解析、必要校验或客户端功能缺陷需要修改客户端。YAML 中的 `harmony-runtime: {}` 继续兼容旧版；新版客户端不会把它视为改写策略的开关。
+
+客户端清理鸿蒙旧版保存的节点选择，不再通过缓存强制覆盖云端代理组。连接健康检查在 VPN 启动后运行并遵循云端 URL 和预期状态码，失败只更新状态，不阻止启动或停止内核；故障切换及恢复由云端代理组执行。配置安装等待应用完成内核初始化，避免重复预热造成竞争；在服务端最小检查间隔内，首次连接复用已在线校验且本地哈希一致的配置，缺失、损坏或过期则重新同步。
 
 国内和内网（含 `100.64.0.0/10`）直连；国内 AI 直连；已知海外 AI、Google、YouTube、GitHub 和开发站点先按域名分流，再判断国内 IP。海外 AI 使用独立 `fallback` 组，依次尝试清单内经过核验的原生节点，然后尝试 WARP。该组只允许已知协议的叶子节点，拒绝链式代理；没有合格节点时使用 `REJECT`，没有本地 `DIRECT` 兜底。AI 健康检查要求 OpenAI `/v1/models` 返回 401（无需 API 密钥），不以普通测速成功作为可用依据。更新节点拓扑时必须重新核验实际出口并维护清单。
 
@@ -58,3 +62,9 @@ WantedBy=timers.target
 ```
 
 执行 `systemctl daemon-reload && systemctl enable --now subscription-push.path subscription-push.timer`。更新程序应原子替换 YAML 文件。备份包含敏感配置，勿公开。
+
+## 登录与客户端更新
+
+登录响应通过 Better Auth 的官方 after hook 附带新建会话的 `session.expiresAt`，客户端继续使用 `set-auth-token` 的签名令牌，可省去紧接登录的一次 `get-session` 往返。旧服务端缺少该字段时，新客户端仍查询会话；恢复已有登录仍在线校验会话。过期或无效的响应不保存凭据。
+
+鸿蒙客户端在启动、返回前台和 VPN 连通后检查 GitHub Releases。同版本号下增加构建号也会提示；启动查询尚未完成时，VPN 连通后的补查会等待后重试。同一版本在本次运行内只提示一次，取消不会关闭后续版本提醒。1502 及更早版本需要手动安装一次 1503 或更新版本以启用提示。

@@ -78,14 +78,6 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: backend/package-lock.json
-      - name: Install routing policy test dependencies
-        run: npm ci --prefix backend
-
       - name: Load pinned gitcode SHAs
         run: grep -v '^#' .github/harmony-pinned-shas.env >> "$GITHUB_ENV"
 
@@ -130,7 +122,6 @@ jobs:
 
       - name: Generate Dart sources
         run: |
-          node tool/generate_routing_policy.mjs --check
           dart format lib/common/atomic_profile.dart lib/common/app_localizations.dart lib/state.dart lib/views/tools.dart test/common/atomic_profile_test.dart lib/common/harmony_account.dart lib/common/auto_proxy.dart lib/providers/harmony_simple.dart lib/providers/action.dart lib/providers/database.dart lib/models/profile.dart lib/views/dashboard/simple.dart test/common/harmony_account_test.dart test/common/auto_proxy_test.dart test/providers/harmony_simple_test.dart test/widgets/simple_dashboard_test.dart test/common/harmony_localization_test.dart test/tool/generate_app_icon_test.dart tool/generate_app_icon.dart
           dart run intl_utils:generate
           dart run build_runner build --delete-conflicting-outputs
@@ -155,6 +146,13 @@ jobs:
         with:
           go-version: '1.26.4'
           cache-dependency-path: core/go.sum
+
+      - name: Test core health checks
+        if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'
+        working-directory: core
+        env:
+          CGO_ENABLED: '0'
+        run: go test -mod=mod -run TestDelayHonorsConfiguredHTTPStatus -count=1 .
 
       - name: Set up HarmonyOS Go
         if: github.head_ref != 'codex/harmony-audit-fixes-github' && github.ref_name != 'codex/harmony-audit-fixes-github'

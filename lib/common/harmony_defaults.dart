@@ -13,7 +13,7 @@ Config harmonyConfigDefaults(Config config) => config.copyWith(
   appSettingProps: defaultAppSettingProps.copyWith(
     disclaimerAccepted: config.appSettingProps.disclaimerAccepted,
     crashlyticsTip: config.appSettingProps.crashlyticsTip,
-    autoCheckUpdate: false,
+    autoCheckUpdate: true,
   ),
   networkProps: defaultNetworkProps,
   vpnProps: defaultVpnProps,
@@ -26,6 +26,7 @@ Config harmonyConfigDefaults(Config config) => config.copyWith(
 );
 
 Profile harmonyProfileDefaults(Profile profile) => profile.copyWith(
+  selectedMap: const {},
   overwriteType: OverwriteType.standard,
   scriptId: null,
   autoUpdate: true,

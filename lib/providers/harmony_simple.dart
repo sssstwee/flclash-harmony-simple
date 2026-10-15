@@ -7,7 +7,6 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/common/auto_proxy.dart';
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/default_routing.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/common/harmony_remote_config.dart';
 import 'package:fl_clash/common/harmony_config_check.dart';
@@ -15,7 +14,6 @@ import 'package:fl_clash/common/harmony_config_freshness.dart';
 import 'package:fl_clash/common/harmony_connect.dart';
 import 'package:fl_clash/common/harmony_home_status.dart';
 import 'package:fl_clash/common/harmony_user_issue.dart';
-import 'package:fl_clash/common/proxy_transport.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/core/core.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -261,6 +259,7 @@ class HarmonySimple extends _$HarmonySimple {
   }
 
   Future<void> onAppResumed() async {
+    unawaited(ref.read(commonActionProvider.notifier).autoCheckUpdate());
     await checkSession();
     if (_api.session != null) {
       unawaited(checkConfigVersion(force: true));
@@ -271,11 +270,21 @@ class HarmonySimple extends _$HarmonySimple {
     if (state.busy || _api.session == null || !ref.read(isStartProvider)) {
       return;
     }
+    final operation = _operation;
+    final token = _api.session!.token;
     try {
-      final ok = await _applyBestRoute(showNoRouteError: false);
-      _recordHealthCheck(ok);
+      final ok = await _checkConfiguredRoute(
+        operation: operation,
+        token: token,
+      );
+      _ensureCurrent(operation, token);
+      if (ref.read(isStartProvider)) _recordHealthCheck(ok);
+    } on _SupersededHarmonyOperation {
+      return;
     } catch (_) {
-      _recordHealthCheck(false);
+      if (ref.mounted && operation == _operation && ref.read(isStartProvider)) {
+        _recordHealthCheck(false);
+      }
     }
   }
 
@@ -426,6 +435,9 @@ class HarmonySimple extends _$HarmonySimple {
     } finally {
       if (ref.mounted && operation == _operation) {
         state = state.copyWith(busy: false, disconnecting: false);
+        if (!running && ref.read(isStartProvider)) {
+          unawaited(reevaluateRoute());
+        }
       }
     }
   }
@@ -435,10 +447,24 @@ class HarmonySimple extends _$HarmonySimple {
     required String token,
   }) async {
     final setup = ref.read(setupActionProvider.notifier);
-    await _syncRemoteProfile(
-      fallbackOnNetworkError: true,
-      operation: operation,
-    );
+    final freshness = state.homeStatus.configFreshness;
+    final checkedAt = freshness.lastCheckedAt;
+    final recentlyVerified =
+        !state.usingCachedConfig &&
+        (freshness.kind == HarmonyConfigFreshnessKind.upToDate ||
+            freshness.kind == HarmonyConfigFreshnessKind.autoUpdated) &&
+        checkedAt != null &&
+        DateTime.now().difference(checkedAt) < _minCheckInterval;
+    final verified = recentlyVerified
+        ? await _verifiedCachedProfile(await _api.readConfigCache())
+        : null;
+    _ensureCurrent(operation, token);
+    if (verified == null || verified.id != state.remoteProfile?.id) {
+      await _syncRemoteProfile(
+        fallbackOnNetworkError: true,
+        operation: operation,
+      );
+    }
     _ensureCurrent(operation, token);
     final profile = state.remoteProfile;
     if (profile == null) {
@@ -457,13 +483,6 @@ class HarmonySimple extends _$HarmonySimple {
         .update((s) => s.copyWith(enable: true));
     await setup.applyProfile(force: true);
     _ensureCurrent(operation, token);
-    final applied = await _applyBestRoute(
-      showNoRouteError: true,
-      operation: operation,
-      token: token,
-    );
-    _ensureCurrent(operation, token);
-    if (!applied) return;
     await setup.updateStatus(true, isInit: true, profileApplied: true);
     _ensureCurrent(operation, token);
     if (!ref.read(isStartProvider)) {
@@ -482,6 +501,9 @@ class HarmonySimple extends _$HarmonySimple {
     _scheduleHealthCheck();
     _scheduleVersionCheck();
     unawaited(checkConfigVersion(force: true));
+    unawaited(
+      ref.read(commonActionProvider.notifier).autoCheckUpdate(retry: true),
+    );
   }
 
   Future<bool> forceRefreshConfig() async {
@@ -658,80 +680,42 @@ class HarmonySimple extends _$HarmonySimple {
     );
   }
 
-  Future<bool> _applyBestRoute({
-    required bool showNoRouteError,
-    int? operation,
-    String? token,
+  Future<bool> _checkConfiguredRoute({
+    required int operation,
+    required String token,
   }) async {
     final profile = state.remoteProfile;
     if (profile == null) return false;
-    final groups = ref.read(groupsProvider);
     final core = ref.read(harmonyCoreControllerProvider);
     final config = await core.getConfig(profile.id);
-    if (operation != null && token != null) {
-      _ensureCurrent(operation, token);
-    }
-    final rules = system.isOhos
-        ? defaultRoutingRules(config)
-        : List<String>.from(config['rules'] ?? const <String>[]);
+    _ensureCurrent(operation, token);
+    final rules = List<String>.from(config['rules'] ?? const <String>[]);
+    final groups = ref.read(groupsProvider);
     final group = connectionGroup(groups, rules);
-    final transportKinds = transportKindsFromConfig(config);
-    final selected = group == null
-        ? null
-        : await autoSelectProxy(
-            group,
-            groups,
-            (name) async {
-              final value = (await core.getDelay(
-                group.testUrl ?? ref.read(appSettingProvider).testUrl,
-                name,
-              )).value;
-              if (operation != null && token != null) {
-                _ensureCurrent(operation, token);
-              }
-              return value;
-            },
-            transportKinds: transportKinds,
-            preferTcpFirst: system.isOhos,
-          );
-    if (operation != null && token != null) {
-      _ensureCurrent(operation, token);
-    }
-    if (selected == null) {
-      if (showNoRouteError) {
-        state = state.copyWith(
-          error: currentAppLocalizations.simpleNoRoute,
-          issue: HarmonyUserIssue.noRoute,
-        );
-      }
-      return false;
-    }
-    final routeKind = selected.usedAutomaticGroup
-        ? HarmonyRouteKind.automaticGroup
-        : selected.preferTcpActive
-        ? HarmonyRouteKind.tcpPreferred
-        : HarmonyRouteKind.manual;
+    if (group == null) return false;
     state = state.copyWith(
       homeStatus: state.homeStatus.copyWith(
-        routeKind: routeKind,
+        routeKind: group.type.isComputedSelected
+            ? HarmonyRouteKind.automaticGroup
+            : HarmonyRouteKind.manual,
         aiGroupName: _aiGroupFromRules(rules),
       ),
     );
-    for (final entry in selected.selections.entries.toList().reversed) {
-      if (operation != null && token != null) {
-        _ensureCurrent(operation, token);
-      }
-      await ref
-          .read(proxiesActionProvider.notifier)
-          .changeProxy(groupName: entry.key, proxyName: entry.value);
-      ref
-          .read(profilesActionProvider.notifier)
-          .updateCurrentSelectedMap(entry.key, entry.value);
-    }
-    ref
-        .read(proxiesActionProvider.notifier)
-        .updateCurrentGroupName(group!.name);
-    return true;
+    ref.read(proxiesActionProvider.notifier).updateCurrentGroupName(group.name);
+    final groupConfig = (config['proxy-groups'] as List? ?? const [])
+        .whereType<Map>()
+        .where((item) => item['name'] == group.name)
+        .firstOrNull;
+    final expectedStatus = groupConfig?['expected-status']?.toString();
+    return probeConfiguredRoute(group, (name) async {
+      final url = group.testUrl ?? ref.read(appSettingProvider).testUrl;
+      final delay = expectedStatus == null
+          ? await core.getDelay(url, name)
+          : await core.getDelay(url, name, expectedStatus: expectedStatus);
+      _ensureCurrent(operation, token);
+      ref.read(proxiesActionProvider.notifier).setDelay(delay);
+      return delay.value;
+    });
   }
 
   String? _aiGroupFromRules(List<String> rules) {
@@ -854,6 +838,15 @@ class HarmonySimple extends _$HarmonySimple {
           download.profileUpdateInterval ??
           profileUpdateIntervalFromYaml(yamlText) ??
           const Duration(hours: 24);
+      // App startup owns the initial core preload. Never race it with restartCore.
+      if (!ref.read(initProvider)) {
+        final ready = Completer<void>();
+        final subscription = ref.listen(initProvider, (_, initialized) {
+          if (initialized && !ready.isCompleted) ready.complete();
+        });
+        await ready.future.whenComplete(subscription.close);
+        _ensureCurrent(op, session.token);
+      }
       await ref.read(coreActionProvider.notifier).tryStartCore();
       _ensureCurrent(op, session.token);
       final target =
@@ -991,7 +984,7 @@ class HarmonySimple extends _$HarmonySimple {
         ),
       );
       if (hotApplyWhenConnected && ref.read(isStartProvider)) {
-        await _applyBestRoute(showNoRouteError: false);
+        unawaited(reevaluateRoute());
       }
     } on HarmonyAccountError catch (error) {
       _ensureCurrent(op, session.token);

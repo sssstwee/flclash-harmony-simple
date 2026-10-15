@@ -88,7 +88,7 @@ final class HarmonySimpleProvider
   }
 }
 
-String _$harmonySimpleHash() => r'05c197600ea8e3d6157e1611966d7798226f5a53';
+String _$harmonySimpleHash() => r'db883db0a7e1354debc395efc6ddb50b1dc3300b';
 
 abstract class _$HarmonySimple extends $Notifier<HarmonySimpleState> {
   HarmonySimpleState build();

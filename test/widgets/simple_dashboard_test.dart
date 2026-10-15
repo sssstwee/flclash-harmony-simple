@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/fixed.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/harmony_account.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
@@ -35,6 +36,18 @@ class SignedOutApi extends HarmonyAccountApi {
 class _EmptyProfiles extends Profiles {
   @override
   List<Profile> build() => [];
+}
+
+class ConnectedHarmonySimple extends IdleHarmonySimple {
+  @override
+  HarmonySimpleState build() => HarmonySimpleState(
+    bootstrapping: false,
+    session: HarmonySession(
+      'fixture-token',
+      'alice',
+      DateTime.now().add(const Duration(days: 1)),
+    ),
+  );
 }
 
 class RemoteHarmonySimple extends IdleHarmonySimple {
@@ -112,6 +125,51 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
   }
+
+  testWidgets(
+    'connected home shows the core node and configured group latency',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            harmonySimpleProvider.overrideWith(ConnectedHarmonySimple.new),
+            initProvider.overrideWithValue(true),
+            isStartProvider.overrideWithValue(true),
+            currentProfileProvider.overrideWithValue(
+              const Profile(
+                id: 7,
+                currentGroupName: 'Cloud',
+                autoUpdateDuration: Duration(hours: 24),
+              ),
+            ),
+            groupsProvider.overrideWithBuild(
+              (_, _) => [
+                const Group(
+                  name: 'Cloud',
+                  type: GroupType.Fallback,
+                  now: 'Configured node',
+                  testUrl: 'https://example.test',
+                  all: [Proxy(name: 'Configured node', type: 'Vless')],
+                ),
+              ],
+            ),
+            delayDataSourceProvider.overrideWithBuild(
+              (_, _) => {
+                'https://example.test': {'Cloud': 123},
+              },
+            ),
+            totalTrafficProvider.overrideWithValue(const Traffic()),
+            trafficsProvider.overrideWithValue(FixedList(0)),
+          ],
+          child: app(const SimpleDashboardView()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Configured node'), findsOneWidget);
+      expect(find.textContaining('123'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('cached remote announcement and copy override local defaults', (
     tester,
