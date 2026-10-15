@@ -511,14 +511,17 @@ class HarmonySimple extends _$HarmonySimple {
     );
   }
 
-  Future<bool> forceRefreshConfig() async {
+  Future<bool> forceRefreshConfig({
+    Map<String, String> messages = const {},
+  }) async {
     if (_api.session == null || state.busy) return false;
     final now = DateTime.now();
     if (_manualRefreshInFlight) return false;
     if (_lastManualRefreshAt != null &&
         now.difference(_lastManualRefreshAt!) < _manualRefreshDebounce) {
       globalState.showNotifier(
-        currentAppLocalizations.harmonyConfigRefreshDebounced,
+        messages['debounced'] ??
+            currentAppLocalizations.harmonyConfigRefreshDebounced,
       );
       return false;
     }
@@ -537,7 +540,8 @@ class HarmonySimple extends _$HarmonySimple {
       );
       ok = true;
       globalState.showNotifier(
-        currentAppLocalizations.harmonyConfigRefreshSuccess,
+        messages['success'] ??
+            currentAppLocalizations.harmonyConfigRefreshSuccess,
       );
     } on HarmonyAccountError catch (error) {
       if (error == HarmonyAccountError.expired) {
@@ -545,13 +549,15 @@ class HarmonySimple extends _$HarmonySimple {
       } else {
         _markConfigCheckFailed(error);
         globalState.showNotifier(
-          currentAppLocalizations.harmonyConfigRefreshFailed,
+          messages['failed'] ??
+              currentAppLocalizations.harmonyConfigRefreshFailed,
         );
       }
     } catch (_) {
       _markConfigCheckFailed(HarmonyAccountError.unavailable);
       globalState.showNotifier(
-        currentAppLocalizations.harmonyConfigRefreshFailed,
+        messages['failed'] ??
+            currentAppLocalizations.harmonyConfigRefreshFailed,
       );
     } finally {
       _manualRefreshInFlight = false;

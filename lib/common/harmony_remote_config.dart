@@ -14,6 +14,7 @@ class HarmonyRemoteConfig {
     'hosts',
   };
   static const textKeys = {
+    'homeTitle',
     'ready',
     'running',
     'connecting',
@@ -24,6 +25,24 @@ class HarmonyRemoteConfig {
     'retry',
     'logout',
     'harmonyAccount',
+    'harmonyAccountValue',
+    'harmonyLatencyValue',
+    'harmonySpeedValue',
+    'harmonyConfigRefreshSuccess',
+    'harmonyConfigRefreshFailed',
+    'harmonyConfigRefreshDebounced',
+    'harmonyRouteLabel',
+    'harmonyAiRoutingLabel',
+    'network',
+    'harmonyHealthLabel',
+    'harmonyCredentialsError',
+    'harmonySessionExpired',
+    'harmonyRateLimited',
+    'harmonyServiceError',
+    'harmonyConfigError',
+    'simpleConnectFailed',
+    'harmonyConfigCheckReasonOffline',
+    'harmonyConfigCheckReasonRateLimit',
     'harmonyAiRoutingHint',
     'harmonyAutoReconnectOff',
     'harmonyAutoReconnectOn',
@@ -89,6 +108,18 @@ class HarmonyRemoteConfig {
     'simpleReady',
     'simpleRunning',
   };
+  static const homeSections = [
+    'announcement',
+    'connection',
+    'config',
+    'issue',
+    'node',
+    'insights',
+    'traffic',
+    'account',
+  ];
+  static const homeDetails = ['route', 'ai', 'network', 'health'];
+  static const homeMaxBytes = 64 * 1024;
   final String version;
   final String minClientVersion;
   final Map<String, dynamic> profile;
@@ -152,15 +183,18 @@ class HarmonyRemoteConfig {
       'defaults',
       'features',
       'parameters',
+      'home',
     });
     final announcement = runtime['announcement'];
     if (announcement != null &&
-        (announcement is! String || announcement.length > 4096)) {
+        (announcement is! String || announcement.runes.length > 4096)) {
       throw const FormatException('Invalid announcement');
     }
     final texts = Map<String, dynamic>.from(runtime['texts'] as Map? ?? {});
     _keys(texts, textKeys);
-    if (texts.values.any((text) => text is! String || text.length > 256)) {
+    if (texts.values.any(
+      (text) => text is! String || text.runes.length > 256,
+    )) {
       throw const FormatException('Invalid text');
     }
     for (final section in ['defaults', 'features']) {
@@ -186,7 +220,44 @@ class HarmonyRemoteConfig {
         throw const FormatException('Invalid interval');
       }
     }
+    final home = runtime['home'];
+    if (home != null) {
+      if (home is! Map) throw const FormatException('Invalid home layout');
+      final layout = Map<String, dynamic>.from(home);
+      _keys(layout, {'sections', 'details'});
+      for (final entry in layout.entries) {
+        final choices = entry.key == 'sections' ? homeSections : homeDetails;
+        final values = entry.value;
+        if (values is! List ||
+            values.any(
+              (value) => value is! String || !choices.contains(value),
+            ) ||
+            values.toSet().length != values.length ||
+            (entry.key == 'sections' && !values.contains('connection'))) {
+          throw const FormatException('Invalid home layout');
+        }
+      }
+    }
     return runtime;
+  }
+
+  /// Homepage display is independent of the private proxy configuration.
+  static Map<String, dynamic> decodeHome(Object? value) {
+    if (value is! Map || utf8.encode(jsonEncode(value)).length > homeMaxBytes) {
+      throw const FormatException('Invalid home configuration');
+    }
+    final document = Map<String, dynamic>.from(value);
+    _keys(document, {'schemaVersion', 'announcement', 'texts', 'home'});
+    if (document.remove('schemaVersion') != 1) {
+      throw const FormatException('Unsupported home schema');
+    }
+    if ((document.containsKey('announcement') &&
+            document['announcement'] is! String) ||
+        (document.containsKey('texts') && document['texts'] is! Map) ||
+        (document.containsKey('home') && document['home'] is! Map)) {
+      throw const FormatException('Invalid home configuration');
+    }
+    return validateRuntime(document);
   }
 
   static List<int> _version(String value) {

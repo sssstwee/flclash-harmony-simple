@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/harmony_remote_ui.dart';
+import 'package:fl_clash/providers/harmony_home_display.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:fl_clash/common/common.dart';
@@ -27,6 +28,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   final _username = TextEditingController();
   final _password = TextEditingController();
   Timer? _sessionTimer;
+  Timer? _homeTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
   List<ConnectivityResult>? _lastConnectivity;
 
@@ -36,12 +38,18 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
       ref.read(harmonySimpleProvider.notifier).bootstrap();
     });
     _sessionTimer = Timer.periodic(
       const Duration(minutes: 15),
       (_) => ref.read(harmonySimpleProvider.notifier).checkSession(),
     );
+    _homeTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+        unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
+      }
+    });
     _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
       if (_lastConnectivity != null && listEquals(_lastConnectivity, results)) {
         return;
@@ -58,6 +66,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     WidgetsBinding.instance.removeObserver(this);
     _connectivitySub?.cancel();
     _sessionTimer?.cancel();
+    _homeTimer?.cancel();
     _username.dispose();
     _password.dispose();
     super.dispose();
@@ -66,6 +75,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(ref.read(harmonyHomeDisplayProvider.notifier).refresh());
       unawaited(ref.read(harmonySimpleProvider.notifier).onAppResumed());
     }
   }
@@ -122,9 +132,26 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
     final nodeDelay = _activeDelay(nodeName);
     final phase = _phase(ui, running);
     final features = ui.remoteRuntime['features'] as Map? ?? {};
+    final refreshMessages = {
+      'debounced': remoteHarmonyText(
+        ref,
+        'harmonyConfigRefreshDebounced',
+        texts.harmonyConfigRefreshDebounced,
+      ),
+      'success': remoteHarmonyText(
+        ref,
+        'harmonyConfigRefreshSuccess',
+        texts.harmonyConfigRefreshSuccess,
+      ),
+      'failed': remoteHarmonyText(
+        ref,
+        'harmonyConfigRefreshFailed',
+        texts.harmonyConfigRefreshFailed,
+      ),
+    };
 
     return CommonScaffold(
-      title: appDisplayName,
+      title: remoteHarmonyText(ref, 'homeTitle', appDisplayName),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -150,9 +177,18 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                   configFreshness: ui.homeStatus.configFreshness,
                   onConfigRefresh: features['manualRefresh'] == false
                       ? null
-                      : () => ref
-                            .read(harmonySimpleProvider.notifier)
-                            .forceRefreshConfig(),
+                      : () {
+                          unawaited(
+                            ref
+                                .read(harmonyHomeDisplayProvider.notifier)
+                                .refresh(force: true),
+                          );
+                          unawaited(
+                            ref
+                                .read(harmonySimpleProvider.notifier)
+                                .forceRefreshConfig(messages: refreshMessages),
+                          );
+                        },
                 )
               : AutofillGroup(
                   child: Form(
@@ -259,7 +295,7 @@ class _SimpleDashboardViewState extends ConsumerState<SimpleDashboardView>
                         if (ui.error != null) ...[
                           const SizedBox(height: 16),
                           Text(
-                            ui.error!,
+                            remoteHarmonyError(ref, texts, ui.error!),
                             textAlign: TextAlign.center,
                             style: TextStyle(color: context.colorScheme.error),
                           ),

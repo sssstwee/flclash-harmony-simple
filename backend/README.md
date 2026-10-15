@@ -10,6 +10,8 @@ Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/re
 
 安装包默认由 GitHub Actions 从 `main` 手动构建和上传，本机仅进行测试和静态检查；推送、PR 和临时分支仅运行验证。每次打包仍须先获得用户授权。
 
+首页显示使用独立 [JSON 文件](homepage/home.json)，可配置所有首页文案及现有区块的显示、隐藏和顺序。发布后客户端独立同步，不触发 VPN 或线路重载；使用方式见 [首页配置说明](homepage/README.md)。`GET /v1/home` 仅提供公开显示数据，原登录和私有订阅接口的鉴权保持不变。
+
 ## VPS 推送订阅（D1）
 
 VPS 上的完整 YAML 订阅文件是分流配置的来源。电脑直接订阅该文件，文件监听任务将同一份内容推送到 Worker，手机登录后从 Worker 下载。推送和导入时保留订阅已有 AI 组及成员顺序，移除其中名称包含 WARP 的成员；动态 `use` / `include-all*` 成员由 Mihomo 原生 `exclude-filter` 排除 WARP，并保留原有过滤条件。没有静态成员或可用动态来源的 AI 组会拒绝写入。仅将国内兜底规则之后的已有 AI 规则提前到该兜底之前，其他优先级不变；没有国内兜底时保留规则顺序。不会补充新的 AI 节点或回退成员，其余规则、代理组和 DNS 由订阅决定。`applyRoutingPolicy` 仅供离线迁移使用。

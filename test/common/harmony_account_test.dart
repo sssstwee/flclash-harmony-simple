@@ -6,6 +6,7 @@ import 'package:fl_clash/common/harmony_account.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MemoryStore extends HarmonySessionStore {
   String? token;
@@ -226,6 +227,56 @@ ResponseBody jsonBody(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final suffix in ['', '/']) {
+    test(
+      'public homepage JSON keeps the VPS prefix and does not send the session$suffix',
+      () async {
+        final http = Dio(
+          BaseOptions(baseUrl: 'https://api.example.test/api$suffix'),
+        );
+        http.httpClientAdapter = Adapter((request) {
+          expect(request.uri.path, '/api/v1/home');
+          expect(request.headers['Authorization'], isNull);
+          expect(request.headers['If-None-Match'], '"ui-current"');
+          return ResponseBody.fromString('', 304);
+        });
+        final api = HarmonyAccountApi(http: http, storage: MemoryStore());
+        api.session = HarmonySession(
+          'private-token',
+          'fixture-user',
+          DateTime.now().add(const Duration(days: 1)),
+        );
+        expect(
+          (await api.fetchHomeDisplay(etag: '"ui-current"')).statusCode,
+          304,
+        );
+        expect(api.session?.token, 'private-token');
+      },
+    );
+  }
+
+  test(
+    'public homepage cache is separate from credentials and survives logout',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      addTearDown(() => SharedPreferences.setMockInitialValues({}));
+      final storage = MemoryStore()..token = 'private-token';
+      final api = HarmonyAccountApi(storage: storage);
+      await api.writeHomeDisplayCache('{"document":{"schemaVersion":1}}');
+      await api.clear();
+      expect(await storage.read(), isNull);
+      expect(
+        await api.readHomeDisplayCache(),
+        '{"document":{"schemaVersion":1}}',
+      );
+      final brokenKeystoreApi = HarmonyAccountApi(storage: FailingStore());
+      expect(
+        await brokenKeystoreApi.readHomeDisplayCache(),
+        '{"document":{"schemaVersion":1}}',
+      );
+    },
+  );
 
   for (final suffix in ['', '/']) {
     for (final versionStatus in [200, 404]) {

@@ -10,6 +10,8 @@ import 'package:fl_clash/common/harmony_config_freshness.dart';
 import 'package:fl_clash/common/harmony_home_status.dart';
 import 'package:fl_clash/common/harmony_theme.dart';
 import 'package:fl_clash/common/harmony_user_issue.dart';
+import 'package:fl_clash/common/harmony_remote_config.dart';
+import 'package:fl_clash/providers/harmony_home_display.dart';
 import 'package:fl_clash/views/dashboard/widgets/simple_connection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -76,6 +78,17 @@ class IdleHarmonySimple extends HarmonySimple {
   Future<void> checkSession() async {}
 }
 
+class StaticHomeDisplay extends HarmonyHomeDisplay {
+  StaticHomeDisplay([this.runtime = const {}]);
+  final Map<String, dynamic> runtime;
+
+  @override
+  Map<String, dynamic> build() => runtime;
+
+  @override
+  Future<void> refresh({bool force = false}) async {}
+}
+
 Finder get primaryConnectionControl =>
     find.byKey(const Key('harmony_primary_connect'));
 
@@ -108,11 +121,18 @@ Widget app(
   home: Scaffold(body: child),
 );
 
-Widget scoped({required Widget child, required SignedOutApi api}) {
+Widget scoped({
+  required Widget child,
+  required SignedOutApi api,
+  Map<String, dynamic> homeRuntime = const {},
+}) {
   return ProviderScope(
     key: UniqueKey(),
     overrides: [
       harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
+      harmonyHomeDisplayProvider.overrideWith(
+        () => StaticHomeDisplay(homeRuntime),
+      ),
       harmonyAccountApiProvider.overrideWithValue(api),
       profilesProvider.overrideWith(_EmptyProfiles.new),
       initProvider.overrideWithValue(true),
@@ -172,6 +192,26 @@ void main() {
     expect(find.text('服务暂时不可用'), findsNothing);
     await tester.pumpWidget(const SizedBox());
   });
+
+  testWidgets(
+    'homepage title and login copy can be changed without a new screen implementation',
+    (tester) async {
+      await tester.pumpWidget(
+        scoped(
+          api: SignedOutApi(),
+          homeRuntime: HarmonyRemoteConfig.decodeHome({
+            'schemaVersion': 1,
+            'texts': {'homeTitle': '我的 CC保镖', 'harmonyLoginHint': '登录后开启连接保护'},
+          }),
+          child: app(const SimpleDashboardView()),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('我的 CC保镖'), findsOneWidget);
+      expect(find.text('登录后开启连接保护'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('home follows system appearance and keeps brand contrast', (
     tester,
@@ -235,6 +275,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            harmonyHomeDisplayProvider.overrideWith(StaticHomeDisplay.new),
             harmonySimpleProvider.overrideWith(ConnectedHarmonySimple.new),
             initProvider.overrideWithValue(true),
             isStartProvider.overrideWithValue(true),
@@ -297,9 +338,115 @@ void main() {
     expect(find.text('远程服务公告'), findsOneWidget);
     expect(find.text('远程就绪文案'), findsOneWidget);
     expect(find.text('退出远程账户'), findsOneWidget);
-    expect(find.text('线路加速'), findsOneWidget);
-    expect(find.textContaining('AI 网站'), findsNothing);
-    expect(find.textContaining('AI服务'), findsNothing);
+    expect(find.text('线路加速'), findsNothing);
+    expect(find.text('AI 网站将走「🤖 AI服务」分组'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('homepage JSON controls native blocks, copy and order', (
+    tester,
+  ) async {
+    var toggles = 0;
+    final runtime = HarmonyRemoteConfig.decodeHome({
+      'schemaVersion': 1,
+      'announcement': 'Hidden announcement',
+      'texts': {
+        'simpleReady': '轻点盾牌，开始保护',
+        'harmonySessionTraffic': '保护流量',
+        'harmonyConfigFreshUnknown': '线路更新状态',
+        'harmonyLogout': '退出账号',
+      },
+      'home': {
+        'sections': ['connection', 'traffic', 'config', 'account'],
+      },
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
+          harmonyHomeDisplayProvider.overrideWith(
+            () => StaticHomeDisplay(runtime),
+          ),
+          totalTrafficProvider.overrideWithValue(const Traffic()),
+          trafficsProvider.overrideWithValue(FixedList(0)),
+        ],
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.disconnected,
+            username: 'alice',
+            onToggle: () => toggles++,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('轻点盾牌，开始保护'), findsOneWidget);
+    expect(find.text('保护流量'), findsOneWidget);
+    expect(find.text('退出账号'), findsOneWidget);
+    expect(find.text('当前节点'), findsNothing);
+    expect(find.text('连接说明'), findsNothing);
+    expect(find.text('Hidden announcement'), findsNothing);
+    expect(
+      tester.getTopLeft(find.text('保护流量')).dy,
+      lessThan(tester.getTopLeft(find.text('线路更新状态')).dy),
+    );
+    await tester.tap(primaryConnectionControl);
+    expect(toggles, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('remote templates keep live version and time values', (
+    tester,
+  ) async {
+    final runtime = HarmonyRemoteConfig.decodeHome({
+      'schemaVersion': 1,
+      'texts': {
+        'harmonyConfigFreshUpToDate': '配置 {version} · {time}',
+        'harmonyHealthCheckOk': '连接正常（{time}）',
+        'network': '当前网络',
+        'harmonyRouteLabel': '保护线路',
+      },
+      'home': {
+        'details': ['network', 'route', 'health'],
+      },
+    });
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          harmonySimpleProvider.overrideWith(IdleHarmonySimple.new),
+          harmonyHomeDisplayProvider.overrideWith(
+            () => StaticHomeDisplay(runtime),
+          ),
+          totalTrafficProvider.overrideWithValue(const Traffic()),
+          trafficsProvider.overrideWithValue(FixedList(0)),
+        ],
+        child: app(
+          SimpleConnectionPanel(
+            phase: ConnectionPhase.connected,
+            username: 'alice',
+            configFreshness: HarmonyConfigFreshness(
+              kind: HarmonyConfigFreshnessKind.upToDate,
+              versionShort: 'abcdef12',
+              lastCheckedAt: DateTime(2026, 10, 16, 1, 2),
+            ),
+            homeStatus: HarmonyHomeStatus(
+              routeKind: HarmonyRouteKind.automaticGroup,
+              networkKind: HarmonyNetworkKind.wifi,
+              lastHealthCheckAt: DateTime(2026, 10, 16, 1, 3),
+              lastHealthCheckOk: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('配置 abcdef12 · 01:02'), findsOneWidget);
+    expect(find.text('连接正常（01:03）'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('当前网络')).dy,
+      lessThan(tester.getTopLeft(find.text('保护线路')).dy),
+    );
+    expect(find.textContaining('{time}'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

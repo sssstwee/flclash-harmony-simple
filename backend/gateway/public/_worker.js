@@ -9,6 +9,7 @@ const SECURITY_HEADERS = {
 function isAllowedPath(pathname) {
   if (
     pathname === '/health' ||
+    pathname === '/v1/home' ||
     pathname === '/v1/config' ||
     pathname === '/v1/config/version'
   ) {
