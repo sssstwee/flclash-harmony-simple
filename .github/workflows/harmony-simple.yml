@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: harmony-simple-${{ github.ref }}
-  cancel-in-progress: true
+  group: harmony-simple-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
@@ -211,4 +211,62 @@ jobs:
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
+
+  release:
+    needs: [build]
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: cc-bodyguard-HarmonyOS-${{ github.sha }}
+          path: release-input
+
+      - name: Prepare verified release assets
+        id: release
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^version: //p' pubspec.yaml)"
+          TAG="v$VERSION"
+          TAG_REFS="$(git ls-remote --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}")"
+          if [[ -n "$TAG_REFS" ]]; then
+            TAG_COMMIT="$(tail -n 1 <<< "$TAG_REFS" | cut -f 1)"
+            if [[ "$TAG_COMMIT" != "$GITHUB_SHA" ]]; then
+              echo "::error::Release version already belongs to another commit; bump pubspec.yaml before building."
+              exit 1
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          cd release-input
+          sha256sum --check SHA256SUMS
+          mkdir ../release
+          cp -- *.hap ../release/
+          for APP in *.app; do
+            zip -q -j "../release/$APP.zip" "$APP"
+          done
+          cd ../release
+          sha256sum -- *.hap *.app.zip > SHA256SUMS
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3.0.3
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: CC保镖 ${{ steps.release.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          body: |
+            GitHub Actions 构建：https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            HAP 为原始未签名安装包，真机安装需要使用包含设备 UDID 的证书和 Profile 签名。
+          files: |
+            release/*.hap
+            release/*.app.zip
+            release/SHA256SUMS
 
