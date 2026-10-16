@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: harmony-simple-${{ github.ref }}
-  cancel-in-progress: true
+  group: harmony-simple-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
