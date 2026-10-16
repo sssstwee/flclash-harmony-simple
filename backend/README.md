@@ -8,7 +8,7 @@ Download the HAP from [Releases](https://github.com/sssstwee/xiaomao-ai-proxy/re
 
 客户端默认通过 `https://69.17.3.174:8444/api` 访问 VPS HTTPS 反向代理，再由 VPS 转发到 Cloudflare。账号校验、会话和配置存储仍在 Worker / D1。VPS 转发需移除入口的 `/api` 前缀，客户端必须保留该前缀拼接登录、配置和版本接口。
 
-安装包默认由 GitHub Actions 从 `main` 手动构建和上传，本机仅进行测试和静态检查；推送、PR 和临时分支仅运行验证。每次打包仍须先获得用户授权。
+安装包默认由 GitHub Actions 从 `main` 手动构建，成功后自动发布到 GitHub Releases（HAP、APP ZIP 和 SHA256SUMS），并保留 Actions 产物。发布任务可单独重试，补发时复用已有产物。本机仅进行测试和静态检查；推送、PR 和临时分支仅运行验证。每次打包仍须先获得用户授权。
 
 首页显示使用独立 [JSON 文件](homepage/home.json)，可配置所有首页文案及现有区块的显示、隐藏和顺序。发布后客户端独立同步，不触发 VPN 或线路重载；使用方式见 [首页配置说明](homepage/README.md)。`GET /v1/home` 仅提供公开显示数据，原登录和私有订阅接口的鉴权保持不变。
 
